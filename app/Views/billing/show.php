@@ -75,32 +75,77 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
       <div class="form-group"><label>EV Model Name</label><input class="form-control" name="vehicle_model" value="<?= e($bill['vehicle_model'] ?? '') ?>"></div>
       <div class="form-group"><label>EV Model Type</label><input class="form-control" name="vehicle_model_type" value="<?= e($bill['vehicle_model_type'] ?? '') ?>"></div>
       <div class="form-group"><label>Model Color</label><input class="form-control" name="color" value="<?= e($bill['color'] ?? '') ?>"></div>
-      <div class="form-group"><label>Chassis No.</label><input class="form-control" name="chassis_no" value="<?= e($bill['chassis_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Motor No.</label><input class="form-control" name="motor_no" value="<?= e($bill['motor_no'] ?? '') ?>"></div>
-      <?php
-        $warrantyOpts = ['6 months', '12 months', '18 months', '24 months', '36 months', 'N/A'];
-        $wEdit = static function (string $name, ?string $current) use ($warrantyOpts): void {
-            $current = (string)($current ?? '');
-            echo '<select class="form-control" name="' . e($name) . '">';
-            echo '<option value="">Select</option>';
-            foreach ($warrantyOpts as $opt) {
-                $sel = $opt === $current ? ' selected' : '';
-                echo '<option value="' . e($opt) . '"' . $sel . '>' . e($opt) . '</option>';
-            }
-            if ($current !== '' && !in_array($current, $warrantyOpts, true)) {
-                echo '<option value="' . e($current) . '" selected>' . e($current) . '</option>';
-            }
-            echo '</select>';
-        };
-      ?>
-      <div class="form-group"><label>Motor Warrenty</label><?php $wEdit('motor_warranty', $bill['motor_warranty'] ?? null); ?></div>
-      <div class="form-group"><label>Battery Type &amp; No.</label><input class="form-control" name="battery_type_no" value="<?= e($bill['battery_type_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Battery Warrenty</label><?php $wEdit('battery_warranty', $bill['battery_warranty'] ?? null); ?></div>
-      <div class="form-group"><label>Controller No.</label><input class="form-control" name="controller_no" value="<?= e($bill['controller_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Controller Warrenty</label><?php $wEdit('controller_warranty', $bill['controller_warranty'] ?? null); ?></div>
-      <div class="form-group"><label>Charger No.</label><input class="form-control" name="charger_no" value="<?= e($bill['charger_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Charger Warrenty</label><?php $wEdit('charger_warranty', $bill['charger_warranty'] ?? null); ?></div>
-      <div class="form-group"><label>H.P. Name</label><input class="form-control" name="hp_name" value="<?= e($bill['hp_name'] ?? '') ?>"></div>
+    </div>
+
+    <?php
+      $warrantyOpts = ['6 months', '12 months', '18 months', '24 months', '36 months', 'N/A'];
+      $wEdit = static function (string $name, ?string $current) use ($warrantyOpts): void {
+          $current = (string)($current ?? '');
+          echo '<select class="form-control" name="' . e($name) . '">';
+          echo '<option value="">Select warranty</option>';
+          foreach ($warrantyOpts as $opt) {
+              $sel = $opt === $current ? ' selected' : '';
+              echo '<option value="' . e($opt) . '"' . $sel . '>' . e($opt) . '</option>';
+          }
+          if ($current !== '' && !in_array($current, $warrantyOpts, true)) {
+              echo '<option value="' . e($current) . '" selected>' . e($current) . '</option>';
+          }
+          echo '</select>';
+      };
+    ?>
+    <style>
+      .ow-parts{display:flex;flex-direction:column;gap:.7rem;margin:1rem 0}
+      .ow-block{border:1px solid var(--border);border-radius:12px;padding:.75rem .85rem;background:#f8fffd}
+      .ow-block h4{margin:0 0 .65rem;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#0f766e}
+      .ow-block .form-grid{gap:.65rem}
+      .ow-block.chassis{background:#fff}
+    </style>
+    <h4 style="margin:1rem 0 .35rem;font-size:.95rem;">Parts &amp; warranty</h4>
+    <p class="muted" style="margin:0 0 .65rem;font-size:0.82rem;">Each part has its own number and warranty — fill one block at a time.</p>
+    <div class="ow-parts">
+      <div class="ow-block chassis">
+        <h4>Chassis</h4>
+        <div class="form-grid">
+          <div class="form-group full"><label>Chassis No.</label><input class="form-control" name="chassis_no" value="<?= e($bill['chassis_no'] ?? '') ?>"></div>
+        </div>
+      </div>
+      <div class="ow-block">
+        <h4>Motor</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Motor No.</label><input class="form-control" name="motor_no" value="<?= e($bill['motor_no'] ?? '') ?>"></div>
+          <div class="form-group"><label>Warranty</label><?php $wEdit('motor_warranty', $bill['motor_warranty'] ?? null); ?></div>
+        </div>
+      </div>
+      <div class="ow-block">
+        <h4>Battery</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Battery Type &amp; No.</label><input class="form-control" name="battery_type_no" value="<?= e($bill['battery_type_no'] ?? '') ?>"></div>
+          <div class="form-group"><label>Warranty</label><?php $wEdit('battery_warranty', $bill['battery_warranty'] ?? null); ?></div>
+        </div>
+      </div>
+      <div class="ow-block">
+        <h4>Controller</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Controller No.</label><input class="form-control" name="controller_no" value="<?= e($bill['controller_no'] ?? '') ?>"></div>
+          <div class="form-group"><label>Warranty</label><?php $wEdit('controller_warranty', $bill['controller_warranty'] ?? null); ?></div>
+        </div>
+      </div>
+      <div class="ow-block">
+        <h4>Charger</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Charger No.</label><input class="form-control" name="charger_no" value="<?= e($bill['charger_no'] ?? '') ?>"></div>
+          <div class="form-group"><label>Warranty</label><?php $wEdit('charger_warranty', $bill['charger_warranty'] ?? null); ?></div>
+        </div>
+      </div>
+      <div class="ow-block chassis">
+        <h4>Finance (optional)</h4>
+        <div class="form-grid">
+          <div class="form-group full"><label>H.P. Name</label><input class="form-control" name="hp_name" value="<?= e($bill['hp_name'] ?? '') ?>"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-grid">
       <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" name="loan_amount" value="<?= e((string)($bill['loan_amount'] ?? '0')) ?>"></div>
       <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" name="discount_amount" value="<?= e((string)($bill['discount_amount'] ?? '0')) ?>"></div>
       <div class="form-group"><label>PM E-DRIVE (₹)</label><input class="form-control" type="number" step="0.01" name="pm_drive_incentive" value="<?= e((string)($bill['pm_drive_incentive'] ?? '0')) ?>"></div>

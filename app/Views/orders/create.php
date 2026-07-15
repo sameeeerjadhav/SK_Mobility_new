@@ -134,31 +134,74 @@ foreach ($variants as $vv) {
     </div>
 
     <div class="card" style="margin-bottom:0.85rem;">
-      <h3 class="card-title">3. Vehicle serials (printed on tax invoice)</h3>
-      <div class="form-grid">
-        <?php
-          $warrantyOpts = ['6 months', '12 months', '18 months', '24 months', '36 months', 'N/A'];
-          $wSelect = static function (string $name, string $default = '12 months') use ($warrantyOpts): void {
-              echo '<select class="form-control" name="' . e($name) . '" required>';
-              echo '<option value="">Select</option>';
-              foreach ($warrantyOpts as $opt) {
-                  $sel = $opt === $default ? ' selected' : '';
-                  echo '<option value="' . e($opt) . '"' . $sel . '>' . e($opt) . '</option>';
-              }
-              echo '</select>';
-          };
-        ?>
-        <div class="form-group full"><label>Chassis No. *</label><input class="form-control" name="chassis_no" required></div>
-        <div class="form-group"><label>Motor No. *</label><input class="form-control" name="motor_no" required></div>
-        <div class="form-group"><label>Motor Warrenty *</label><?php $wSelect('motor_warranty', '12 months'); ?></div>
-        <div class="form-group"><label>Battery Type *</label><input class="form-control" name="battery_capacity" x-model="batteryType" placeholder="e.g. Lithium 60V" required></div>
-        <div class="form-group"><label>Battery No. *</label><input class="form-control" name="battery_no" required></div>
-        <div class="form-group"><label>Battery Warrenty *</label><?php $wSelect('battery_warranty', '36 months'); ?></div>
-        <div class="form-group"><label>Controller No. *</label><input class="form-control" name="controller_no" required></div>
-        <div class="form-group"><label>Controller Warrenty *</label><?php $wSelect('controller_warranty', '12 months'); ?></div>
-        <div class="form-group"><label>Charger No. *</label><input class="form-control" name="charger_no" required></div>
-        <div class="form-group"><label>Charger Warrenty *</label><?php $wSelect('charger_warranty', '12 months'); ?></div>
-        <div class="form-group"><label>H.P. Name (Finance)</label><input class="form-control" name="hp_name"></div>
+      <h3 class="card-title">3. Parts &amp; warranty (printed on tax invoice)</h3>
+      <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">Each part has its own number and warranty — fill one block at a time.</p>
+      <?php
+        $warrantyOpts = ['6 months', '12 months', '18 months', '24 months', '36 months', 'N/A'];
+        $wSelect = static function (string $name, string $default = '12 months') use ($warrantyOpts): void {
+            echo '<select class="form-control" name="' . e($name) . '" required>';
+            echo '<option value="">Select warranty</option>';
+            foreach ($warrantyOpts as $opt) {
+                $sel = $opt === $default ? ' selected' : '';
+                echo '<option value="' . e($opt) . '"' . $sel . '>' . e($opt) . '</option>';
+            }
+            echo '</select>';
+        };
+      ?>
+      <style>
+        .ow-parts{display:flex;flex-direction:column;gap:.7rem}
+        .ow-block{border:1px solid var(--border);border-radius:12px;padding:.75rem .85rem;background:#f8fffd}
+        .ow-block h4{margin:0 0 .65rem;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#0f766e}
+        .ow-block .form-grid{gap:.65rem}
+        .ow-block.chassis{background:#fff}
+      </style>
+      <div class="ow-parts">
+        <div class="ow-block chassis">
+          <h4>Chassis</h4>
+          <div class="form-grid">
+            <div class="form-group full"><label>Chassis No. *</label><input class="form-control" name="chassis_no" required></div>
+          </div>
+        </div>
+
+        <div class="ow-block">
+          <h4>Motor</h4>
+          <div class="form-grid">
+            <div class="form-group"><label>Motor No. *</label><input class="form-control" name="motor_no" required></div>
+            <div class="form-group"><label>Warranty *</label><?php $wSelect('motor_warranty', '12 months'); ?></div>
+          </div>
+        </div>
+
+        <div class="ow-block">
+          <h4>Battery</h4>
+          <div class="form-grid">
+            <div class="form-group"><label>Battery Type *</label><input class="form-control" name="battery_capacity" x-model="batteryType" placeholder="e.g. Lithium 60V" required></div>
+            <div class="form-group"><label>Battery No. *</label><input class="form-control" name="battery_no" required></div>
+            <div class="form-group"><label>Warranty *</label><?php $wSelect('battery_warranty', '36 months'); ?></div>
+          </div>
+        </div>
+
+        <div class="ow-block">
+          <h4>Controller</h4>
+          <div class="form-grid">
+            <div class="form-group"><label>Controller No. *</label><input class="form-control" name="controller_no" required></div>
+            <div class="form-group"><label>Warranty *</label><?php $wSelect('controller_warranty', '12 months'); ?></div>
+          </div>
+        </div>
+
+        <div class="ow-block">
+          <h4>Charger</h4>
+          <div class="form-grid">
+            <div class="form-group"><label>Charger No. *</label><input class="form-control" name="charger_no" required></div>
+            <div class="form-group"><label>Warranty *</label><?php $wSelect('charger_warranty', '12 months'); ?></div>
+          </div>
+        </div>
+
+        <div class="ow-block chassis">
+          <h4>Finance (optional)</h4>
+          <div class="form-grid">
+            <div class="form-group full"><label>H.P. Name</label><input class="form-control" name="hp_name" placeholder="Hire purchase / finance partner"></div>
+          </div>
+        </div>
       </div>
     </div>
 
