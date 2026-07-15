@@ -68,14 +68,31 @@ class VehicleController extends Controller
 
         $variants = $this->db()->prepare('SELECT * FROM vehicle_variants WHERE vehicle_id = ? ORDER BY id DESC');
         $variants->execute([$vehicleId]);
-        $images = $this->db()->prepare('SELECT * FROM vehicle_images WHERE vehicle_id = ? ORDER BY is_primary DESC, sort_order');
+        $variants = $variants->fetchAll();
+
+        $images = $this->db()->prepare(
+            'SELECT * FROM vehicle_images WHERE vehicle_id = ? ORDER BY is_primary DESC, sort_order, id'
+        );
         $images->execute([$vehicleId]);
+        $allImages = $images->fetchAll();
+
+        $vehicleImages = [];
+        $imagesByVariant = [];
+        foreach ($allImages as $img) {
+            $vid = $img['variant_id'] !== null && $img['variant_id'] !== '' ? (int)$img['variant_id'] : null;
+            if ($vid) {
+                $imagesByVariant[$vid][] = $img;
+            } else {
+                $vehicleImages[] = $img;
+            }
+        }
 
         $this->view('vehicles/show', [
             'title' => $vehicle['name'],
             'vehicle' => $vehicle,
-            'variants' => $variants->fetchAll(),
-            'images' => $images->fetchAll(),
+            'variants' => $variants,
+            'images' => $vehicleImages,
+            'imagesByVariant' => $imagesByVariant,
             'canManage' => can('manage_vehicles'),
             'categories' => $this->db()->query('SELECT * FROM vehicle_categories WHERE is_active = 1')->fetchAll(),
         ]);
@@ -249,7 +266,7 @@ class VehicleController extends Controller
 
         $this->db()->prepare('DELETE FROM inventory_movements WHERE variant_id = ?')->execute([$variantId]);
         $this->db()->prepare('DELETE FROM inventory WHERE variant_id = ?')->execute([$variantId]);
-        $this->db()->prepare('UPDATE vehicle_images SET variant_id = NULL WHERE variant_id = ?')->execute([$variantId]);
+        $this->db()->prepare('DELETE FROM vehicle_images WHERE variant_id = ?')->execute([$variantId]);
         $this->db()->prepare('DELETE FROM vehicle_variants WHERE id = ? AND vehicle_id = ?')->execute([$variantId, $vehicleId]);
 
         Audit::log('delete', 'vehicles', 'vehicle_variants', $variantId);
@@ -262,19 +279,64 @@ class VehicleController extends Controller
         require_permission('manage_vehicles');
         $this->validateCsrf();
         $vehicleId = (int)$id;
+        $variantId = (int)$this->input('variant_id');
+        if ($variantId > 0) {
+            $check = $this->db()->prepare('SELECT id FROM vehicle_variants WHERE id = ? AND vehicle_id = ?');
+            $check->execute([$variantId, $vehicleId]);
+            if (!$check->fetch()) {
+                flash('error', 'Invalid variant.');
+                $this->redirect('/vehicles/' . $vehicleId);
+            }
+        } else {
+            $variantId = null;
+        }
+
         $path = Upload::store($_FILES['image'] ?? [], 'vehicles', ['jpg', 'jpeg', 'png', 'gif', 'webp']);
         if (!$path) {
             flash('error', 'Image upload failed.');
             $this->redirect('/vehicles/' . $vehicleId);
         }
+
         $isPrimary = isset($_POST['is_primary']) ? 1 : 0;
         if ($isPrimary) {
-            $this->db()->prepare('UPDATE vehicle_images SET is_primary = 0 WHERE vehicle_id = ?')->execute([$vehicleId]);
+            if ($variantId) {
+                $this->db()->prepare(
+                    'UPDATE vehicle_images SET is_primary = 0 WHERE vehicle_id = ? AND variant_id = ?'
+                )->execute([$vehicleId, $variantId]);
+            } else {
+                $this->db()->prepare(
+                    'UPDATE vehicle_images SET is_primary = 0 WHERE vehicle_id = ? AND variant_id IS NULL'
+                )->execute([$vehicleId]);
+            }
         }
+
         $this->db()->prepare(
-            'INSERT INTO vehicle_images (vehicle_id, image_url, is_primary) VALUES (?,?,?)'
-        )->execute([$vehicleId, $path, $isPrimary]);
-        flash('success', 'Image uploaded.');
+            'INSERT INTO vehicle_images (vehicle_id, variant_id, image_url, is_primary) VALUES (?,?,?,?)'
+        )->execute([$vehicleId, $variantId, $path, $isPrimary]);
+
+        Audit::log('create', 'vehicles', 'vehicle_images', (int)$this->db()->lastInsertId());
+        flash('success', $variantId ? 'Variant image uploaded.' : 'Vehicle image uploaded.');
+        $this->redirect('/vehicles/' . $vehicleId);
+    }
+
+    public function destroyImage(string $id, string $imageId): void
+    {
+        require_permission('manage_vehicles');
+        $this->validateCsrf();
+        $vehicleId = (int)$id;
+        $imgId = (int)$imageId;
+
+        $stmt = $this->db()->prepare('SELECT * FROM vehicle_images WHERE id = ? AND vehicle_id = ?');
+        $stmt->execute([$imgId, $vehicleId]);
+        $img = $stmt->fetch();
+        if (!$img) {
+            flash('error', 'Image not found.');
+            $this->redirect('/vehicles/' . $vehicleId);
+        }
+
+        $this->db()->prepare('DELETE FROM vehicle_images WHERE id = ?')->execute([$imgId]);
+        Audit::log('delete', 'vehicles', 'vehicle_images', $imgId);
+        flash('success', 'Image deleted.');
         $this->redirect('/vehicles/' . $vehicleId);
     }
 }

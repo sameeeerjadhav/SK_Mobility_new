@@ -63,6 +63,7 @@ $router->post('/vehicles', [VehicleController::class, 'store'], ['require_auth']
 $router->post('/vehicles/{id}/variants/{vid}/delete', [VehicleController::class, 'destroyVariant'], ['require_auth']);
 $router->post('/vehicles/{id}/variants/{vid}', [VehicleController::class, 'updateVariant'], ['require_auth']);
 $router->post('/vehicles/{id}/variants', [VehicleController::class, 'addVariant'], ['require_auth']);
+$router->post('/vehicles/{id}/images/{imageId}/delete', [VehicleController::class, 'destroyImage'], ['require_auth']);
 $router->post('/vehicles/{id}/images', [VehicleController::class, 'uploadImage'], ['require_auth']);
 $router->post('/vehicles/{id}/delete', [VehicleController::class, 'destroy'], ['require_auth']);
 $router->post('/vehicles/{id}', [VehicleController::class, 'update'], ['require_auth']);
