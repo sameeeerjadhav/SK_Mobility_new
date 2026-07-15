@@ -4,6 +4,8 @@ public/uploads/vehicles/*
 !public/uploads/vehicles/.gitkeep
 public/uploads/dealer-documents/*
 !public/uploads/dealer-documents/.gitkeep
+public/uploads/expenses/*
+!public/uploads/expenses/.gitkeep
 *.log
 .DS_Store
 Thumbs.db

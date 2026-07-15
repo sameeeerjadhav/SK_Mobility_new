@@ -1,12 +1,24 @@
 <?php
 
+use App\Controllers\AdminController;
 use App\Controllers\AuthController;
 use App\Controllers\BillingController;
 use App\Controllers\DashboardController;
 use App\Controllers\DealerController;
+use App\Controllers\ExpenseController;
+use App\Controllers\FinanceController;
+use App\Controllers\HrController;
+use App\Controllers\InventoryController;
+use App\Controllers\LeadController;
+use App\Controllers\NotificationController;
 use App\Controllers\OrderController;
+use App\Controllers\PartnerController;
 use App\Controllers\PaymentController;
 use App\Controllers\ProfileController;
+use App\Controllers\ReportController;
+use App\Controllers\SearchController;
+use App\Controllers\ServiceController;
+use App\Controllers\SparePartController;
 use App\Controllers\VehicleController;
 use App\Core\Router;
 
@@ -19,12 +31,20 @@ $router->post('/login', [AuthController::class, 'login']);
 $router->get('/logout', [AuthController::class, 'logout']);
 $router->get('/dealers/register', [DealerController::class, 'showRegister']);
 $router->post('/dealers/register', [DealerController::class, 'register']);
+$router->post('/leads/capture', [LeadController::class, 'capture']);
 
-// Auth required
+// Auth
 $router->get('/dashboard', [DashboardController::class, 'index'], ['require_auth']);
 $router->get('/profile', [ProfileController::class, 'index'], ['require_auth']);
 $router->post('/profile', [ProfileController::class, 'update'], ['require_auth']);
 $router->post('/profile/password', [ProfileController::class, 'changePassword'], ['require_auth']);
+$router->get('/search', [SearchController::class, 'index'], ['require_auth']);
+
+// Notifications
+$router->get('/notifications', [NotificationController::class, 'index'], ['require_auth']);
+$router->get('/notifications/unread-count', [NotificationController::class, 'unreadCount'], ['require_auth']);
+$router->post('/notifications/read-all', [NotificationController::class, 'markAllRead'], ['require_auth']);
+$router->post('/notifications/{id}/read', [NotificationController::class, 'markRead'], ['require_auth']);
 
 // Dealers
 $router->get('/dealers', [DealerController::class, 'index'], ['require_auth']);
@@ -55,9 +75,80 @@ $router->post('/payments', [PaymentController::class, 'store'], ['require_auth']
 
 // Billing
 $router->get('/billing', [BillingController::class, 'index'], ['require_auth']);
-$router->get('/billing/{id}', [BillingController::class, 'show'], ['require_auth']);
+$router->post('/billing/warranty', [BillingController::class, 'createWarranty'], ['require_auth']);
 $router->get('/billing/{id}/preview', [BillingController::class, 'preview'], ['require_auth']);
 $router->get('/billing/{id}/pdf', [BillingController::class, 'pdf'], ['require_auth']);
-$router->post('/billing/warranty', [BillingController::class, 'createWarranty'], ['require_auth']);
+$router->get('/billing/{id}', [BillingController::class, 'show'], ['require_auth']);
+
+// Inventory
+$router->get('/inventory', [InventoryController::class, 'index'], ['require_auth']);
+$router->post('/inventory/adjust', [InventoryController::class, 'adjust'], ['require_auth']);
+$router->post('/inventory/transfer', [InventoryController::class, 'transfer'], ['require_auth']);
+
+// Leads
+$router->get('/leads', [LeadController::class, 'index'], ['require_auth']);
+$router->post('/leads', [LeadController::class, 'store'], ['require_auth']);
+$router->post('/leads/{id}/status', [LeadController::class, 'updateStatus'], ['require_auth']);
+$router->post('/leads/{id}/followups', [LeadController::class, 'addFollowup'], ['require_auth']);
+
+// Services
+$router->get('/services', [ServiceController::class, 'index'], ['require_auth']);
+$router->post('/services', [ServiceController::class, 'store'], ['require_auth']);
+$router->post('/services/technicians', [ServiceController::class, 'technicians'], ['require_auth']);
+$router->get('/services/{id}', [ServiceController::class, 'show'], ['require_auth']);
+$router->post('/services/{id}/job-cards', [ServiceController::class, 'createJobCard'], ['require_auth']);
+$router->post('/job-cards/{id}', [ServiceController::class, 'updateJobCard'], ['require_auth']);
+
+// Spare parts
+$router->get('/spare-parts', [SparePartController::class, 'index'], ['require_auth']);
+$router->post('/spare-parts', [SparePartController::class, 'store'], ['require_auth']);
+$router->post('/spare-parts/usage', [SparePartController::class, 'usage'], ['require_auth']);
+$router->post('/spare-parts/{id}', [SparePartController::class, 'update'], ['require_auth']);
+$router->post('/spare-parts/{id}/delete', [SparePartController::class, 'destroy'], ['require_auth']);
+
+// HR
+$router->get('/hr', [HrController::class, 'index'], ['require_auth']);
+$router->post('/hr/employees', [HrController::class, 'storeEmployee'], ['require_auth']);
+$router->post('/hr/employees/{id}', [HrController::class, 'updateEmployee'], ['require_auth']);
+$router->post('/hr/employees/{id}/delete', [HrController::class, 'deleteEmployee'], ['require_auth']);
+$router->post('/hr/salaries', [HrController::class, 'storeSalary'], ['require_auth']);
+$router->post('/hr/salaries/{id}/delete', [HrController::class, 'deleteSalary'], ['require_auth']);
+
+// Partners
+$router->get('/partners', [PartnerController::class, 'index'], ['require_auth']);
+$router->post('/partners', [PartnerController::class, 'store'], ['require_auth']);
+$router->post('/partners/{id}', [PartnerController::class, 'update'], ['require_auth']);
+$router->post('/partners/{id}/delete', [PartnerController::class, 'destroy'], ['require_auth']);
+$router->post('/partner-transactions', [PartnerController::class, 'storeTransaction'], ['require_auth']);
+$router->post('/partner-transactions/{id}/delete', [PartnerController::class, 'deleteTransaction'], ['require_auth']);
+
+// Expenses
+$router->get('/expenses', [ExpenseController::class, 'index'], ['require_auth']);
+$router->post('/expenses', [ExpenseController::class, 'store'], ['require_auth']);
+$router->post('/expenses/categories', [ExpenseController::class, 'storeCategory'], ['require_auth']);
+$router->post('/expenses/categories/{id}/delete', [ExpenseController::class, 'deleteCategory'], ['require_auth']);
+$router->post('/expenses/{id}', [ExpenseController::class, 'update'], ['require_auth']);
+$router->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy'], ['require_auth']);
+
+// Finance
+$router->get('/finance', [FinanceController::class, 'index'], ['require_auth']);
+$router->post('/finance/bank-accounts', [FinanceController::class, 'storeAccount'], ['require_auth']);
+$router->post('/finance/bank-accounts/{id}', [FinanceController::class, 'updateAccount'], ['require_auth']);
+$router->post('/finance/bank-accounts/{id}/delete', [FinanceController::class, 'deleteAccount'], ['require_auth']);
+$router->post('/finance/loans', [FinanceController::class, 'storeLoan'], ['require_auth']);
+$router->post('/finance/loans/{id}', [FinanceController::class, 'updateLoan'], ['require_auth']);
+$router->post('/finance/loans/{id}/delete', [FinanceController::class, 'deleteLoan'], ['require_auth']);
+
+// Reports
+$router->get('/reports', [ReportController::class, 'index'], ['require_auth']);
+$router->get('/reports/export/{type}', [ReportController::class, 'export'], ['require_auth']);
+
+// Admin
+$router->get('/admin', [AdminController::class, 'index'], ['require_auth']);
+$router->post('/admin/users', [AdminController::class, 'storeUser'], ['require_auth']);
+$router->post('/admin/users/{id}', [AdminController::class, 'updateUser'], ['require_auth']);
+$router->post('/admin/users/{id}/toggle', [AdminController::class, 'toggleUser'], ['require_auth']);
+$router->post('/admin/roles/{id}/permissions', [AdminController::class, 'updateRolePermissions'], ['require_auth']);
+$router->post('/admin/settings/{key}', [AdminController::class, 'updateSetting'], ['require_auth']);
 
 return $router;

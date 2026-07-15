@@ -61,19 +61,25 @@ Ensure these are writable:
 
 **Change this password immediately** after first login (Profile → Change password).
 
-## Features delivered (Phase 1–2)
+## Features delivered
 
-- Auth (session login/logout, profile, change password)
-- RBAC (roles + permissions)
-- Audit logging
-- Dealers (public register, approve/reject, documents, KPIs)
-- Vehicles (CRUD, variants, images)
-- Orders (dealer + customer, GST 28%, subsidies, auto-bill)
-- Payments (record + summaries; Razorpay keys stub in `.env`)
-- Billing (list, preview/print, PDF download via printable HTML; Dompdf if `vendor/` present)
-- Dashboards (admin KPIs + MoM trends + charts; dealer/service views)
+### Phase 1–2
+- Auth, RBAC, audit logs
+- Dealers, Vehicles, Orders (GST + auto-bill), Payments, Billing PDF, Dashboards
 
-Phases 3–6 (inventory, leads, services, HR, etc.) are schema-ready; nav shows “soon”.
+### Phase 3–6
+- Inventory (warehouses, adjust, transfer)
+- Leads CRM (funnel, status, follow-ups)
+- Services + job cards + technicians
+- Spare parts + usage
+- HR employees & salaries
+- Partners & transactions
+- Office expenses & categories
+- Finance (bank accounts & loans)
+- Admin panel (users, roles/permissions, audit logs, settings)
+- Reports export (CSV)
+- Notifications + 60s unread polling
+- Global header search (orders, dealers, vehicles, leads)
 
 ## PDF invoices
 

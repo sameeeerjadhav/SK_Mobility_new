@@ -25,6 +25,7 @@ body {
 
 a { color: var(--primary); text-decoration: none; }
 a:hover { color: var(--primary-dark); }
+[x-cloak] { display: none !important; }
 
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar {
