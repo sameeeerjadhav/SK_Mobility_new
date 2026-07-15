@@ -620,8 +620,8 @@ table.data tbody tr:last-child td { border-bottom: 0; }
 
 .vehicle-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.9rem;
 }
 .vh-card {
   display: block;
@@ -629,18 +629,19 @@ table.data tbody tr:last-child td { border-bottom: 0; }
   text-decoration: none;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  box-shadow: none;
+  transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease), border-color 0.15s;
 }
 .vh-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  border-color: #b6e4de;
   color: inherit;
 }
 .vh-card-media {
-  aspect-ratio: 16 / 11;
+  aspect-ratio: 16 / 10;
   background: linear-gradient(145deg, #ccfbf1, #f0fdfa);
   overflow: hidden;
 }
@@ -653,24 +654,24 @@ table.data tbody tr:last-child td { border-bottom: 0; }
 .vh-card-empty {
   width: 100%;
   height: 100%;
-  min-height: 150px;
+  min-height: 130px;
   display: grid;
   place-items: center;
   color: #0f766e;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
-.vh-card-body { padding: 0.9rem 1rem 1.05rem; }
+.vh-card-body { padding: 0.7rem 0.85rem 0.85rem; }
 .vh-card-cat {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
 }
 .vh-card h3 {
-  margin: 0.3rem 0 0.55rem;
-  font-size: 1.05rem;
+  margin: 0.2rem 0 0.45rem;
+  font-size: 0.98rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.25;
@@ -684,32 +685,12 @@ table.data tbody tr:last-child td { border-bottom: 0; }
 .vh-card-price {
   font-weight: 800;
   color: var(--primary-dark);
-  font-size: 0.98rem;
+  font-size: 0.92rem;
 }
 .vh-card-vars {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   color: var(--muted);
-}
-.vehicle-card {
-  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease) !important;
-}
-.vehicle-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md) !important;
-}
-.vehicle-card img {
-  width: 100%;
-  height: 168px;
-  object-fit: cover;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #ccfbf1, #f0faf8);
-}
-.vehicle-card h3 {
-  margin: 0.85rem 0 0.3rem;
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
 }
 .muted { color: var(--muted); }
 
