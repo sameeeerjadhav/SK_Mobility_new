@@ -1,4 +1,4 @@
-<div x-data="{ empOpen: false, salOpen: false }">
+<div x-data="{ empOpen: false, salOpen: false, editEmp: null }">
   <div class="toolbar">
     <div><h1 class="page-title">HR Management</h1><p class="page-sub">Employees & payroll</p></div>
     <div style="display:flex;gap:0.5rem;">
@@ -50,8 +50,9 @@
         <td><?= e($e['designation'] ?? '—') ?></td>
         <td><?= money($e['basic_salary']) ?></td>
         <td><?= status_chip($e['status']) ?></td>
-        <td>
-          <form method="post" action="<?= url('hr/employees/'.$e['id'].'/delete') ?>" onsubmit="return confirm('Delete employee?')">
+        <td style="white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" type="button" @click='editEmp = <?= json_encode($e, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
+          <form method="post" action="<?= url('hr/employees/'.$e['id'].'/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete employee?')">
             <?= csrf_field() ?><button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
@@ -78,6 +79,33 @@
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-outline" @click="empOpen=false">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
     </form></div>
+  </div>
+
+  <div class="modal-backdrop" :class="{open:!!editEmp}" @click.self="editEmp=null" x-show="editEmp" x-cloak>
+    <div class="modal" x-show="editEmp">
+      <form method="post" :action="'<?= url('hr/employees') ?>/'+editEmp?.id">
+        <?= csrf_field() ?>
+        <div class="modal-header"><h3 class="modal-title">Edit Employee</h3></div>
+        <div class="modal-body form-grid">
+          <div class="form-group"><label>First name</label><input class="form-control" name="first_name" :value="editEmp?.first_name" required></div>
+          <div class="form-group"><label>Last name</label><input class="form-control" name="last_name" :value="editEmp?.last_name" required></div>
+          <div class="form-group"><label>Email</label><input class="form-control" name="email" :value="editEmp?.email"></div>
+          <div class="form-group"><label>Phone</label><input class="form-control" name="phone" :value="editEmp?.phone"></div>
+          <div class="form-group"><label>Department</label><input class="form-control" name="department" :value="editEmp?.department"></div>
+          <div class="form-group"><label>Designation</label><input class="form-control" name="designation" :value="editEmp?.designation"></div>
+          <div class="form-group"><label>Joining date</label><input class="form-control" type="date" name="date_of_joining" :value="editEmp?.date_of_joining"></div>
+          <div class="form-group"><label>Basic salary</label><input class="form-control" type="number" step="0.01" name="basic_salary" :value="editEmp?.basic_salary" required></div>
+          <div class="form-group"><label>Status</label>
+            <select class="form-control" name="status" :value="editEmp?.status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="terminated">Terminated</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline" @click="editEmp=null">Cancel</button><button class="btn btn-primary" type="submit">Update</button></div>
+      </form>
+    </div>
   </div>
 
   <div class="modal-backdrop" :class="{open:salOpen}" @click.self="salOpen=false">

@@ -49,6 +49,8 @@ $router->post('/notifications/{id}/read', [NotificationController::class, 'markR
 // Dealers
 $router->get('/dealers', [DealerController::class, 'index'], ['require_auth']);
 $router->post('/dealers', [DealerController::class, 'store'], ['require_auth']);
+$router->post('/dealers/{id}', [DealerController::class, 'update'], ['require_auth']);
+$router->post('/dealers/{id}/delete', [DealerController::class, 'destroy'], ['require_auth']);
 $router->get('/dealers/{id}', [DealerController::class, 'show'], ['require_auth']);
 $router->post('/dealers/{id}/approve', [DealerController::class, 'approve'], ['require_auth']);
 $router->post('/dealers/{id}/documents', [DealerController::class, 'uploadDocument'], ['require_auth']);
@@ -84,6 +86,9 @@ $router->get('/billing/{id}', [BillingController::class, 'show'], ['require_auth
 $router->get('/inventory', [InventoryController::class, 'index'], ['require_auth']);
 $router->post('/inventory/adjust', [InventoryController::class, 'adjust'], ['require_auth']);
 $router->post('/inventory/transfer', [InventoryController::class, 'transfer'], ['require_auth']);
+$router->post('/inventory/warehouses', [InventoryController::class, 'storeWarehouse'], ['require_auth']);
+$router->post('/inventory/warehouses/{id}', [InventoryController::class, 'updateWarehouse'], ['require_auth']);
+$router->post('/inventory/warehouses/{id}/delete', [InventoryController::class, 'deleteWarehouse'], ['require_auth']);
 
 // Leads
 $router->get('/leads', [LeadController::class, 'index'], ['require_auth']);

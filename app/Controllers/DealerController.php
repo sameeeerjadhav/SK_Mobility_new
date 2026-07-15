@@ -136,6 +136,38 @@ class DealerController extends Controller
         $this->redirect('/dealers');
     }
 
+    public function update(string $id): void
+    {
+        require_permission('manage_dealers');
+        $this->validateCsrf();
+        $dealerId = (int)$id;
+        $this->db()->prepare(
+            'UPDATE dealers SET business_name=?, contact_person=?, email=?, phone=?, gst_number=?, pan_number=? WHERE id=?'
+        )->execute([
+            $this->input('business_name'),
+            $this->input('contact_person'),
+            $this->input('email'),
+            $this->input('phone'),
+            $this->input('gst_number'),
+            $this->input('pan_number'),
+            $dealerId,
+        ]);
+        Audit::log('update', 'dealers', 'dealers', $dealerId);
+        flash('success', 'Dealer updated.');
+        $this->redirect('/dealers/' . $dealerId);
+    }
+
+    public function destroy(string $id): void
+    {
+        require_permission('manage_dealers');
+        $this->validateCsrf();
+        $dealerId = (int)$id;
+        $this->db()->prepare("UPDATE dealers SET status = 'suspended' WHERE id = ?")->execute([$dealerId]);
+        Audit::log('delete', 'dealers', 'dealers', $dealerId);
+        flash('success', 'Dealer suspended.');
+        $this->redirect('/dealers');
+    }
+
     public function show(string $id): void
     {
         require_permission('manage_dealers');

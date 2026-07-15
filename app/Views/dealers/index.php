@@ -41,6 +41,7 @@
             <td><?= money($d['total_revenue']) ?></td>
             <td style="white-space:nowrap;">
               <a class="btn btn-sm btn-outline" href="<?= url('dealers/' . $d['id']) ?>">View</a>
+              <a class="btn btn-sm btn-outline" href="<?= url('dealers/' . $d['id']) ?>#edit">Edit</a>
               <?php if ($d['status'] === 'pending'): ?>
                 <form method="post" action="<?= url('dealers/' . $d['id'] . '/approve') ?>" style="display:inline;">
                   <?= csrf_field() ?>

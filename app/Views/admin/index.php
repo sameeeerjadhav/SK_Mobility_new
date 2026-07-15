@@ -1,4 +1,4 @@
-<div x-data="{ userOpen: false, roleEdit: null }">
+<div x-data="{ userOpen: false, roleEdit: null, editUser: null }">
   <h1 class="page-title">Admin Panel</h1>
   <p class="page-sub">Users, roles & audit logs</p>
   <div class="tabs">
@@ -94,7 +94,15 @@
           <td><span class="chip chip-primary"><?= e($u['role_name']) ?></span></td>
           <td><?= status_chip($u['is_active'] ? 'active' : 'inactive') ?></td>
           <td><?= india_datetime($u['last_login_at']) ?></td>
-          <td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-sm btn-outline" type="button" @click='editUser = <?= json_encode([
+              "id" => (int)$u["id"],
+              "first_name" => $u["first_name"],
+              "last_name" => $u["last_name"],
+              "phone" => $u["phone"],
+              "role_slug" => $u["role_slug"],
+              "is_active" => (int)$u["is_active"],
+            ], JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
             <form method="post" action="<?= url('admin/users/'.$u['id'].'/toggle') ?>" style="display:inline;">
               <?= csrf_field() ?><button class="btn btn-sm btn-outline" type="submit"><?= $u['is_active']?'Deactivate':'Activate' ?></button>
             </form>
@@ -120,6 +128,32 @@
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-outline" @click="userOpen=false">Cancel</button><button class="btn btn-primary" type="submit">Create</button></div>
       </form></div>
+    </div>
+
+    <div class="modal-backdrop" :class="{open:!!editUser}" @click.self="editUser=null" x-show="editUser" x-cloak>
+      <div class="modal" x-show="editUser">
+        <form method="post" :action="'<?= url('admin/users') ?>/'+editUser?.id">
+          <?= csrf_field() ?>
+          <div class="modal-header"><h3 class="modal-title">Edit User</h3></div>
+          <div class="modal-body form-grid">
+            <div class="form-group"><label>First name</label><input class="form-control" name="first_name" :value="editUser?.first_name" required></div>
+            <div class="form-group"><label>Last name</label><input class="form-control" name="last_name" :value="editUser?.last_name" required></div>
+            <div class="form-group"><label>Phone</label><input class="form-control" name="phone" :value="editUser?.phone"></div>
+            <div class="form-group"><label>Role</label>
+              <select class="form-control" name="role_slug" :value="editUser?.role_slug">
+                <?php foreach ($roles as $r): ?><option value="<?= e($r['slug']) ?>"><?= e($r['name']) ?></option><?php endforeach; ?>
+              </select>
+            </div>
+            <div class="form-group"><label>Active</label>
+              <select class="form-control" name="is_active" :value="String(editUser?.is_active)">
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline" @click="editUser=null">Cancel</button><button class="btn btn-primary" type="submit">Update</button></div>
+        </form>
+      </div>
     </div>
   <?php endif; ?>
 </div>

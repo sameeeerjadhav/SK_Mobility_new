@@ -1,4 +1,4 @@
-<div x-data="{ partnerOpen: false, txOpen: false }">
+<div x-data="{ partnerOpen: false, txOpen: false, editPartner: null }">
   <div class="toolbar">
     <div><h1 class="page-title">Partners</h1><p class="page-sub">Vendors & transactions</p></div>
     <div style="display:flex;gap:0.5rem;">
@@ -21,8 +21,9 @@
             <td><?= e($p['name']) ?></td>
             <td><span class="chip chip-info"><?= e(ucfirst($p['type'])) ?></span></td>
             <td><?= e($p['contact_person'] ?? '—') ?><div class="muted" style="font-size:0.75rem;"><?= e($p['phone'] ?? '') ?></div></td>
-            <td>
-              <form method="post" action="<?= url('partners/'.$p['id'].'/delete') ?>" onsubmit="return confirm('Delete?')">
+            <td style="white-space:nowrap;">
+              <button class="btn btn-sm btn-outline" type="button" @click='editPartner = <?= json_encode($p, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
+              <form method="post" action="<?= url('partners/'.$p['id'].'/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete?')">
                 <?= csrf_field() ?><button class="btn btn-sm btn-danger" type="submit">Delete</button>
               </form>
             </td>
@@ -71,6 +72,35 @@
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-outline" @click="partnerOpen=false">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
     </form></div>
+  </div>
+
+  <div class="modal-backdrop" :class="{open:!!editPartner}" @click.self="editPartner=null" x-show="editPartner" x-cloak>
+    <div class="modal" x-show="editPartner">
+      <form method="post" :action="'<?= url('partners') ?>/'+editPartner?.id">
+        <?= csrf_field() ?>
+        <div class="modal-header"><h3 class="modal-title">Edit Partner</h3></div>
+        <div class="modal-body form-grid">
+          <div class="form-group"><label>Name</label><input class="form-control" name="name" :value="editPartner?.name" required></div>
+          <div class="form-group"><label>Type</label>
+            <select class="form-control" name="type" :value="editPartner?.type">
+              <?php foreach (['vendor','distributor','supplier','other'] as $t): ?><option value="<?= $t ?>"><?= ucfirst($t) ?></option><?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group"><label>Contact</label><input class="form-control" name="contact_person" :value="editPartner?.contact_person"></div>
+          <div class="form-group"><label>Phone</label><input class="form-control" name="phone" :value="editPartner?.phone"></div>
+          <div class="form-group"><label>Email</label><input class="form-control" name="email" :value="editPartner?.email"></div>
+          <div class="form-group"><label>GST</label><input class="form-control" name="gst_number" :value="editPartner?.gst_number"></div>
+          <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" :value="editPartner?.address" rows="2"></textarea></div>
+          <div class="form-group"><label>Active</label>
+            <select class="form-control" name="is_active" :value="String(editPartner?.is_active)">
+              <option value="1">Active</option>
+              <option value="0">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline" @click="editPartner=null">Cancel</button><button class="btn btn-primary" type="submit">Update</button></div>
+      </form>
+    </div>
   </div>
 
   <div class="modal-backdrop" :class="{open:txOpen}" @click.self="txOpen=false">

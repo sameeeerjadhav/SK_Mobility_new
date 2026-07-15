@@ -167,4 +167,52 @@ class InventoryController extends Controller
         flash('success', 'Stock transferred.');
         $this->redirect('/inventory?warehouse_id=' . $toId);
     }
+
+    public function storeWarehouse(): void
+    {
+        require_permission('manage_inventory');
+        $this->validateCsrf();
+        $this->db()->prepare(
+            'INSERT INTO warehouses (name, location, address, manager_name, phone, is_active) VALUES (?,?,?,?,?,1)'
+        )->execute([
+            $this->input('name'),
+            $this->input('location'),
+            $this->input('address'),
+            $this->input('manager_name'),
+            $this->input('phone'),
+        ]);
+        Audit::log('create', 'inventory', 'warehouses', (int)$this->db()->lastInsertId());
+        flash('success', 'Warehouse created.');
+        $this->redirect('/inventory');
+    }
+
+    public function updateWarehouse(string $id): void
+    {
+        require_permission('manage_inventory');
+        $this->validateCsrf();
+        $this->db()->prepare(
+            'UPDATE warehouses SET name=?, location=?, address=?, manager_name=?, phone=?, is_active=? WHERE id=?'
+        )->execute([
+            $this->input('name'),
+            $this->input('location'),
+            $this->input('address'),
+            $this->input('manager_name'),
+            $this->input('phone'),
+            (int)$this->input('is_active'),
+            (int)$id,
+        ]);
+        Audit::log('update', 'inventory', 'warehouses', (int)$id);
+        flash('success', 'Warehouse updated.');
+        $this->redirect('/inventory?warehouse_id=' . (int)$id);
+    }
+
+    public function deleteWarehouse(string $id): void
+    {
+        require_permission('manage_inventory');
+        $this->validateCsrf();
+        $this->db()->prepare('UPDATE warehouses SET is_active = 0 WHERE id = ?')->execute([(int)$id]);
+        Audit::log('delete', 'inventory', 'warehouses', (int)$id);
+        flash('success', 'Warehouse deactivated.');
+        $this->redirect('/inventory');
+    }
 }

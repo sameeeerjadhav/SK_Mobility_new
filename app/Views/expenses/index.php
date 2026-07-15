@@ -1,4 +1,4 @@
-<div x-data="{ expOpen: false, catOpen: false }">
+<div x-data="{ expOpen: false, catOpen: false, editExp: null }">
   <div class="toolbar">
     <div><h1 class="page-title">Office Expenses</h1><p class="page-sub">Track office spending</p></div>
     <div style="display:flex;gap:0.5rem;">
@@ -33,8 +33,9 @@
         <td><?= money($e['amount']) ?></td>
         <td><?= e(ucfirst($e['payment_mode'])) ?></td>
         <td><?= e($e['description'] ?? '—') ?></td>
-        <td>
-          <form method="post" action="<?= url('expenses/'.$e['id'].'/delete') ?>" onsubmit="return confirm('Delete?')">
+        <td style="white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" type="button" @click='editExp = <?= json_encode($e, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
+          <form method="post" action="<?= url('expenses/'.$e['id'].'/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete?')">
             <?= csrf_field() ?><button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
@@ -62,6 +63,31 @@
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-outline" @click="expOpen=false">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
     </form></div>
+  </div>
+
+  <div class="modal-backdrop" :class="{open:!!editExp}" @click.self="editExp=null" x-show="editExp" x-cloak>
+    <div class="modal" x-show="editExp">
+      <form method="post" :action="'<?= url('expenses') ?>/'+editExp?.id">
+        <?= csrf_field() ?>
+        <div class="modal-header"><h3 class="modal-title">Edit Expense</h3></div>
+        <div class="modal-body form-grid">
+          <div class="form-group"><label>Category</label>
+            <select class="form-control" name="category_id" :value="editExp?.category_id">
+              <?php foreach ($categories as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group"><label>Amount</label><input class="form-control" type="number" step="0.01" name="amount" :value="editExp?.amount" required></div>
+          <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" :value="editExp?.expense_date"></div>
+          <div class="form-group"><label>Payment mode</label>
+            <select class="form-control" name="payment_mode" :value="editExp?.payment_mode">
+              <?php foreach (['cash','bank','upi','card','cheque'] as $m): ?><option value="<?= $m ?>"><?= ucfirst($m) ?></option><?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group full"><label>Description</label><textarea class="form-control" name="description" :value="editExp?.description" rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline" @click="editExp=null">Cancel</button><button class="btn btn-primary" type="submit">Update</button></div>
+      </form>
+    </div>
   </div>
 
   <div class="modal-backdrop" :class="{open:catOpen}" @click.self="catOpen=false">

@@ -1,4 +1,4 @@
-<div x-data="{ bankOpen: false, loanOpen: false }">
+<div x-data="{ bankOpen: false, loanOpen: false, editBank: null, editLoan: null }">
   <div class="toolbar">
     <div><h1 class="page-title">Finance</h1><p class="page-sub">Bank accounts & loans</p></div>
     <div style="display:flex;gap:0.5rem;">
@@ -31,8 +31,9 @@
         <td><?= money($l['outstanding_amount']) ?></td>
         <td><?= money($l['emi_amount']) ?></td>
         <td><?= status_chip($l['status']) ?></td>
-        <td>
-          <form method="post" action="<?= url('finance/loans/'.$l['id'].'/delete') ?>" onsubmit="return confirm('Delete?')">
+        <td style="white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" type="button" @click='editLoan = <?= json_encode($l, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
+          <form method="post" action="<?= url('finance/loans/'.$l['id'].'/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete?')">
             <?= csrf_field() ?><button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
@@ -53,8 +54,9 @@
         <td><?= e($a['ifsc_code'] ?? '—') ?></td>
         <td><?= e(ucfirst($a['account_type'])) ?></td>
         <td><strong><?= money($a['current_balance']) ?></strong></td>
-        <td>
-          <form method="post" action="<?= url('finance/bank-accounts/'.$a['id'].'/delete') ?>" onsubmit="return confirm('Delete?')">
+        <td style="white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" type="button" @click='editBank = <?= json_encode($a, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
+          <form method="post" action="<?= url('finance/bank-accounts/'.$a['id'].'/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete?')">
             <?= csrf_field() ?><button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
@@ -83,6 +85,33 @@
     </form></div>
   </div>
 
+  <div class="modal-backdrop" :class="{open:!!editBank}" @click.self="editBank=null" x-show="editBank" x-cloak>
+    <div class="modal" x-show="editBank">
+      <form method="post" :action="'<?= url('finance/bank-accounts') ?>/'+editBank?.id">
+        <?= csrf_field() ?>
+        <div class="modal-header"><h3 class="modal-title">Edit Bank Account</h3></div>
+        <div class="modal-body form-grid">
+          <div class="form-group"><label>Account name</label><input class="form-control" name="account_name" :value="editBank?.account_name" required></div>
+          <div class="form-group"><label>Bank name</label><input class="form-control" name="bank_name" :value="editBank?.bank_name" required></div>
+          <div class="form-group"><label>Account number</label><input class="form-control" name="account_number" :value="editBank?.account_number" required></div>
+          <div class="form-group"><label>IFSC</label><input class="form-control" name="ifsc_code" :value="editBank?.ifsc_code"></div>
+          <div class="form-group"><label>Type</label>
+            <select class="form-control" name="account_type" :value="editBank?.account_type">
+              <option value="current">Current</option><option value="savings">Savings</option><option value="overdraft">Overdraft</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Balance</label><input class="form-control" type="number" step="0.01" name="current_balance" :value="editBank?.current_balance"></div>
+          <div class="form-group"><label>Active</label>
+            <select class="form-control" name="is_active" :value="String(editBank?.is_active)">
+              <option value="1">Active</option><option value="0">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline" @click="editBank=null">Cancel</button><button class="btn btn-primary" type="submit">Update</button></div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-backdrop" :class="{open:loanOpen}" @click.self="loanOpen=false">
     <div class="modal"><form method="post" action="<?= url('finance/loans') ?>">
       <?= csrf_field() ?>
@@ -102,5 +131,36 @@
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-outline" @click="loanOpen=false">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
     </form></div>
+  </div>
+
+  <div class="modal-backdrop" :class="{open:!!editLoan}" @click.self="editLoan=null" x-show="editLoan" x-cloak>
+    <div class="modal" x-show="editLoan">
+      <form method="post" :action="'<?= url('finance/loans') ?>/'+editLoan?.id">
+        <?= csrf_field() ?>
+        <div class="modal-header"><h3 class="modal-title">Edit Loan</h3></div>
+        <div class="modal-body form-grid">
+          <div class="form-group"><label>Lender</label><input class="form-control" name="lender_name" :value="editLoan?.lender_name" required></div>
+          <div class="form-group"><label>Type</label>
+            <select class="form-control" name="loan_type" :value="editLoan?.loan_type">
+              <?php foreach (['vehicle','equipment','personal','business','other'] as $t): ?><option value="<?= $t ?>"><?= ucfirst($t) ?></option><?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group"><label>Principal</label><input class="form-control" type="number" step="0.01" name="principal_amount" :value="editLoan?.principal_amount"></div>
+          <div class="form-group"><label>Interest %</label><input class="form-control" type="number" step="0.01" name="interest_rate" :value="editLoan?.interest_rate"></div>
+          <div class="form-group"><label>Tenure</label><input class="form-control" type="number" name="tenure_months" :value="editLoan?.tenure_months"></div>
+          <div class="form-group"><label>EMI</label><input class="form-control" type="number" step="0.01" name="emi_amount" :value="editLoan?.emi_amount"></div>
+          <div class="form-group"><label>Start date</label><input class="form-control" type="date" name="start_date" :value="editLoan?.start_date"></div>
+          <div class="form-group"><label>End date</label><input class="form-control" type="date" name="end_date" :value="editLoan?.end_date"></div>
+          <div class="form-group"><label>Outstanding</label><input class="form-control" type="number" step="0.01" name="outstanding_amount" :value="editLoan?.outstanding_amount"></div>
+          <div class="form-group"><label>Status</label>
+            <select class="form-control" name="status" :value="editLoan?.status">
+              <option value="active">Active</option><option value="closed">Closed</option><option value="defaulted">Defaulted</option>
+            </select>
+          </div>
+          <div class="form-group full"><label>Notes</label><textarea class="form-control" name="notes" :value="editLoan?.notes" rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline" @click="editLoan=null">Cancel</button><button class="btn btn-primary" type="submit">Update</button></div>
+      </form>
+    </div>
   </div>
 </div>

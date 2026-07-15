@@ -24,10 +24,15 @@
         </form>
       </div>
     <?php elseif ($dealer['status'] === 'approved'): ?>
-      <form method="post" action="<?= url('dealers/' . $dealer['id'] . '/approve') ?>">
-        <?= csrf_field() ?><input type="hidden" name="status" value="suspended">
-        <button class="btn btn-danger" type="submit">Suspend</button>
-      </form>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-outline" type="button" onclick="document.getElementById('editDealerModal').classList.add('open')">Edit</button>
+        <form method="post" action="<?= url('dealers/' . $dealer['id'] . '/approve') ?>">
+          <?= csrf_field() ?><input type="hidden" name="status" value="suspended">
+          <button class="btn btn-danger" type="submit">Suspend</button>
+        </form>
+      </div>
+    <?php else: ?>
+      <button class="btn btn-outline" type="button" onclick="document.getElementById('editDealerModal').classList.add('open')">Edit</button>
     <?php endif; ?>
   </div>
 </div>
@@ -122,3 +127,32 @@
     </ul>
   </div>
 </div>
+
+<div class="modal-backdrop" id="editDealerModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <form method="post" action="<?= url('dealers/' . $dealer['id']) ?>">
+      <?= csrf_field() ?>
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Dealer</h3>
+        <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('editDealerModal').classList.remove('open')">Close</button>
+      </div>
+      <div class="modal-body form-grid">
+        <div class="form-group full"><label>Business name</label><input class="form-control" name="business_name" value="<?= e($dealer['business_name']) ?>" required></div>
+        <div class="form-group"><label>Contact person</label><input class="form-control" name="contact_person" value="<?= e($dealer['contact_person']) ?>" required></div>
+        <div class="form-group"><label>Phone</label><input class="form-control" name="phone" value="<?= e($dealer['phone']) ?>" required></div>
+        <div class="form-group"><label>Email</label><input class="form-control" type="email" name="email" value="<?= e($dealer['email']) ?>" required></div>
+        <div class="form-group"><label>GST</label><input class="form-control" name="gst_number" value="<?= e($dealer['gst_number'] ?? '') ?>"></div>
+        <div class="form-group"><label>PAN</label><input class="form-control" name="pan_number" value="<?= e($dealer['pan_number'] ?? '') ?>"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('editDealerModal').classList.remove('open')">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  if (location.hash === '#edit') {
+    document.getElementById('editDealerModal')?.classList.add('open');
+  }
+</script>
