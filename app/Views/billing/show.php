@@ -77,13 +77,29 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
       <div class="form-group"><label>Model Color</label><input class="form-control" name="color" value="<?= e($bill['color'] ?? '') ?>"></div>
       <div class="form-group"><label>Chassis No.</label><input class="form-control" name="chassis_no" value="<?= e($bill['chassis_no'] ?? '') ?>"></div>
       <div class="form-group"><label>Motor No.</label><input class="form-control" name="motor_no" value="<?= e($bill['motor_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Motor Warrenty</label><input class="form-control" name="motor_warranty" value="<?= e($bill['motor_warranty'] ?? '') ?>"></div>
+      <?php
+        $warrantyOpts = ['6 months', '12 months', '18 months', '24 months', '36 months', 'N/A'];
+        $wEdit = static function (string $name, ?string $current) use ($warrantyOpts): void {
+            $current = (string)($current ?? '');
+            echo '<select class="form-control" name="' . e($name) . '">';
+            echo '<option value="">Select</option>';
+            foreach ($warrantyOpts as $opt) {
+                $sel = $opt === $current ? ' selected' : '';
+                echo '<option value="' . e($opt) . '"' . $sel . '>' . e($opt) . '</option>';
+            }
+            if ($current !== '' && !in_array($current, $warrantyOpts, true)) {
+                echo '<option value="' . e($current) . '" selected>' . e($current) . '</option>';
+            }
+            echo '</select>';
+        };
+      ?>
+      <div class="form-group"><label>Motor Warrenty</label><?php $wEdit('motor_warranty', $bill['motor_warranty'] ?? null); ?></div>
       <div class="form-group"><label>Battery Type &amp; No.</label><input class="form-control" name="battery_type_no" value="<?= e($bill['battery_type_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Battery Warrenty</label><input class="form-control" name="battery_warranty" value="<?= e($bill['battery_warranty'] ?? '') ?>"></div>
+      <div class="form-group"><label>Battery Warrenty</label><?php $wEdit('battery_warranty', $bill['battery_warranty'] ?? null); ?></div>
       <div class="form-group"><label>Controller No.</label><input class="form-control" name="controller_no" value="<?= e($bill['controller_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Controller Warrenty</label><input class="form-control" name="controller_warranty" value="<?= e($bill['controller_warranty'] ?? '') ?>"></div>
+      <div class="form-group"><label>Controller Warrenty</label><?php $wEdit('controller_warranty', $bill['controller_warranty'] ?? null); ?></div>
       <div class="form-group"><label>Charger No.</label><input class="form-control" name="charger_no" value="<?= e($bill['charger_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Charger Warrenty</label><input class="form-control" name="charger_warranty" value="<?= e($bill['charger_warranty'] ?? '') ?>"></div>
+      <div class="form-group"><label>Charger Warrenty</label><?php $wEdit('charger_warranty', $bill['charger_warranty'] ?? null); ?></div>
       <div class="form-group"><label>H.P. Name</label><input class="form-control" name="hp_name" value="<?= e($bill['hp_name'] ?? '') ?>"></div>
       <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" name="loan_amount" value="<?= e((string)($bill['loan_amount'] ?? '0')) ?>"></div>
       <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" name="discount_amount" value="<?= e((string)($bill['discount_amount'] ?? '0')) ?>"></div>
