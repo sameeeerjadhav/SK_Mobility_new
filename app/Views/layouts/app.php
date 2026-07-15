@@ -11,9 +11,30 @@ try {
     $unread = \App\Services\NotificationService::unreadCount();
 } catch (\Throwable $e) {}
 
+$icons = [
+    'Dashboard' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+    'Dealers' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    'Vehicles' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14v-5l-2-5H7L5 12v5z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>',
+    'Orders' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
+    'Payments' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
+    'Inventory' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
+    'Leads' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+    'Services' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+    'Spare Parts' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    'Billing' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
+    'HR' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    'Partners' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>',
+    'Expenses' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+    'Finance' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-8"/></svg>',
+    'Reports' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>',
+    'Admin Panel' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
+    'Notifications' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+    'Profile' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+];
+
 $nav = [];
 $nav[] = ['section' => 'Overview', 'items' => [
-    ['label' => 'Dashboard', 'href' => '/dashboard', 'roles' => null],
+    ['label' => 'Dashboard', 'href' => '/dashboard'],
 ]];
 
 if ($role === 'super_admin') {
@@ -78,15 +99,20 @@ function nav_active(string $href, string $current): bool {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= e($title ?? 'SK Mobility') ?> — SK Mobility</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<?= asset('assets/css/app.css') ?>">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="<?= asset('assets/css/app.css') ?>?v=2">
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="app-shell" x-data="{ sidebarOpen: false, searchQ: '', searchResults: [], searchOpen: false, unread: <?= (int)$unread ?> }">
+  <div class="sidebar-overlay" :class="{ show: sidebarOpen }" @click="sidebarOpen=false"></div>
   <aside class="sidebar" :class="{ open: sidebarOpen }">
-    <div class="sidebar-brand">SK Mobility</div>
+    <div class="sidebar-brand">
+      <div class="brand-mark">SK</div>
+      <div class="brand-text">SK Mobility<span>EV Dealership ERP</span></div>
+    </div>
     <nav class="sidebar-nav">
       <?php foreach ($nav as $group): ?>
         <div class="nav-section"><?= e($group['section']) ?></div>
@@ -94,18 +120,25 @@ function nav_active(string $href, string $current): bool {
           if (isset($item['perm']) && !can($item['perm'])) continue;
         ?>
           <a class="nav-link <?= nav_active($item['href'], $current) ? 'active' : '' ?>"
-             href="<?= url(ltrim($item['href'], '/')) ?>">
+             href="<?= url(ltrim($item['href'], '/')) ?>"
+             @click="sidebarOpen=false">
+            <?= $icons[$item['label']] ?? '' ?>
             <?= e($item['label']) ?>
           </a>
         <?php endforeach; ?>
       <?php endforeach; ?>
-      <a class="nav-link" href="<?= url('logout') ?>" style="margin-top:1rem;color:#dc2626;">Logout</a>
+      <a class="nav-link logout" href="<?= url('logout') ?>">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </a>
     </nav>
   </aside>
 
   <div class="main">
     <header class="topbar">
-      <button class="icon-btn" type="button" @click="sidebarOpen = !sidebarOpen" style="display:none;" id="menuBtn">☰</button>
+      <button class="icon-btn" type="button" @click="sidebarOpen = !sidebarOpen" id="menuBtn" style="display:none;" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
       <div class="search-box" @click.outside="searchOpen=false">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
         <input type="search" placeholder="Search orders, dealers, vehicles, leads…"
@@ -115,12 +148,11 @@ function nav_active(string $href, string $current): bool {
                  fetch('<?= url('search') ?>?q=' + encodeURIComponent(searchQ))
                    .then(r => r.json()).then(d => { searchResults = d.results || []; searchOpen = true; });
                ">
-        <div x-show="searchOpen" x-cloak
-             style="position:absolute;left:0;right:0;top:110%;background:#fff;border:1px solid #f1f5f9;border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.08);z-index:50;max-height:320px;overflow:auto;">
+        <div class="search-results" x-show="searchOpen" x-cloak>
           <template x-for="item in searchResults" :key="item.type + item.title + item.url">
-            <a :href="item.url" style="display:block;padding:0.7rem 1rem;border-bottom:1px solid #f8fafc;color:inherit;">
-              <div style="font-size:0.7rem;font-weight:700;color:#0d9488;text-transform:uppercase;" x-text="item.type"></div>
-              <div style="font-weight:600;" x-text="item.title"></div>
+            <a class="search-result-item" :href="item.url">
+              <div class="search-result-type" x-text="item.type"></div>
+              <div class="search-result-title" x-text="item.title"></div>
               <div class="muted" style="font-size:0.75rem;" x-text="item.meta"></div>
             </a>
           </template>
@@ -128,13 +160,13 @@ function nav_active(string $href, string $current): bool {
         </div>
       </div>
       <div class="topbar-actions">
-        <a class="icon-btn" href="<?= url('notifications') ?>" title="Notifications">
-          🔔
+        <a class="icon-btn" href="<?= url('notifications') ?>" title="Notifications" aria-label="Notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="badge-dot" x-show="unread > 0" x-text="unread" x-cloak></span>
         </a>
         <a class="user-pill" href="<?= url('profile') ?>">
           <span class="avatar"><?= e(strtoupper(substr($u['first_name'] ?? 'U', 0, 1) . substr($u['last_name'] ?? '', 0, 1))) ?></span>
-          <span style="font-size:0.85rem;font-weight:600;padding-right:0.35rem;"><?= e(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?></span>
+          <span class="user-name"><?= e(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?></span>
         </a>
       </div>
     </header>
@@ -151,14 +183,21 @@ function nav_active(string $href, string $current): bool {
   </div>
 </div>
 <script>
-  if (window.matchMedia('(max-width: 960px)').matches) {
-    document.getElementById('menuBtn').style.display = 'inline-flex';
-  }
+  const menuBtn = document.getElementById('menuBtn');
+  const syncMenu = () => {
+    if (window.matchMedia('(max-width: 960px)').matches) {
+      menuBtn.style.display = 'inline-flex';
+    } else {
+      menuBtn.style.display = 'none';
+    }
+  };
+  syncMenu();
+  window.addEventListener('resize', syncMenu);
   setInterval(() => {
     fetch('<?= url('notifications/unread-count') ?>')
       .then(r => r.json())
       .then(d => {
-        const root = document.querySelector('[x-data]');
+        const root = document.querySelector('.app-shell');
         if (root && root._x_dataStack) {
           root._x_dataStack[0].unread = d.count || 0;
         }

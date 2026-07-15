@@ -1,5 +1,9 @@
-<h1 class="page-title">Dashboard</h1>
-<p class="page-sub">Overview of SK Mobility operations</p>
+<div class="toolbar">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-sub">Overview of SK Mobility operations</p>
+  </div>
+</div>
 
 <div class="stat-grid">
   <?php foreach ($stats as $s): ?>

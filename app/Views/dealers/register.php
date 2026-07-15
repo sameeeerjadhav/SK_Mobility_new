@@ -1,7 +1,8 @@
 <div class="auth-page">
   <div class="auth-card" style="max-width:560px;">
+    <div class="auth-brand-mark">SK</div>
     <div class="auth-brand">Dealer Registration</div>
-    <p class="muted" style="text-align:center;">Apply to join the SK Mobility dealer network</p>
+    <p class="muted" style="text-align:center;margin:0 0 1.25rem;font-weight:500;">Apply to join the SK Mobility dealer network</p>
     <?php if ($msg = flash('error')): ?><div class="alert alert-error"><?= e($msg) ?></div><?php endif; ?>
     <form method="post" action="<?= url('dealers/register') ?>">
       <?= csrf_field() ?>
