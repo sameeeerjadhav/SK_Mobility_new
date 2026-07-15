@@ -30,28 +30,28 @@ class OrderService
             if ($dealerId <= 0) {
                 throw new RuntimeException('Dealer is required for dealer orders.');
             }
-        } else {
-            if (empty($data['customer_name']) || empty($data['customer_phone'])) {
-                throw new RuntimeException('Customer name and phone are required.');
-            }
-            $requiredInvoice = [
-                'color' => 'Model Color',
-                'sale_date' => 'Date of Sale',
-                'chassis_no' => 'Chassis No.',
-                'motor_no' => 'Motor No.',
-                'motor_warranty' => 'Motor Warranty',
-                'battery_capacity' => 'Battery Type',
-                'battery_no' => 'Battery No.',
-                'battery_warranty' => 'Battery Warranty',
-                'controller_no' => 'Controller No.',
-                'controller_warranty' => 'Controller Warranty',
-                'charger_no' => 'Charger No.',
-                'charger_warranty' => 'Charger Warranty',
-            ];
-            foreach ($requiredInvoice as $key => $label) {
-                if (trim((string)($data[$key] ?? '')) === '') {
-                    throw new RuntimeException($label . ' is required for the tax invoice.');
-                }
+        }
+
+        if (empty($data['customer_name']) || empty($data['customer_phone'])) {
+            throw new RuntimeException('Buyer name and phone are required.');
+        }
+
+        $requiredInvoice = [
+            'sale_date' => 'Date of Sale',
+            'chassis_no' => 'Chassis No.',
+            'motor_no' => 'Motor No.',
+            'motor_warranty' => 'Motor Warranty',
+            'battery_capacity' => 'Battery Type',
+            'battery_no' => 'Battery No.',
+            'battery_warranty' => 'Battery Warranty',
+            'controller_no' => 'Controller No.',
+            'controller_warranty' => 'Controller Warranty',
+            'charger_no' => 'Charger No.',
+            'charger_warranty' => 'Charger Warranty',
+        ];
+        foreach ($requiredInvoice as $key => $label) {
+            if (trim((string)($data[$key] ?? '')) === '') {
+                throw new RuntimeException($label . ' is required for the tax invoice.');
             }
         }
 
@@ -64,9 +64,10 @@ class OrderService
                 continue;
             }
             $stmt = $db->prepare(
-                'SELECT vv.*, v.id AS vehicle_id, v.name AS vehicle_name
+                'SELECT vv.*, v.id AS vehicle_id, v.name AS vehicle_name, c.name AS category_name
                  FROM vehicle_variants vv
                  JOIN vehicles v ON v.id = vv.vehicle_id
+                 JOIN vehicle_categories c ON c.id = v.category_id
                  WHERE vv.id = ? AND vv.is_active = 1'
             );
             $stmt->execute([$variantId]);
@@ -86,6 +87,8 @@ class OrderService
                 'description' => $variant['vehicle_name'] . ' — ' . $variant['name'] . ($variant['color'] ? ' (' . $variant['color'] . ')' : ''),
                 'model_code' => $variant['sku'] ?? null,
                 'model_name' => $variant['vehicle_name'],
+                'variant_name' => $variant['name'],
+                'category_name' => $variant['category_name'] ?? null,
                 'color' => $variant['color'] ?? null,
             ];
         }
@@ -94,8 +97,18 @@ class OrderService
             throw new RuntimeException('No valid items in order.');
         }
 
-        $pmIncentive = $orderType === 'customer' ? (float)($data['pm_drive_incentive'] ?? 0) : 0.0;
-        $stateSubsidy = $orderType === 'customer' ? (float)($data['state_subsidy'] ?? 0) : 0.0;
+        // EV model type / color come from the selected variant (tax invoice alignment)
+        $primary = $lineItems[0];
+        $vehicleModelType = $primary['variant_name'];
+        $color = trim((string)($data['color'] ?? '')) !== ''
+            ? $data['color']
+            : ($primary['color'] ?? null);
+        if ($color === null || $color === '') {
+            throw new RuntimeException('Model Color is required (select a variant with a color, or enter color).');
+        }
+
+        $pmIncentive = (float)($data['pm_drive_incentive'] ?? 0);
+        $stateSubsidy = (float)($data['state_subsidy'] ?? 0);
         $extraDisc = (float)($data['discount_amount'] ?? 0);
         $loanAmount = (float)($data['loan_amount'] ?? 0);
         $totalDisc = $pmIncentive + $stateSubsidy + $extraDisc;
@@ -110,7 +123,6 @@ class OrderService
         $orderNumber = next_code($prefix, 'orders', 'order_number');
         $bookingNo = trim((string)($data['booking_no'] ?? '')) ?: $orderNumber;
         $saleDate = $data['sale_date'] ?: date('Y-m-d');
-        $color = $data['color'] ?? ($lineItems[0]['color'] ?? null);
         $batteryTypeNo = trim(implode(' ', array_filter([
             $data['battery_capacity'] ?? null,
             $data['battery_no'] ?? null,
@@ -152,7 +164,7 @@ class OrderService
                 $data['charger_warranty'] ?? null,
                 $data['hp_name'] ?? null,
                 $color,
-                $data['vehicle_model_type'] ?? null,
+                $vehicleModelType,
                 $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
                 $paymentMode, $saleDate, $subtotal, $taxAmount, $totalAmount,
                 'pending',
@@ -179,9 +191,10 @@ class OrderService
             )->execute([$orderId, 'pending', 'Order created', $userId]);
 
             $billNumber = next_code('INV', 'bills', 'bill_number');
-            $customerName = $orderType === 'dealer'
-                ? (self::dealerName($db, $dealerId) ?? 'Dealer')
-                : ($data['customer_name'] ?? '');
+            $customerName = trim((string)($data['customer_name'] ?? ''));
+            if ($customerName === '' && $dealerId) {
+                $customerName = self::dealerName($db, $dealerId) ?? 'Dealer';
+            }
 
             $dealerCode = null;
             if ($dealerId) {
@@ -218,7 +231,7 @@ class OrderService
                 $data['customer_aadhaar'] ?? null,
                 $data['customer_pan'] ?? null,
                 $lineItems[0]['model_name'] ?? ($lineItems[0]['description'] ?? null),
-                $data['vehicle_model_type'] ?? null,
+                $vehicleModelType,
                 $color,
                 $data['chassis_no'] ?? null,
                 $data['motor_no'] ?? null,

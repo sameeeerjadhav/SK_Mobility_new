@@ -63,13 +63,16 @@
         <div class="od-rows">
           <?php if ($order['order_type'] === 'dealer'): ?>
             <div class="od-row"><span class="k">Dealer</span><span class="v"><?= e($order['business_name'] ?? '—') ?> <span class="muted"><?= e($order['dealer_code'] ?? '') ?></span></span></div>
-            <div class="od-row"><span class="k">Delivery</span><span class="v"><?= e($order['delivery_address'] ?: '—') ?></span></div>
-          <?php else: ?>
-            <div class="od-row"><span class="k">Customer</span><span class="v"><?= e($order['customer_name']) ?> · <?= e($order['customer_phone']) ?></span></div>
-            <div class="od-row"><span class="k">Address</span><span class="v"><?= e($order['customer_address'] ?: '—') ?></span></div>
-            <div class="od-row"><span class="k">Chassis</span><span class="v"><?= e($order['chassis_no'] ?: '—') ?> / <?= e($order['motor_no'] ?: '—') ?></span></div>
-            <div class="od-row"><span class="k">Subsidies</span><span class="v">PM <?= money($order['pm_drive_incentive']) ?> · State <?= money($order['state_subsidy']) ?></span></div>
           <?php endif; ?>
+          <div class="od-row"><span class="k">Buyer</span><span class="v"><?= e($order['customer_name'] ?: '—') ?> · <?= e($order['customer_phone'] ?: '—') ?></span></div>
+          <div class="od-row"><span class="k">Address</span><span class="v"><?= e($order['customer_address'] ?: ($order['delivery_address'] ?: '—')) ?></span></div>
+          <div class="od-row"><span class="k">Model type</span><span class="v"><?= e($order['vehicle_model_type'] ?: '—') ?> · <?= e($order['color'] ?: '—') ?></span></div>
+          <div class="od-row"><span class="k">Sale date</span><span class="v"><?= india_date($order['sale_date'] ?? null) ?></span></div>
+          <div class="od-row"><span class="k">Chassis</span><span class="v"><?= e($order['chassis_no'] ?: '—') ?></span></div>
+          <div class="od-row"><span class="k">Motor</span><span class="v"><?= e($order['motor_no'] ?: '—') ?> <span class="muted"><?= e($order['motor_warranty'] ? '(' . $order['motor_warranty'] . ')' : '') ?></span></span></div>
+          <div class="od-row"><span class="k">Battery</span><span class="v"><?= e(trim(($order['battery_capacity'] ?? '') . ' ' . ($order['battery_no'] ?? '')) ?: '—') ?></span></div>
+          <div class="od-row"><span class="k">Controller</span><span class="v"><?= e($order['controller_no'] ?: '—') ?></span></div>
+          <div class="od-row"><span class="k">Charger</span><span class="v"><?= e($order['charger_no'] ?: '—') ?></span></div>
         </div>
         <div class="od-money">
           <div><span class="k">Subtotal</span><span class="v"><?= money($order['subtotal']) ?></span></div>
