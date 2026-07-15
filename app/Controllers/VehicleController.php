@@ -30,7 +30,11 @@ class VehicleController extends Controller
 
         $stmt = $this->db()->prepare(
             "SELECT v.*, c.name AS category_name,
-                (SELECT image_url FROM vehicle_images vi WHERE vi.vehicle_id = v.id AND vi.is_primary = 1 LIMIT 1) AS image_url,
+                (SELECT vi.image_url FROM vehicle_images vi
+                  WHERE vi.vehicle_id = v.id
+                  ORDER BY vi.is_primary DESC, (vi.variant_id IS NULL) DESC, vi.id ASC
+                  LIMIT 1) AS image_url,
+                (SELECT COUNT(*) FROM vehicle_variants vv WHERE vv.vehicle_id = v.id AND vv.is_active = 1) AS variant_count,
                 (SELECT MIN(price) FROM vehicle_variants vv WHERE vv.vehicle_id = v.id AND vv.is_active = 1) AS min_price
              FROM vehicles v
              JOIN vehicle_categories c ON c.id = v.category_id
@@ -87,12 +91,31 @@ class VehicleController extends Controller
             }
         }
 
+        $coverStmt = $this->db()->prepare(
+            'SELECT image_url FROM vehicle_images WHERE vehicle_id = ?
+             ORDER BY is_primary DESC, (variant_id IS NULL) DESC, id ASC LIMIT 1'
+        );
+        $coverStmt->execute([$vehicleId]);
+        $coverImage = $coverStmt->fetchColumn() ?: null;
+
+        $activeVariants = array_values(array_filter($variants, static fn ($vv) => (int)$vv['is_active'] === 1));
+        $minPrice = null;
+        foreach ($activeVariants as $vv) {
+            $p = (float)$vv['price'];
+            if ($minPrice === null || $p < $minPrice) {
+                $minPrice = $p;
+            }
+        }
+
         $this->view('vehicles/show', [
             'title' => $vehicle['name'],
             'vehicle' => $vehicle,
             'variants' => $variants,
             'images' => $vehicleImages,
             'imagesByVariant' => $imagesByVariant,
+            'coverImage' => $coverImage,
+            'minPrice' => $minPrice ?? (float)$vehicle['base_price'],
+            'variantCount' => count($variants),
             'canManage' => can('manage_vehicles'),
             'categories' => $this->db()->query('SELECT * FROM vehicle_categories WHERE is_active = 1')->fetchAll(),
         ]);
@@ -293,11 +316,34 @@ class VehicleController extends Controller
 
         $path = Upload::store($_FILES['image'] ?? [], 'vehicles', ['jpg', 'jpeg', 'png', 'gif', 'webp']);
         if (!$path) {
-            flash('error', 'Image upload failed.');
+            flash('error', 'Image upload failed. Use JPG, PNG, GIF, or WebP.');
             $this->redirect('/vehicles/' . $vehicleId);
         }
 
         $isPrimary = isset($_POST['is_primary']) ? 1 : 0;
+
+        // Auto-primary so catalog cards always get a cover image when none exist yet
+        if (!$isPrimary) {
+            if ($variantId) {
+                $cnt = $this->db()->prepare('SELECT COUNT(*) FROM vehicle_images WHERE vehicle_id = ? AND variant_id = ?');
+                $cnt->execute([$vehicleId, $variantId]);
+            } else {
+                $cnt = $this->db()->prepare('SELECT COUNT(*) FROM vehicle_images WHERE vehicle_id = ? AND variant_id IS NULL');
+                $cnt->execute([$vehicleId]);
+            }
+            if ((int)$cnt->fetchColumn() === 0) {
+                $isPrimary = 1;
+            }
+        }
+
+        // If this is the first image on the whole vehicle, mark it for catalog cover
+        $any = $this->db()->prepare('SELECT COUNT(*) FROM vehicle_images WHERE vehicle_id = ?');
+        $any->execute([$vehicleId]);
+        $isFirstOnVehicle = (int)$any->fetchColumn() === 0;
+        if ($isFirstOnVehicle) {
+            $isPrimary = 1;
+        }
+
         if ($isPrimary) {
             if ($variantId) {
                 $this->db()->prepare(
@@ -308,6 +354,12 @@ class VehicleController extends Controller
                     'UPDATE vehicle_images SET is_primary = 0 WHERE vehicle_id = ? AND variant_id IS NULL'
                 )->execute([$vehicleId]);
             }
+            // Also clear other catalog primaries so one clear cover exists
+            if ($isFirstOnVehicle || !$variantId) {
+                $this->db()->prepare(
+                    'UPDATE vehicle_images SET is_primary = 0 WHERE vehicle_id = ?'
+                )->execute([$vehicleId]);
+            }
         }
 
         $this->db()->prepare(
@@ -315,7 +367,7 @@ class VehicleController extends Controller
         )->execute([$vehicleId, $variantId, $path, $isPrimary]);
 
         Audit::log('create', 'vehicles', 'vehicle_images', (int)$this->db()->lastInsertId());
-        flash('success', $variantId ? 'Variant image uploaded.' : 'Vehicle image uploaded.');
+        flash('success', $variantId ? 'Variant image uploaded.' : 'Vehicle image uploaded — it will show on the catalog card.');
         $this->redirect('/vehicles/' . $vehicleId);
     }
 

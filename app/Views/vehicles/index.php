@@ -2,45 +2,54 @@
   <div class="toolbar">
     <div>
       <h1 class="page-title">Vehicles</h1>
-      <p class="page-sub">EV catalog & variants</p>
+      <p class="page-sub">Catalog models, variants &amp; media</p>
     </div>
     <?php if ($canManage): ?>
       <button class="btn btn-primary" type="button" @click="createOpen=true">+ Create Vehicle</button>
     <?php endif; ?>
   </div>
 
-  <form method="get" class="card" style="margin-bottom:1rem;display:flex;gap:0.75rem;flex-wrap:wrap;align-items:end;">
-    <div class="form-group" style="margin:0;min-width:180px;">
+  <form method="get" class="vh-filters">
+    <div class="form-group" style="margin:0;min-width:160px;">
       <label>Category</label>
       <select class="form-control" name="category_id">
-        <option value="">All</option>
+        <option value="">All categories</option>
         <?php foreach ($categories as $c): ?>
           <option value="<?= (int)$c['id'] ?>" <?= (string)$categoryId === (string)$c['id'] ? 'selected' : '' ?>><?= e($c['name']) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="form-group" style="margin:0;flex:1;min-width:200px;">
+    <div class="form-group" style="margin:0;flex:1;min-width:180px;">
       <label>Search</label>
-      <input class="form-control" name="search" value="<?= e($search) ?>">
+      <input class="form-control" name="search" value="<?= e($search) ?>" placeholder="Name or brand">
     </div>
     <button class="btn btn-outline" type="submit">Filter</button>
   </form>
 
   <div class="vehicle-grid">
     <?php foreach ($vehicles as $v): ?>
-      <a class="card vehicle-card" href="<?= url('vehicles/' . $v['id']) ?>" style="display:block;color:inherit;">
-        <?php if ($v['image_url']): ?>
-          <img src="<?= asset($v['image_url']) ?>" alt="<?= e($v['name']) ?>">
-        <?php else: ?>
-          <div style="height:160px;border-radius:12px;background:linear-gradient(135deg,#ccfbf1,#f0faf8);display:grid;place-items:center;color:#0d9488;font-weight:700;">No image</div>
-        <?php endif; ?>
-        <div class="muted" style="font-size:0.75rem;margin-top:0.75rem;"><?= e($v['category_name']) ?></div>
-        <h3><?= e($v['name']) ?></h3>
-        <div style="font-weight:700;color:#0d9488;"><?= money($v['min_price'] ?? $v['base_price']) ?></div>
+      <a class="vh-card" href="<?= url('vehicles/' . $v['id']) ?>">
+        <div class="vh-card-media">
+          <?php if (!empty($v['image_url'])): ?>
+            <img src="<?= asset($v['image_url']) ?>" alt="<?= e($v['name']) ?>" loading="lazy">
+          <?php else: ?>
+            <div class="vh-card-empty">No photo</div>
+          <?php endif; ?>
+        </div>
+        <div class="vh-card-body">
+          <div class="vh-card-cat"><?= e($v['category_name']) ?></div>
+          <h3><?= e($v['name']) ?></h3>
+          <div class="vh-card-meta">
+            <span class="vh-card-price"><?= money($v['min_price'] ?? $v['base_price']) ?></span>
+            <span class="vh-card-vars"><?= (int)($v['variant_count'] ?? 0) ?> variant<?= (int)($v['variant_count'] ?? 0) === 1 ? '' : 's' ?></span>
+          </div>
+        </div>
       </a>
     <?php endforeach; ?>
   </div>
-  <?php if (!$vehicles): ?><div class="card"><p class="muted">No vehicles found. Create one to get started.</p></div><?php endif; ?>
+  <?php if (!$vehicles): ?>
+    <div class="card"><p class="muted" style="margin:0;">No vehicles found. Create one to get started.</p></div>
+  <?php endif; ?>
 
   <?php if ($canManage): ?>
   <div class="modal-backdrop" :class="{ open: createOpen }" @click.self="createOpen=false">

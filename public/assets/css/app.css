@@ -623,6 +623,74 @@ table.data tbody tr:last-child td { border-bottom: 0; }
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 1.1rem;
 }
+.vh-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.vh-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  color: inherit;
+}
+.vh-card-media {
+  aspect-ratio: 16 / 11;
+  background: linear-gradient(145deg, #ccfbf1, #f0fdfa);
+  overflow: hidden;
+}
+.vh-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vh-card-empty {
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  color: #0f766e;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.vh-card-body { padding: 0.9rem 1rem 1.05rem; }
+.vh-card-cat {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.vh-card h3 {
+  margin: 0.3rem 0 0.55rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.vh-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.vh-card-price {
+  font-weight: 800;
+  color: var(--primary-dark);
+  font-size: 0.98rem;
+}
+.vh-card-vars {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
 .vehicle-card {
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease) !important;
 }
