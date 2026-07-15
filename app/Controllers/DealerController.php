@@ -205,6 +205,16 @@ class DealerController extends Controller
         $leadsCnt->execute([$dealerId]);
         $totalLeads = (int)$leadsCnt->fetchColumn();
 
+        $linkedUser = null;
+        if (!empty($dealer['user_id'])) {
+            $uStmt = $this->db()->prepare(
+                'SELECT id, email, first_name, last_name, phone, is_active, last_login_at, created_at
+                 FROM users WHERE id = ? LIMIT 1'
+            );
+            $uStmt->execute([(int)$dealer['user_id']]);
+            $linkedUser = $uStmt->fetch() ?: null;
+        }
+
         $this->view('dealers/show', [
             'title' => $dealer['business_name'],
             'dealer' => $dealer,
@@ -213,6 +223,7 @@ class DealerController extends Controller
             'recentOrders' => $recentOrders,
             'statusBreakdown' => $statusBreakdown,
             'totalLeads' => $totalLeads,
+            'linkedUser' => $linkedUser,
         ]);
     }
 
@@ -290,6 +301,91 @@ class DealerController extends Controller
         )->execute([$dealerId, $type, $path]);
         Audit::log('create', 'dealers', 'dealer_documents', (int)$this->db()->lastInsertId());
         flash('success', 'Document uploaded.');
+        $this->redirect('/dealers/' . $dealerId);
+    }
+
+    /**
+     * Admin: set / reset password for the dealer login user.
+     * Existing passwords are hashed and cannot be displayed — a new one is set and shown once.
+     */
+    public function resetPassword(string $id): void
+    {
+        require_permission('manage_dealers');
+        $this->validateCsrf();
+        $dealerId = (int)$id;
+
+        $stmt = $this->db()->prepare('SELECT * FROM dealers WHERE id = ?');
+        $stmt->execute([$dealerId]);
+        $dealer = $stmt->fetch();
+        if (!$dealer) {
+            flash('error', 'Dealer not found.');
+            $this->redirect('/dealers');
+        }
+
+        $password = $this->input('password');
+        $generate = isset($_POST['generate']) && $_POST['generate'] === '1';
+
+        if ($generate || $password === '') {
+            $password = 'Dealer@' . random_int(1000, 9999) . chr(random_int(65, 90));
+        }
+
+        if (strlen($password) < 6) {
+            flash('error', 'Password must be at least 6 characters.');
+            $this->redirect('/dealers/' . $dealerId);
+        }
+
+        $userId = (int)($dealer['user_id'] ?? 0);
+
+        // Create linked user if dealer was approved without an account (edge case)
+        if ($userId <= 0) {
+            if ($dealer['status'] !== 'approved') {
+                flash('error', 'Approve the dealer first to create a login account.');
+                $this->redirect('/dealers/' . $dealerId);
+            }
+            $roleId = (int)$this->db()->query("SELECT id FROM roles WHERE slug = 'dealer' LIMIT 1")->fetchColumn();
+            $this->db()->prepare(
+                'INSERT INTO users (role_id, email, password_hash, first_name, last_name, phone, is_active, is_verified)
+                 VALUES (?,?,?,?,?,?,1,1)'
+            )->execute([
+                $roleId,
+                $dealer['email'],
+                password_hash($password, PASSWORD_BCRYPT),
+                $dealer['contact_person'],
+                'Dealer',
+                $dealer['phone'],
+            ]);
+            $userId = (int)$this->db()->lastInsertId();
+            $this->db()->prepare('UPDATE dealers SET user_id = ? WHERE id = ?')->execute([$userId, $dealerId]);
+        } else {
+            $this->db()->prepare('UPDATE users SET password_hash = ?, is_active = 1 WHERE id = ?')
+                ->execute([password_hash($password, PASSWORD_BCRYPT), $userId]);
+        }
+
+        // Keep login email in sync with dealer email
+        $this->db()->prepare('UPDATE users SET email = ?, phone = ? WHERE id = ?')
+            ->execute([$dealer['email'], $dealer['phone'], $userId]);
+
+        Audit::log('update', 'dealers', 'users', $userId, null, ['password' => 'reset_by_admin']);
+        flash('success', "Password updated. Login: {$dealer['email']} / New password: {$password}");
+        $this->redirect('/dealers/' . $dealerId);
+    }
+
+    public function toggleUser(string $id): void
+    {
+        require_permission('manage_dealers');
+        $this->validateCsrf();
+        $dealerId = (int)$id;
+        $stmt = $this->db()->prepare('SELECT user_id, email FROM dealers WHERE id = ?');
+        $stmt->execute([$dealerId]);
+        $dealer = $stmt->fetch();
+        if (!$dealer || empty($dealer['user_id'])) {
+            flash('error', 'No login account linked to this dealer.');
+            $this->redirect('/dealers/' . $dealerId);
+        }
+        $this->db()->prepare('UPDATE users SET is_active = 1 - is_active WHERE id = ?')
+            ->execute([(int)$dealer['user_id']]);
+        Audit::log('update', 'dealers', 'users', (int)$dealer['user_id']);
+        flash('success', 'Dealer login access toggled.');
         $this->redirect('/dealers/' . $dealerId);
     }
 }

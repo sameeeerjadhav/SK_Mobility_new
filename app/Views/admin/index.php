@@ -139,6 +139,7 @@
             <div class="form-group"><label>First name</label><input class="form-control" name="first_name" :value="editUser?.first_name" required></div>
             <div class="form-group"><label>Last name</label><input class="form-control" name="last_name" :value="editUser?.last_name" required></div>
             <div class="form-group"><label>Phone</label><input class="form-control" name="phone" :value="editUser?.phone"></div>
+            <div class="form-group"><label>New password</label><input class="form-control" type="text" name="password" placeholder="Leave blank to keep current" minlength="6" autocomplete="off"></div>
             <div class="form-group"><label>Role</label>
               <select class="form-control" name="role_slug" :value="editUser?.role_slug">
                 <?php foreach ($roles as $r): ?><option value="<?= e($r['slug']) ?>"><?= e($r['name']) ?></option><?php endforeach; ?>

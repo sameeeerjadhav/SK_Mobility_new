@@ -106,8 +106,16 @@ class AdminController extends Controller
             (int)$this->input('is_active'),
             (int)$id,
         ]);
-        Audit::log('update', 'admin', 'users', (int)$id);
-        flash('success', 'User updated.');
+        $newPass = $this->input('password');
+        if ($newPass !== '' && strlen($newPass) >= 6) {
+            $this->db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+                ->execute([password_hash($newPass, PASSWORD_BCRYPT), (int)$id]);
+            Audit::log('update', 'admin', 'users', (int)$id, null, ['password' => 'reset']);
+            flash('success', "User updated. New password: {$newPass}");
+        } else {
+            Audit::log('update', 'admin', 'users', (int)$id);
+            flash('success', 'User updated.');
+        }
         $this->redirect('/admin?tab=users');
     }
 

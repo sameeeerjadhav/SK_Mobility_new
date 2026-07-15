@@ -54,6 +54,8 @@ $router->post('/dealers/{id}/delete', [DealerController::class, 'destroy'], ['re
 $router->get('/dealers/{id}', [DealerController::class, 'show'], ['require_auth']);
 $router->post('/dealers/{id}/approve', [DealerController::class, 'approve'], ['require_auth']);
 $router->post('/dealers/{id}/documents', [DealerController::class, 'uploadDocument'], ['require_auth']);
+$router->post('/dealers/{id}/password', [DealerController::class, 'resetPassword'], ['require_auth']);
+$router->post('/dealers/{id}/toggle-login', [DealerController::class, 'toggleUser'], ['require_auth']);
 
 // Vehicles
 $router->get('/vehicles', [VehicleController::class, 'index'], ['require_auth']);
