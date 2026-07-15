@@ -197,15 +197,16 @@ class OrderController extends Controller
         );
         $history->execute([$orderId]);
 
-        $bill = $this->db()->prepare('SELECT id, bill_number FROM bills WHERE order_id = ? LIMIT 1');
+        $bill = $this->db()->prepare('SELECT * FROM bills WHERE order_id = ? LIMIT 1');
         $bill->execute([$orderId]);
+        $billRow = $bill->fetch() ?: null;
 
         $this->view('orders/show', [
             'title' => $order['order_number'],
             'order' => $order,
             'items' => $items->fetchAll(),
             'history' => $history->fetchAll(),
-            'bill' => $bill->fetch() ?: null,
+            'bill' => $billRow,
             'canManage' => can('manage_orders') || can('approve_orders'),
         ]);
     }

@@ -15,6 +15,10 @@
 .od-row{display:grid;grid-template-columns:6.5rem minmax(0,1fr);gap:.5rem;font-size:.875rem;line-height:1.35}
 .od-row .k{color:#64748b;font-weight:600;font-size:.8rem}
 .od-row .v{font-weight:600;color:#0f172a}
+.od-parts{display:flex;flex-direction:column;gap:.55rem;margin-top:.75rem;padding-top:.7rem;border-top:1px solid #e2e8f0}
+.od-part{border:1px solid #e2e8f0;border-radius:10px;padding:.55rem .7rem;background:#f8fffd}
+.od-part h4{margin:0 0 .4rem;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#0f766e}
+.od-part .od-row{grid-template-columns:5.5rem minmax(0,1fr)}
 .od-money{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.75rem;padding-top:.7rem;border-top:1px solid #e2e8f0}
 .od-money>div{display:flex;flex-direction:column;gap:.1rem}
 .od-money .k{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
@@ -60,20 +64,62 @@
     <div class="od-col">
       <div class="card">
         <h3 class="card-title">Details</h3>
+        <?php
+          $o = static function (string $key, $default = '') use ($order, $bill) {
+              $val = $order[$key] ?? null;
+              if ($val === null || $val === '') {
+                  $val = is_array($bill) ? ($bill[$key] ?? null) : null;
+              }
+              return ($val === null || $val === '') ? $default : $val;
+          };
+          $batteryLabel = trim((string)$o('battery_capacity') . ' ' . (string)$o('battery_no'));
+          if ($batteryLabel === '') {
+              $batteryLabel = (string)$o('battery_type_no');
+          }
+        ?>
         <div class="od-rows">
           <?php if ($order['order_type'] === 'dealer'): ?>
             <div class="od-row"><span class="k">Dealer</span><span class="v"><?= e($order['business_name'] ?? '—') ?> <span class="muted"><?= e($order['dealer_code'] ?? '') ?></span></span></div>
           <?php endif; ?>
-          <div class="od-row"><span class="k">Buyer</span><span class="v"><?= e($order['customer_name'] ?: '—') ?> · <?= e($order['customer_phone'] ?: '—') ?></span></div>
-          <div class="od-row"><span class="k">Address</span><span class="v"><?= e($order['customer_address'] ?: ($order['delivery_address'] ?: '—')) ?></span></div>
-          <div class="od-row"><span class="k">Model type</span><span class="v"><?= e($order['vehicle_model_type'] ?: '—') ?> · <?= e($order['color'] ?: '—') ?></span></div>
-          <div class="od-row"><span class="k">Sale date</span><span class="v"><?= india_date($order['sale_date'] ?? null) ?></span></div>
-          <div class="od-row"><span class="k">Chassis</span><span class="v"><?= e($order['chassis_no'] ?: '—') ?></span></div>
-          <div class="od-row"><span class="k">Motor</span><span class="v"><?= e($order['motor_no'] ?: '—') ?> <span class="muted"><?= e($order['motor_warranty'] ? '(' . $order['motor_warranty'] . ')' : '') ?></span></span></div>
-          <div class="od-row"><span class="k">Battery</span><span class="v"><?= e(trim(($order['battery_capacity'] ?? '') . ' ' . ($order['battery_no'] ?? '')) ?: '—') ?></span></div>
-          <div class="od-row"><span class="k">Controller</span><span class="v"><?= e($order['controller_no'] ?: '—') ?></span></div>
-          <div class="od-row"><span class="k">Charger</span><span class="v"><?= e($order['charger_no'] ?: '—') ?></span></div>
+          <div class="od-row"><span class="k">Buyer</span><span class="v"><?= e($o('customer_name', '—')) ?> · <?= e($o('customer_phone', '—')) ?></span></div>
+          <div class="od-row"><span class="k">Address</span><span class="v"><?= e($o('customer_address') ?: ($o('delivery_address') ?: '—')) ?></span></div>
+          <div class="od-row"><span class="k">Model type</span><span class="v"><?= e($o('vehicle_model_type', '—')) ?> · <?= e($o('color', '—')) ?></span></div>
+          <div class="od-row"><span class="k">Sale date</span><span class="v"><?= india_date($o('sale_date') ?: null) ?></span></div>
         </div>
+
+        <div class="od-parts">
+          <div class="od-part">
+            <h4>Chassis</h4>
+            <div class="od-row"><span class="k">Number</span><span class="v"><?= e($o('chassis_no', '—')) ?></span></div>
+          </div>
+          <div class="od-part">
+            <h4>Motor</h4>
+            <div class="od-row"><span class="k">Number</span><span class="v"><?= e($o('motor_no', '—')) ?></span></div>
+            <div class="od-row"><span class="k">Warranty</span><span class="v"><?= e($o('motor_warranty', '—')) ?></span></div>
+          </div>
+          <div class="od-part">
+            <h4>Battery</h4>
+            <div class="od-row"><span class="k">Type / No.</span><span class="v"><?= e($batteryLabel !== '' ? $batteryLabel : '—') ?></span></div>
+            <div class="od-row"><span class="k">Warranty</span><span class="v"><?= e($o('battery_warranty', '—')) ?></span></div>
+          </div>
+          <div class="od-part">
+            <h4>Controller</h4>
+            <div class="od-row"><span class="k">Number</span><span class="v"><?= e($o('controller_no', '—')) ?></span></div>
+            <div class="od-row"><span class="k">Warranty</span><span class="v"><?= e($o('controller_warranty', '—')) ?></span></div>
+          </div>
+          <div class="od-part">
+            <h4>Charger</h4>
+            <div class="od-row"><span class="k">Number</span><span class="v"><?= e($o('charger_no', '—')) ?></span></div>
+            <div class="od-row"><span class="k">Warranty</span><span class="v"><?= e($o('charger_warranty', '—')) ?></span></div>
+          </div>
+          <?php if ($o('hp_name') !== ''): ?>
+          <div class="od-part">
+            <h4>Finance</h4>
+            <div class="od-row"><span class="k">H.P. Name</span><span class="v"><?= e($o('hp_name')) ?></span></div>
+          </div>
+          <?php endif; ?>
+        </div>
+
         <div class="od-money">
           <div><span class="k">Subtotal</span><span class="v"><?= money($order['subtotal']) ?></span></div>
           <div><span class="k">GST 28%</span><span class="v"><?= money($order['tax_amount']) ?></span></div>
