@@ -71,6 +71,7 @@ $router->get('/vehicles/{id}', [VehicleController::class, 'show'], ['require_aut
 
 // Orders
 $router->get('/orders', [OrderController::class, 'index'], ['require_auth']);
+$router->get('/orders/create', [OrderController::class, 'create'], ['require_auth']);
 $router->post('/orders', [OrderController::class, 'store'], ['require_auth']);
 $router->get('/orders/{id}', [OrderController::class, 'show'], ['require_auth']);
 $router->post('/orders/{id}/status', [OrderController::class, 'updateStatus'], ['require_auth']);

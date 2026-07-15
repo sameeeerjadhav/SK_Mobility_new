@@ -50,17 +50,9 @@ class OrderController extends Controller
         $stmt->execute($params);
 
         $dealers = [];
-        $variants = [];
         if (can('manage_orders')) {
             $dealers = $this->db()->query(
                 "SELECT id, business_name, dealer_code FROM dealers WHERE status = 'approved' ORDER BY business_name"
-            )->fetchAll();
-            $variants = $this->db()->query(
-                "SELECT vv.id, vv.name, vv.sku, vv.color, vv.price, v.name AS vehicle_name
-                 FROM vehicle_variants vv
-                 JOIN vehicles v ON v.id = vv.vehicle_id
-                 WHERE vv.is_active = 1 AND v.is_active = 1
-                 ORDER BY v.name, vv.name"
             )->fetchAll();
         }
 
@@ -72,12 +64,33 @@ class OrderController extends Controller
             'page' => $page,
             'totalPages' => max(1, (int)ceil($total / $perPage)),
             'dealers' => $dealers,
-            'variants' => $variants,
             'canManage' => can('manage_orders'),
             'isAdmin' => Auth::role() === 'super_admin',
             'successOrder' => $_SESSION['last_order'] ?? null,
         ]);
         unset($_SESSION['last_order']);
+    }
+
+    public function create(): void
+    {
+        require_permission('manage_orders');
+        $dealers = $this->db()->query(
+            "SELECT id, business_name, dealer_code FROM dealers WHERE status = 'approved' ORDER BY business_name"
+        )->fetchAll();
+        $variants = $this->db()->query(
+            "SELECT vv.id, vv.name, vv.sku, vv.color, vv.price, v.name AS vehicle_name
+             FROM vehicle_variants vv
+             JOIN vehicles v ON v.id = vv.vehicle_id
+             WHERE vv.is_active = 1 AND v.is_active = 1
+             ORDER BY v.name, vv.name"
+        )->fetchAll();
+
+        $this->view('orders/create', [
+            'title' => 'Create Order',
+            'dealers' => $dealers,
+            'variants' => $variants,
+            'isAdmin' => Auth::role() === 'super_admin',
+        ]);
     }
 
     public function store(): void
@@ -137,17 +150,15 @@ class OrderController extends Controller
 
         try {
             $result = OrderService::create($payload, (int)Auth::id());
-            $_SESSION['last_order'] = $result;
             flash('success', 'Order ' . $result['order_number'] . ' created with bill ' . $result['bill_number']);
+            $this->redirect('/orders/' . $result['order_id']);
         } catch (RuntimeException $e) {
             flash('error', $e->getMessage());
+            $this->redirect('/orders/create');
         } catch (\Throwable $e) {
-            flash('error', 'Failed to create order.');
-            if (env('APP_DEBUG') === 'true') {
-                flash('error', $e->getMessage());
-            }
+            flash('error', env('APP_DEBUG') === 'true' ? $e->getMessage() : 'Failed to create order.');
+            $this->redirect('/orders/create');
         }
-        $this->redirect('/orders');
     }
 
     public function show(string $id): void

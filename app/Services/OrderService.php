@@ -34,6 +34,25 @@ class OrderService
             if (empty($data['customer_name']) || empty($data['customer_phone'])) {
                 throw new RuntimeException('Customer name and phone are required.');
             }
+            $requiredInvoice = [
+                'color' => 'Model Color',
+                'sale_date' => 'Date of Sale',
+                'chassis_no' => 'Chassis No.',
+                'motor_no' => 'Motor No.',
+                'motor_warranty' => 'Motor Warranty',
+                'battery_capacity' => 'Battery Type',
+                'battery_no' => 'Battery No.',
+                'battery_warranty' => 'Battery Warranty',
+                'controller_no' => 'Controller No.',
+                'controller_warranty' => 'Controller Warranty',
+                'charger_no' => 'Charger No.',
+                'charger_warranty' => 'Charger Warranty',
+            ];
+            foreach ($requiredInvoice as $key => $label) {
+                if (trim((string)($data[$key] ?? '')) === '') {
+                    throw new RuntimeException($label . ' is required for the tax invoice.');
+                }
+            }
         }
 
         $lineItems = [];
