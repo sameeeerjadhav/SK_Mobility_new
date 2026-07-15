@@ -117,7 +117,19 @@ a:hover { color: var(--primary-dark); }
   text-transform: uppercase;
   margin-top: 2px;
 }
-.sidebar-nav { padding: 0.35rem 0.85rem 1.5rem; overflow-y: auto; flex: 1; }
+.sidebar-nav {
+  padding: 0.35rem 0.85rem 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  overscroll-behavior: contain;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chrome / Safari */
+}
 .nav-section {
   font-size: 0.65rem;
   font-weight: 700;

@@ -241,6 +241,14 @@ function require_role(string ...$roles): void
     }
 }
 
+function nav_active(string $href, string $current): bool
+{
+    if ($href === '#' || $href === '') {
+        return false;
+    }
+    return $current === $href || str_starts_with($current, $href . '/');
+}
+
 function setting(string $key, ?string $default = null): ?string
 {
     static $cache = null;
