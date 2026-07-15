@@ -1,7 +1,8 @@
 <?php
 
 /**
- * Load .env file into getenv / $_ENV
+ * Load .env file into $_ENV (preferred) and putenv.
+ * Values may be quoted; $ in passwords is preserved.
  */
 function loadEnv(string $path): void
 {
@@ -19,16 +20,27 @@ function loadEnv(string $path): void
         }
         [$key, $value] = explode('=', $line, 2);
         $key = trim($key);
-        $value = trim($value, " \t\"'");
+        $value = trim($value);
+        if (
+            (str_starts_with($value, '"') && str_ends_with($value, '"')) ||
+            (str_starts_with($value, "'") && str_ends_with($value, "'"))
+        ) {
+            $value = substr($value, 1, -1);
+        }
         $_ENV[$key] = $value;
-        putenv("$key=$value");
+        // Avoid shell-style $ expansion issues: set via putenv without interpolation
+        putenv($key . '=' . $value);
     }
 }
 
 function env(string $key, mixed $default = null): mixed
 {
-    $val = $_ENV[$key] ?? getenv($key);
-    if ($val === false || $val === null || $val === '') {
+    if (array_key_exists($key, $_ENV)) {
+        $val = $_ENV[$key];
+        return $val === '' ? $default : $val;
+    }
+    $val = getenv($key);
+    if ($val === false || $val === '') {
         return $default;
     }
     return $val;

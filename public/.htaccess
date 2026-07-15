@@ -1,9 +1,16 @@
 RewriteEngine On
+RewriteBase /
 
-# Serve existing files directly
+# Block directory listing
+Options -Indexes
+
+# If MultiViews causes weird 404/500 on some hosts:
+Options -MultiViews
+
+# Serve existing files/folders as-is
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Route everything else through front controller
+# Front controller
 RewriteRule ^ index.php [L]
