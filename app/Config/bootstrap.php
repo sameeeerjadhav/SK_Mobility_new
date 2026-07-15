@@ -3,7 +3,7 @@
 /**
  * Bootstrap with clearer deploy errors (Hostinger 500 diagnostics).
  */
-define('BASE_PATH', dirname(__DIR__));
+define('BASE_PATH', dirname(__DIR__, 2)); // project root (parent of app/ and public/)
 
 $errorHandler = static function (string $message): void {
     http_response_code(500);
