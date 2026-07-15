@@ -1,5 +1,5 @@
 <div x-data="{
-  orderType: '<?= Auth::role() === 'dealer' ? 'dealer' : 'customer' ?>',
+  orderType: 'customer',
   items: [{ variant_id: '', quantity: 1 }]
 }">
   <div style="margin-bottom:0.75rem;"><a href="<?= url('orders') ?>">&larr; Orders</a></div>
@@ -20,10 +20,10 @@
         <div class="form-group">
           <label>Type</label>
           <select class="form-control" name="order_type" x-model="orderType" required>
-            <?php if ($isAdmin): ?>
+            <?php if (!empty($isAdmin)): ?>
               <option value="dealer">Dealer Order</option>
             <?php endif; ?>
-            <option value="customer" selected>Customer Order (Tax Invoice)</option>
+            <option value="customer">Customer Order (Tax Invoice)</option>
           </select>
         </div>
         <div class="form-group">
@@ -42,7 +42,7 @@
       <div class="form-grid">
         <div class="form-group">
           <label>Dealer</label>
-          <select class="form-control" name="dealer_id">
+          <select class="form-control" name="dealer_id" :required="orderType==='dealer'">
             <option value="">Select dealer</option>
             <?php foreach ($dealers as $d): ?>
               <option value="<?= (int)$d['id'] ?>"><?= e($d['business_name']) ?> (<?= e($d['dealer_code'] ?? 'N/A') ?>)</option>
@@ -60,8 +60,8 @@
       <div class="card" style="margin-bottom:0.85rem;">
         <h3 class="card-title">Customer (Tax Invoice)</h3>
         <div class="form-grid">
-          <div class="form-group"><label>Cust. Name *</label><input class="form-control" name="customer_name" required></div>
-          <div class="form-group"><label>Mob. *</label><input class="form-control" name="customer_phone" required></div>
+          <div class="form-group"><label>Cust. Name *</label><input class="form-control" name="customer_name" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Mob. *</label><input class="form-control" name="customer_phone" :required="orderType==='customer'"></div>
           <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" type="email"></div>
           <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="customer_aadhaar"></div>
           <div class="form-group"><label>PAN No.</label><input class="form-control" name="customer_pan"></div>
@@ -74,18 +74,18 @@
         <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">These fields appear on the SAI KUBER tax invoice. Required for customer orders.</p>
         <div class="form-grid">
           <div class="form-group"><label>EV Model Type</label><input class="form-control" name="vehicle_model_type" placeholder="e.g. Electric Scooter"></div>
-          <div class="form-group"><label>Model Color *</label><input class="form-control" name="color" required></div>
-          <div class="form-group"><label>Date of Sale *</label><input class="form-control" type="date" name="sale_date" value="<?= date('Y-m-d') ?>" required></div>
-          <div class="form-group full"><label>Chassis No. *</label><input class="form-control" name="chassis_no" required></div>
-          <div class="form-group"><label>Motor No. *</label><input class="form-control" name="motor_no" required></div>
-          <div class="form-group"><label>Motor Warrenty *</label><input class="form-control" name="motor_warranty" placeholder="e.g. 12 months" required></div>
-          <div class="form-group"><label>Battery Type *</label><input class="form-control" name="battery_capacity" placeholder="e.g. Lithium 60V" required></div>
-          <div class="form-group"><label>Battery No. *</label><input class="form-control" name="battery_no" required></div>
-          <div class="form-group"><label>Battery Warrenty *</label><input class="form-control" name="battery_warranty" required></div>
-          <div class="form-group"><label>Controller No. *</label><input class="form-control" name="controller_no" required></div>
-          <div class="form-group"><label>Controller Warrenty *</label><input class="form-control" name="controller_warranty" required></div>
-          <div class="form-group"><label>Charger No. *</label><input class="form-control" name="charger_no" required></div>
-          <div class="form-group"><label>Charger Warrenty *</label><input class="form-control" name="charger_warranty" required></div>
+          <div class="form-group"><label>Model Color *</label><input class="form-control" name="color" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Date of Sale *</label><input class="form-control" type="date" name="sale_date" value="<?= date('Y-m-d') ?>" :required="orderType==='customer'"></div>
+          <div class="form-group full"><label>Chassis No. *</label><input class="form-control" name="chassis_no" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Motor No. *</label><input class="form-control" name="motor_no" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Motor Warrenty *</label><input class="form-control" name="motor_warranty" placeholder="e.g. 12 months" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Battery Type *</label><input class="form-control" name="battery_capacity" placeholder="e.g. Lithium 60V" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Battery No. *</label><input class="form-control" name="battery_no" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Battery Warrenty *</label><input class="form-control" name="battery_warranty" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Controller No. *</label><input class="form-control" name="controller_no" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Controller Warrenty *</label><input class="form-control" name="controller_warranty" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Charger No. *</label><input class="form-control" name="charger_no" :required="orderType==='customer'"></div>
+          <div class="form-group"><label>Charger Warrenty *</label><input class="form-control" name="charger_warranty" :required="orderType==='customer'"></div>
           <div class="form-group"><label>H.P. Name (Finance)</label><input class="form-control" name="hp_name"></div>
         </div>
       </div>
