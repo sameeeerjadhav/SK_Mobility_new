@@ -80,6 +80,7 @@ $router->post('/payments', [PaymentController::class, 'store'], ['require_auth']
 // Billing
 $router->get('/billing', [BillingController::class, 'index'], ['require_auth']);
 $router->post('/billing/warranty', [BillingController::class, 'createWarranty'], ['require_auth']);
+$router->post('/billing/{id}', [BillingController::class, 'update'], ['require_auth']);
 $router->get('/billing/{id}/preview', [BillingController::class, 'preview'], ['require_auth']);
 $router->get('/billing/{id}/pdf', [BillingController::class, 'pdf'], ['require_auth']);
 $router->get('/billing/{id}', [BillingController::class, 'show'], ['require_auth']);

@@ -59,14 +59,16 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
 INSERT INTO users (id, role_id, email, password_hash, first_name, last_name, phone, is_active, is_verified) VALUES
 (1, 1, 'admin@skmobility.com', '$2y$10$8hQP4OmQjFP8gg6HPHmjveWbaRB/ELddTSwft6XxWErDKdwH.HMgu', 'Super', 'Admin', '9999999999', 1, 1);
 
--- System settings
+-- System settings (SAI KUBER MOBILITY tax invoice header)
 INSERT INTO system_settings (setting_key, setting_value, description) VALUES
-('company_name', 'SK Mobility Pvt Ltd', 'Legal company name'),
-('company_address', '123 EV Tech Park, Pune, Maharashtra 411001', 'Registered address'),
-('company_phone', '+91 20 1234 5678', 'Company phone'),
-('company_email', 'info@skmobility.com', 'Company email'),
-('company_gstin', '27AABCS1234A1Z5', 'GSTIN'),
-('brand_name', 'SK Mobility', 'Brand name'),
+('company_name', 'SAI KUBER MOBILITY', 'Legal company name on tax invoice'),
+('company_address', 'Main Branch: S.No. 365, Opp. to Atma Malik Hospital, Nagar Manmad Road, Kokamthan.', 'Main branch address'),
+('company_branch_address', 'Branch: Opp. Rajpal, Nagar-Manmad Road, Tal. Kopargaon, Dist. Ahilyanagar.', 'Second branch address'),
+('company_phone', '9130119191, 9270047343', 'Company phones'),
+('company_email', 'info@saikubermobility.com', 'Company email'),
+('company_gstin', '27AFZFS1183A1ZP', 'GSTIN'),
+('company_state', 'Maharashtra', 'State name on invoice'),
+('brand_name', 'SK MOBILITY', 'Brand / logo text'),
 ('company_state_code', '27', 'Maharashtra state code');
 
 -- Taxes

@@ -65,6 +65,9 @@ class OrderService
                 'unit_price' => $unit,
                 'total_price' => $total,
                 'description' => $variant['vehicle_name'] . ' — ' . $variant['name'] . ($variant['color'] ? ' (' . $variant['color'] . ')' : ''),
+                'model_code' => $variant['sku'] ?? null,
+                'model_name' => $variant['vehicle_name'],
+                'color' => $variant['color'] ?? null,
             ];
         }
 
@@ -74,25 +77,44 @@ class OrderService
 
         $pmIncentive = $orderType === 'customer' ? (float)($data['pm_drive_incentive'] ?? 0) : 0.0;
         $stateSubsidy = $orderType === 'customer' ? (float)($data['state_subsidy'] ?? 0) : 0.0;
-        $taxable = max(0, $subtotal - $pmIncentive - $stateSubsidy);
-        $taxAmount = round($taxable * 0.28, 2);
+        $extraDisc = (float)($data['discount_amount'] ?? 0);
+        $loanAmount = (float)($data['loan_amount'] ?? 0);
+        $totalDisc = $pmIncentive + $stateSubsidy + $extraDisc;
+
+        $taxable = max(0, $subtotal - $totalDisc);
+        $cgst = round($taxable * 0.14, 2);
+        $sgst = round($taxable * 0.14, 2);
+        $taxAmount = round($cgst + $sgst, 2);
         $totalAmount = round($taxable + $taxAmount, 2);
 
         $prefix = $orderType === 'dealer' ? 'ORD' : 'CORD';
         $orderNumber = next_code($prefix, 'orders', 'order_number');
+        $bookingNo = trim((string)($data['booking_no'] ?? '')) ?: $orderNumber;
+        $saleDate = $data['sale_date'] ?: date('Y-m-d');
+        $color = $data['color'] ?? ($lineItems[0]['color'] ?? null);
+        $batteryTypeNo = trim(implode(' ', array_filter([
+            $data['battery_capacity'] ?? null,
+            $data['battery_no'] ?? null,
+        ])));
+
+        $paymentMode = self::normalizePaymentMode($data);
 
         $db->beginTransaction();
         try {
             $db->prepare(
                 'INSERT INTO orders (
-                    order_number, order_type, dealer_id,
+                    order_number, booking_no, order_type, dealer_id,
                     customer_name, customer_phone, customer_email, customer_address,
-                    customer_aadhaar, customer_pan, chassis_no, motor_no, battery_capacity, color,
-                    pm_drive_incentive, state_subsidy, subtotal, tax_amount, total_amount,
+                    customer_aadhaar, customer_pan, chassis_no, motor_no,
+                    battery_capacity, battery_no, controller_no, charger_no,
+                    motor_warranty, battery_warranty, controller_warranty, charger_warranty,
+                    hp_name, color, vehicle_model_type,
+                    pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
+                    payment_mode, sale_date, subtotal, tax_amount, total_amount,
                     status, delivery_address, notes, expected_delivery_date, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
-                $orderNumber, $orderType, $dealerId,
+                $orderNumber, $bookingNo, $orderType, $dealerId,
                 $data['customer_name'] ?? null,
                 $data['customer_phone'] ?? null,
                 $data['customer_email'] ?? null,
@@ -102,8 +124,18 @@ class OrderService
                 $data['chassis_no'] ?? null,
                 $data['motor_no'] ?? null,
                 $data['battery_capacity'] ?? null,
-                $data['color'] ?? null,
-                $pmIncentive, $stateSubsidy, $subtotal, $taxAmount, $totalAmount,
+                $data['battery_no'] ?? null,
+                $data['controller_no'] ?? null,
+                $data['charger_no'] ?? null,
+                $data['motor_warranty'] ?? null,
+                $data['battery_warranty'] ?? null,
+                $data['controller_warranty'] ?? null,
+                $data['charger_warranty'] ?? null,
+                $data['hp_name'] ?? null,
+                $color,
+                $data['vehicle_model_type'] ?? null,
+                $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
+                $paymentMode, $saleDate, $subtotal, $taxAmount, $totalAmount,
                 'pending',
                 $data['delivery_address'] ?? null,
                 $data['notes'] ?? null,
@@ -127,7 +159,6 @@ class OrderService
                 'INSERT INTO order_status_history (order_id, status, notes, changed_by) VALUES (?,?,?,?)'
             )->execute([$orderId, 'pending', 'Order created', $userId]);
 
-            // Auto-create bill
             $billNumber = next_code('INV', 'bills', 'bill_number');
             $customerName = $orderType === 'dealer'
                 ? (self::dealerName($db, $dealerId) ?? 'Dealer')
@@ -142,43 +173,65 @@ class OrderService
 
             $db->prepare(
                 'INSERT INTO bills (
-                    bill_number, bill_type, order_id,
-                    company_name, company_address, company_phone, company_email,
-                    company_gstin, company_state_code, brand_name, dealer_code,
-                    customer_name, customer_phone, customer_address,
+                    bill_number, bill_type, order_id, booking_no,
+                    company_name, company_address, company_branch_address, company_phone, company_email,
+                    company_gstin, company_state, company_state_code, brand_name, dealer_code,
+                    customer_name, customer_phone, customer_email, customer_address,
                     customer_aadhaar, customer_pan,
-                    vehicle_model, chassis_no, motor_no, vehicle_sale_date,
+                    vehicle_model, vehicle_model_type, color, chassis_no, motor_no,
+                    battery_type_no, controller_no, charger_no,
+                    motor_warranty, battery_warranty, controller_warranty, charger_warranty,
+                    hp_name, vehicle_sale_date,
                     subtotal, tax_rate, cgst_rate, sgst_rate,
-                    pm_drive_incentive, state_subsidy, total_amount, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                    pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
+                    payment_mode, total_amount, created_by
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
-                $billNumber, 'vehicle', $orderId,
-                setting('company_name'), setting('company_address'),
+                $billNumber, 'vehicle', $orderId, $bookingNo,
+                setting('company_name'), setting('company_address'), setting('company_branch_address'),
                 setting('company_phone'), setting('company_email'),
-                setting('company_gstin'), setting('company_state_code'),
+                setting('company_gstin'), setting('company_state', 'Maharashtra'), setting('company_state_code'),
                 setting('brand_name'), $dealerCode,
                 $customerName,
                 $data['customer_phone'] ?? null,
+                $data['customer_email'] ?? null,
                 $data['customer_address'] ?? ($data['delivery_address'] ?? null),
                 $data['customer_aadhaar'] ?? null,
                 $data['customer_pan'] ?? null,
-                $lineItems[0]['description'] ?? null,
+                $lineItems[0]['model_name'] ?? ($lineItems[0]['description'] ?? null),
+                $data['vehicle_model_type'] ?? null,
+                $color,
                 $data['chassis_no'] ?? null,
                 $data['motor_no'] ?? null,
-                date('Y-m-d'),
+                $batteryTypeNo !== '' ? $batteryTypeNo : null,
+                $data['controller_no'] ?? null,
+                $data['charger_no'] ?? null,
+                $data['motor_warranty'] ?? null,
+                $data['battery_warranty'] ?? null,
+                $data['controller_warranty'] ?? null,
+                $data['charger_warranty'] ?? null,
+                $data['hp_name'] ?? null,
+                $saleDate,
                 $subtotal, 28, 14, 14,
-                $pmIncentive, $stateSubsidy, $totalAmount, $userId,
+                $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
+                $paymentMode, $totalAmount, $userId,
             ]);
             $billId = (int)$db->lastInsertId();
 
             $bi = $db->prepare(
-                'INSERT INTO bill_items (bill_id, description, hsn_code, quantity, unit_price, total_price)
-                 VALUES (?,?,?,?,?,?)'
+                'INSERT INTO bill_items (bill_id, description, model_code, hsn_code, quantity, unit_price, discount, taxable_amount, cgst_amount, sgst_amount, total_price)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?)'
             );
-            foreach ($lineItems as $li) {
+            foreach ($lineItems as $idx => $li) {
+                $lineDisc = $idx === 0 ? $totalDisc : 0.0;
+                $lineTaxable = max(0, $li['unit_price'] * $li['quantity'] - $lineDisc);
+                $lineCgst = round($lineTaxable * 0.14, 2);
+                $lineSgst = round($lineTaxable * 0.14, 2);
+                $lineTotal = round($lineTaxable + $lineCgst + $lineSgst, 2);
                 $bi->execute([
-                    $billId, $li['description'], '87116020',
-                    $li['quantity'], $li['unit_price'], $li['total_price'],
+                    $billId, $li['description'], $li['model_code'], '87116020',
+                    $li['quantity'], $li['unit_price'], $lineDisc,
+                    $lineTaxable, $lineCgst, $lineSgst, $lineTotal,
                 ]);
             }
 
@@ -215,6 +268,21 @@ class OrderService
             'bill_number' => $billNumber,
             'total_amount' => $totalAmount,
         ];
+    }
+
+    private static function normalizePaymentMode(array $data): ?string
+    {
+        if (!empty($data['payment_mode'])) {
+            return (string)$data['payment_mode'];
+        }
+        $parts = [];
+        if (!empty($data['paid_cash'])) {
+            $parts[] = 'cash';
+        }
+        if (!empty($data['paid_cheque'])) {
+            $parts[] = 'cheque';
+        }
+        return $parts ? implode('_', $parts) : null;
     }
 
     private static function dealerName(PDO $db, int $dealerId): ?string

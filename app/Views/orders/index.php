@@ -107,18 +107,35 @@
 
           <div x-show="orderType==='customer'" style="display:none;">
             <div class="form-grid">
-              <div class="form-group"><label>Customer Name</label><input class="form-control" name="customer_name"></div>
-              <div class="form-group"><label>Phone</label><input class="form-control" name="customer_phone"></div>
-              <div class="form-group"><label>Email</label><input class="form-control" name="customer_email"></div>
-              <div class="form-group"><label>Aadhaar</label><input class="form-control" name="customer_aadhaar"></div>
-              <div class="form-group"><label>PAN</label><input class="form-control" name="customer_pan"></div>
-              <div class="form-group full"><label>Address</label><textarea class="form-control" name="customer_address" rows="2"></textarea></div>
-              <div class="form-group"><label>Chassis No</label><input class="form-control" name="chassis_no"></div>
-              <div class="form-group"><label>Motor No</label><input class="form-control" name="motor_no"></div>
-              <div class="form-group"><label>Battery</label><input class="form-control" name="battery_capacity"></div>
-              <div class="form-group"><label>Color</label><input class="form-control" name="color"></div>
+              <div class="form-group"><label>Cust. Name</label><input class="form-control" name="customer_name"></div>
+              <div class="form-group"><label>Booking No.</label><input class="form-control" name="booking_no" placeholder="Optional — defaults to order no."></div>
+              <div class="form-group"><label>Mob.</label><input class="form-control" name="customer_phone"></div>
+              <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" type="email"></div>
+              <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="customer_aadhaar"></div>
+              <div class="form-group"><label>PAN No.</label><input class="form-control" name="customer_pan"></div>
+              <div class="form-group full"><label>Add. (Address)</label><textarea class="form-control" name="customer_address" rows="2"></textarea></div>
+              <div class="form-group"><label>EV Model Type</label><input class="form-control" name="vehicle_model_type" placeholder="e.g. Electric Scooter"></div>
+              <div class="form-group"><label>Model Color</label><input class="form-control" name="color"></div>
+              <div class="form-group"><label>Date of Sale</label><input class="form-control" type="date" name="sale_date" value="<?= date('Y-m-d') ?>"></div>
+              <div class="form-group"><label>Chassis No.</label><input class="form-control" name="chassis_no"></div>
+              <div class="form-group"><label>Motor No.</label><input class="form-control" name="motor_no"></div>
+              <div class="form-group"><label>Motor Warrenty</label><input class="form-control" name="motor_warranty" placeholder="e.g. 12 months"></div>
+              <div class="form-group"><label>Battery Type</label><input class="form-control" name="battery_capacity" placeholder="e.g. Lithium 60V"></div>
+              <div class="form-group"><label>Battery No.</label><input class="form-control" name="battery_no"></div>
+              <div class="form-group"><label>Battery Warrenty</label><input class="form-control" name="battery_warranty"></div>
+              <div class="form-group"><label>Controller No.</label><input class="form-control" name="controller_no"></div>
+              <div class="form-group"><label>Controller Warrenty</label><input class="form-control" name="controller_warranty"></div>
+              <div class="form-group"><label>Charger No.</label><input class="form-control" name="charger_no"></div>
+              <div class="form-group"><label>Charger Warrenty</label><input class="form-control" name="charger_warranty"></div>
+              <div class="form-group"><label>H.P. Name (Finance)</label><input class="form-control" name="hp_name"></div>
+              <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" name="loan_amount" value="0"></div>
+              <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" name="discount_amount" value="0"></div>
               <div class="form-group"><label>PM E-DRIVE Incentive (₹)</label><input class="form-control" type="number" step="0.01" name="pm_drive_incentive" value="0"></div>
               <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" name="state_subsidy" value="0"></div>
+              <div class="form-group full" style="display:flex;gap:1.25rem;align-items:center;padding-top:0.5rem;">
+                <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1"> Paid in Cash</label>
+                <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1"> Paid in Cheque</label>
+              </div>
             </div>
           </div>
 

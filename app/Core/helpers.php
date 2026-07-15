@@ -95,6 +95,54 @@ function money(float|string|null $amount): string
     return $sign . '₹' . $int . '.' . $dec;
 }
 
+/** Indian currency amount in words (rupees only; paise as "and XX/100"). */
+function amount_in_words(float|string|null $amount): string
+{
+    $n = round((float)$amount, 2);
+    $neg = $n < 0;
+    $n = abs($n);
+    $rupees = (int)floor($n);
+    $paise = (int)round(($n - $rupees) * 100);
+
+    $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+        'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    $twoDigits = static function (int $num) use ($ones, $tens): string {
+        if ($num < 20) {
+            return $ones[$num];
+        }
+        return trim($tens[(int)floor($num / 10)] . ' ' . $ones[$num % 10]);
+    };
+
+    $words = static function (int $num) use ($ones, $twoDigits, &$words): string {
+        if ($num === 0) {
+            return '';
+        }
+        if ($num < 100) {
+            return $twoDigits($num);
+        }
+        if ($num < 1000) {
+            return trim($ones[(int)floor($num / 100)] . ' Hundred ' . $words($num % 100));
+        }
+        if ($num < 100000) {
+            return trim($words((int)floor($num / 1000)) . ' Thousand ' . $words($num % 1000));
+        }
+        if ($num < 10000000) {
+            return trim($words((int)floor($num / 100000)) . ' Lakh ' . $words($num % 100000));
+        }
+        return trim($words((int)floor($num / 10000000)) . ' Crore ' . $words($num % 10000000));
+    };
+
+    $text = $rupees === 0 ? 'Zero' : $words($rupees);
+    $text = 'Rupees ' . trim($text);
+    if ($paise > 0) {
+        $text .= ' and ' . $twoDigits($paise) . ' Paise';
+    }
+    $text .= ' Only';
+    return ($neg ? 'Minus ' : '') . $text;
+}
+
 function india_date(?string $date): string
 {
     if (!$date) {
