@@ -60,10 +60,12 @@ $router->post('/dealers/{id}/toggle-login', [DealerController::class, 'toggleUse
 // Vehicles
 $router->get('/vehicles', [VehicleController::class, 'index'], ['require_auth']);
 $router->post('/vehicles', [VehicleController::class, 'store'], ['require_auth']);
-$router->post('/vehicles/{id}', [VehicleController::class, 'update'], ['require_auth']);
-$router->post('/vehicles/{id}/delete', [VehicleController::class, 'destroy'], ['require_auth']);
+$router->post('/vehicles/{id}/variants/{vid}/delete', [VehicleController::class, 'destroyVariant'], ['require_auth']);
+$router->post('/vehicles/{id}/variants/{vid}', [VehicleController::class, 'updateVariant'], ['require_auth']);
 $router->post('/vehicles/{id}/variants', [VehicleController::class, 'addVariant'], ['require_auth']);
 $router->post('/vehicles/{id}/images', [VehicleController::class, 'uploadImage'], ['require_auth']);
+$router->post('/vehicles/{id}/delete', [VehicleController::class, 'destroy'], ['require_auth']);
+$router->post('/vehicles/{id}', [VehicleController::class, 'update'], ['require_auth']);
 $router->get('/vehicles/{id}', [VehicleController::class, 'show'], ['require_auth']);
 
 // Orders

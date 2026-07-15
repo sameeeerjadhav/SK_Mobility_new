@@ -135,9 +135,32 @@ class VehicleController extends Controller
         require_permission('manage_vehicles');
         $this->validateCsrf();
         $vehicleId = (int)$id;
-        $this->db()->prepare('UPDATE vehicles SET is_active = 0 WHERE id = ?')->execute([$vehicleId]);
+
+        $stmt = $this->db()->prepare('SELECT COUNT(*) FROM order_items WHERE vehicle_id = ?');
+        $stmt->execute([$vehicleId]);
+        $used = (int)$stmt->fetchColumn();
+        if ($used > 0) {
+            flash('error', 'Cannot delete: this vehicle is used in ' . $used . ' order line(s).');
+            $this->redirect('/vehicles/' . $vehicleId);
+        }
+
+        $vids = $this->db()->prepare('SELECT id FROM vehicle_variants WHERE vehicle_id = ?');
+        $vids->execute([$vehicleId]);
+        $variantIds = array_map('intval', array_column($vids->fetchAll(), 'id'));
+        if ($variantIds) {
+            $in = implode(',', array_fill(0, count($variantIds), '?'));
+            $this->db()->prepare("DELETE FROM inventory_movements WHERE variant_id IN ({$in})")->execute($variantIds);
+            $this->db()->prepare("DELETE FROM inventory WHERE variant_id IN ({$in})")->execute($variantIds);
+        }
+        $this->db()->prepare('DELETE FROM inventory WHERE vehicle_id = ?')->execute([$vehicleId]);
+        $this->db()->prepare('UPDATE leads SET interested_vehicle_id = NULL WHERE interested_vehicle_id = ?')
+            ->execute([$vehicleId]);
+        $this->db()->prepare('DELETE FROM vehicle_images WHERE vehicle_id = ?')->execute([$vehicleId]);
+        $this->db()->prepare('DELETE FROM vehicle_variants WHERE vehicle_id = ?')->execute([$vehicleId]);
+        $this->db()->prepare('DELETE FROM vehicles WHERE id = ?')->execute([$vehicleId]);
+
         Audit::log('delete', 'vehicles', 'vehicles', $vehicleId);
-        flash('success', 'Vehicle deactivated.');
+        flash('success', 'Vehicle deleted.');
         $this->redirect('/vehicles');
     }
 
@@ -162,6 +185,75 @@ class VehicleController extends Controller
         ]);
         Audit::log('create', 'vehicles', 'vehicle_variants', (int)$this->db()->lastInsertId());
         flash('success', 'Variant added.');
+        $this->redirect('/vehicles/' . $vehicleId);
+    }
+
+    public function updateVariant(string $id, string $vid): void
+    {
+        require_permission('manage_vehicles');
+        $this->validateCsrf();
+        $vehicleId = (int)$id;
+        $variantId = (int)$vid;
+
+        $check = $this->db()->prepare('SELECT id FROM vehicle_variants WHERE id = ? AND vehicle_id = ?');
+        $check->execute([$variantId, $vehicleId]);
+        if (!$check->fetch()) {
+            flash('error', 'Variant not found.');
+            $this->redirect('/vehicles/' . $vehicleId);
+        }
+
+        $sku = $this->input('sku');
+        if ($sku === '') {
+            $sku = strtoupper(substr(slugify($this->input('name')), 0, 8)) . '-' . random_int(100, 999);
+        }
+
+        $this->db()->prepare(
+            'UPDATE vehicle_variants SET name=?, sku=?, color=?, price=?, battery_capacity_kwh=?, range_km=?, is_active=?
+             WHERE id=? AND vehicle_id=?'
+        )->execute([
+            $this->input('name'),
+            $sku,
+            $this->input('color'),
+            (float)$this->input('price'),
+            $this->input('battery_capacity_kwh') !== '' ? (float)$this->input('battery_capacity_kwh') : null,
+            $this->input('range_km') !== '' ? (int)$this->input('range_km') : null,
+            (int)$this->input('is_active', '1'),
+            $variantId,
+            $vehicleId,
+        ]);
+        Audit::log('update', 'vehicles', 'vehicle_variants', $variantId);
+        flash('success', 'Variant updated.');
+        $this->redirect('/vehicles/' . $vehicleId);
+    }
+
+    public function destroyVariant(string $id, string $vid): void
+    {
+        require_permission('manage_vehicles');
+        $this->validateCsrf();
+        $vehicleId = (int)$id;
+        $variantId = (int)$vid;
+
+        $check = $this->db()->prepare('SELECT id FROM vehicle_variants WHERE id = ? AND vehicle_id = ?');
+        $check->execute([$variantId, $vehicleId]);
+        if (!$check->fetch()) {
+            flash('error', 'Variant not found.');
+            $this->redirect('/vehicles/' . $vehicleId);
+        }
+
+        $used = $this->db()->prepare('SELECT COUNT(*) FROM order_items WHERE variant_id = ?');
+        $used->execute([$variantId]);
+        if ((int)$used->fetchColumn() > 0) {
+            flash('error', 'Cannot delete: this variant is used in existing orders.');
+            $this->redirect('/vehicles/' . $vehicleId);
+        }
+
+        $this->db()->prepare('DELETE FROM inventory_movements WHERE variant_id = ?')->execute([$variantId]);
+        $this->db()->prepare('DELETE FROM inventory WHERE variant_id = ?')->execute([$variantId]);
+        $this->db()->prepare('UPDATE vehicle_images SET variant_id = NULL WHERE variant_id = ?')->execute([$variantId]);
+        $this->db()->prepare('DELETE FROM vehicle_variants WHERE id = ? AND vehicle_id = ?')->execute([$variantId, $vehicleId]);
+
+        Audit::log('delete', 'vehicles', 'vehicle_variants', $variantId);
+        flash('success', 'Variant deleted.');
         $this->redirect('/vehicles/' . $vehicleId);
     }
 

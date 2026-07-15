@@ -1,6 +1,6 @@
 <div style="margin-bottom:1rem;"><a href="<?= url('vehicles') ?>">&larr; Vehicles</a></div>
 
-<div class="grid-2">
+<div class="grid-2" x-data="{ editVariant: null }">
   <div class="card">
     <h1 class="page-title" style="margin-top:0;"><?= e($vehicle['name']) ?></h1>
     <p class="muted"><?= e($vehicle['brand']) ?> · <?= e($vehicle['category_name']) ?></p>
@@ -23,11 +23,13 @@
           <div class="form-group"><label>Base Price</label><input class="form-control" type="number" step="0.01" name="base_price" value="<?= e($vehicle['base_price']) ?>"></div>
           <div class="form-group full"><label>Description</label><textarea class="form-control" name="description" rows="3"><?= e($vehicle['description'] ?? '') ?></textarea></div>
         </div>
-        <button class="btn btn-primary" type="submit">Update</button>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem;">
+          <button class="btn btn-primary" type="submit">Update vehicle</button>
+        </div>
       </form>
-      <form method="post" action="<?= url('vehicles/' . $vehicle['id'] . '/delete') ?>" style="margin-top:0.75rem;" onsubmit="return confirm('Deactivate this vehicle?')">
+      <form method="post" action="<?= url('vehicles/' . $vehicle['id'] . '/delete') ?>" style="margin-top:0.75rem;" onsubmit="return confirm('Permanently delete this vehicle and all its variants? This cannot be undone.')">
         <?= csrf_field() ?>
-        <button class="btn btn-danger" type="submit">Deactivate</button>
+        <button class="btn btn-danger" type="submit">Delete vehicle</button>
       </form>
     <?php endif; ?>
   </div>
@@ -54,25 +56,49 @@
       <h3 class="card-title">Variants</h3>
       <div class="table-wrap">
         <table class="data">
-          <thead><tr><th>Name</th><th>SKU</th><th>Color</th><th>Price</th><th>Battery</th><th>Range</th></tr></thead>
+          <thead><tr><th>Name</th><th>SKU</th><th>Color</th><th>Price</th><th>Battery</th><th>Range</th><?php if ($canManage): ?><th></th><?php endif; ?></tr></thead>
           <tbody>
           <?php foreach ($variants as $vv): ?>
             <tr>
-              <td><?= e($vv['name']) ?></td>
+              <td>
+                <?= e($vv['name']) ?>
+                <?php if (!(int)$vv['is_active']): ?><span class="chip chip-secondary" style="margin-left:0.35rem;">Inactive</span><?php endif; ?>
+              </td>
               <td><?= e($vv['sku']) ?></td>
               <td><?= e($vv['color'] ?? '—') ?></td>
               <td><?= money($vv['price']) ?></td>
               <td><?= e($vv['battery_capacity_kwh'] ?? '—') ?> kWh</td>
               <td><?= e($vv['range_km'] ?? '—') ?> km</td>
+              <?php if ($canManage): ?>
+              <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-outline" type="button"
+                  @click='editVariant = <?= json_encode([
+                      'id' => (int)$vv['id'],
+                      'name' => $vv['name'],
+                      'sku' => $vv['sku'],
+                      'color' => $vv['color'] ?? '',
+                      'price' => $vv['price'],
+                      'battery_capacity_kwh' => $vv['battery_capacity_kwh'] ?? '',
+                      'range_km' => $vv['range_km'] ?? '',
+                      'is_active' => (int)$vv['is_active'],
+                  ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>'>Edit</button>
+                <form method="post" action="<?= url('vehicles/' . $vehicle['id'] . '/variants/' . $vv['id'] . '/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete this variant?')">
+                  <?= csrf_field() ?>
+                  <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                </form>
+              </td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
-          <?php if (!$variants): ?><tr><td colspan="6" class="muted">No variants yet.</td></tr><?php endif; ?>
+          <?php if (!$variants): ?><tr><td colspan="<?= $canManage ? 7 : 6 ?>" class="muted">No variants yet.</td></tr><?php endif; ?>
           </tbody>
         </table>
       </div>
+
       <?php if ($canManage): ?>
         <form method="post" action="<?= url('vehicles/' . $vehicle['id'] . '/variants') ?>" style="margin-top:1rem;">
           <?= csrf_field() ?>
+          <h4 style="margin:0 0 0.5rem;font-size:0.85rem;">Add variant</h4>
           <div class="form-grid">
             <div class="form-group"><label>Variant name</label><input class="form-control" name="name" required></div>
             <div class="form-group"><label>SKU</label><input class="form-control" name="sku" placeholder="Auto if blank"></div>
@@ -83,6 +109,36 @@
           </div>
           <button class="btn btn-primary" type="submit">Add Variant</button>
         </form>
+
+        <div class="modal-backdrop" :class="{ open: !!editVariant }" @click.self="editVariant=null" x-show="editVariant" x-cloak>
+          <div class="modal" x-show="editVariant">
+            <form method="post" :action="'<?= url('vehicles/' . $vehicle['id'] . '/variants') ?>/' + editVariant?.id">
+              <?= csrf_field() ?>
+              <div class="modal-header">
+                <h3 class="modal-title">Edit variant</h3>
+                <button type="button" class="btn btn-sm btn-outline" @click="editVariant=null">Close</button>
+              </div>
+              <div class="modal-body form-grid">
+                <div class="form-group"><label>Name</label><input class="form-control" name="name" :value="editVariant?.name" required></div>
+                <div class="form-group"><label>SKU</label><input class="form-control" name="sku" :value="editVariant?.sku"></div>
+                <div class="form-group"><label>Color</label><input class="form-control" name="color" :value="editVariant?.color"></div>
+                <div class="form-group"><label>Price</label><input class="form-control" type="number" step="0.01" name="price" :value="editVariant?.price" required></div>
+                <div class="form-group"><label>Battery kWh</label><input class="form-control" type="number" step="0.01" name="battery_capacity_kwh" :value="editVariant?.battery_capacity_kwh"></div>
+                <div class="form-group"><label>Range km</label><input class="form-control" type="number" name="range_km" :value="editVariant?.range_km"></div>
+                <div class="form-group"><label>Active</label>
+                  <select class="form-control" name="is_active" :value="String(editVariant?.is_active)">
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline" @click="editVariant=null">Cancel</button>
+                <button class="btn btn-primary" type="submit">Save variant</button>
+              </div>
+            </form>
+          </div>
+        </div>
       <?php endif; ?>
     </div>
   </div>
