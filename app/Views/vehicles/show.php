@@ -8,7 +8,10 @@ $tabInit = match ($_GET['tab'] ?? '') {
     default => 'overview',
 };
 ?>
-<?php $batteryTypes = ['Lithium Ion', 'Lead Acid']; ?>
+<?php
+$batteryTypes = ['Lithium Ion', 'Lead Acid'];
+$batterySpecOptions = \App\Controllers\VehicleController::batterySpecOptions();
+?>
 <style>
 .vp{max-width:1100px}
 .vp-back{display:inline-block;font-size:.82rem;font-weight:600;color:#64748b;margin:0 0 .7rem}
@@ -75,7 +78,23 @@ $tabInit = match ($_GET['tab'] ?? '') {
 }
 </style>
 
-<div class="vp" x-data="{ tab: '<?= e($tabInit) ?>', editVariant: null }">
+<div class="vp" x-data="{
+  tab: '<?= e($tabInit) ?>',
+  editVariant: null,
+  addBatteryType: '',
+  addBatterySpec: '',
+  batteryOptions: <?= htmlspecialchars(json_encode($batterySpecOptions, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>,
+  specsFor(type) { return this.batteryOptions[type] || []; },
+  onAddTypeChange() {
+    const opts = this.specsFor(this.addBatteryType);
+    if (!opts.includes(this.addBatterySpec)) this.addBatterySpec = '';
+  },
+  onEditTypeChange() {
+    if (!this.editVariant) return;
+    const opts = this.specsFor(this.editVariant.battery_type);
+    if (!opts.includes(this.editVariant.battery_spec)) this.editVariant.battery_spec = '';
+  }
+}">
   <a class="vp-back" href="<?= url('vehicles') ?>">&larr; Vehicles</a>
 
   <div class="vp-hero">
@@ -197,8 +216,8 @@ $tabInit = match ($_GET['tab'] ?? '') {
                       'sku' => $vv['sku'],
                       'color' => $vv['color'] ?? '',
                       'price' => $vv['price'],
-                      'battery_capacity_kwh' => $vv['battery_capacity_kwh'] ?? '',
                       'battery_type' => $vv['battery_type'] ?? '',
+                      'battery_spec' => $vv['battery_spec'] ?? '',
                       'range_km' => $vv['range_km'] ?? '',
                       'is_active' => (int)$vv['is_active'],
                   ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>'>Edit</button>
@@ -214,7 +233,7 @@ $tabInit = match ($_GET['tab'] ?? '') {
               <div class="vv-spec price"><span>Price</span><strong><?= money($vv['price']) ?></strong></div>
               <div class="vv-spec"><span>Color</span><strong><?= e($vv['color'] ?: '—') ?></strong></div>
               <div class="vv-spec"><span>Battery type</span><strong><?= e($vv['battery_type'] ?: '—') ?></strong></div>
-              <div class="vv-spec"><span>Battery</span><strong><?= e($vv['battery_capacity_kwh'] ?? '—') ?> kWh</strong></div>
+              <div class="vv-spec"><span>Capacity</span><strong><?= e($vv['battery_spec'] ?: '—') ?></strong></div>
               <div class="vv-spec"><span>Range</span><strong><?= e($vv['range_km'] ?? '—') ?> km</strong></div>
             </div>
 
@@ -260,14 +279,21 @@ $tabInit = match ($_GET['tab'] ?? '') {
           <div class="form-group"><label>Color</label><input class="form-control" name="color"></div>
           <div class="form-group"><label>Price</label><input class="form-control" type="number" step="0.01" name="price" required></div>
           <div class="form-group"><label>Battery type</label>
-            <select class="form-control" name="battery_type">
+            <select class="form-control" name="battery_type" x-model="addBatteryType" @change="onAddTypeChange()">
               <option value="">Select</option>
               <?php foreach ($batteryTypes as $bt): ?>
                 <option value="<?= e($bt) ?>"><?= e($bt) ?></option>
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="form-group"><label>Battery kWh</label><input class="form-control" type="number" step="0.01" name="battery_capacity_kwh"></div>
+          <div class="form-group"><label>Battery capacity</label>
+            <select class="form-control" name="battery_spec" x-model="addBatterySpec" :disabled="!addBatteryType">
+              <option value="">Select</option>
+              <template x-for="opt in specsFor(addBatteryType)" :key="opt">
+                <option :value="opt" x-text="opt"></option>
+              </template>
+            </select>
+          </div>
           <div class="form-group"><label>Range km</label><input class="form-control" type="number" name="range_km"></div>
         </div>
         <button class="btn btn-sm btn-primary" type="submit">Add variant</button>
@@ -287,14 +313,21 @@ $tabInit = match ($_GET['tab'] ?? '') {
               <div class="form-group"><label>Color</label><input class="form-control" name="color" :value="editVariant?.color"></div>
               <div class="form-group"><label>Price</label><input class="form-control" type="number" step="0.01" name="price" :value="editVariant?.price" required></div>
               <div class="form-group"><label>Battery type</label>
-                <select class="form-control" name="battery_type" x-model="editVariant.battery_type">
+                <select class="form-control" name="battery_type" x-model="editVariant.battery_type" @change="onEditTypeChange()">
                   <option value="">Select</option>
                   <?php foreach ($batteryTypes as $bt): ?>
                     <option value="<?= e($bt) ?>"><?= e($bt) ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
-              <div class="form-group"><label>Battery kWh</label><input class="form-control" type="number" step="0.01" name="battery_capacity_kwh" :value="editVariant?.battery_capacity_kwh"></div>
+              <div class="form-group"><label>Battery capacity</label>
+                <select class="form-control" name="battery_spec" x-model="editVariant.battery_spec" :disabled="!editVariant?.battery_type">
+                  <option value="">Select</option>
+                  <template x-for="opt in specsFor(editVariant?.battery_type)" :key="opt">
+                    <option :value="opt" x-text="opt"></option>
+                  </template>
+                </select>
+              </div>
               <div class="form-group"><label>Range km</label><input class="form-control" type="number" name="range_km" :value="editVariant?.range_km"></div>
               <div class="form-group"><label>Active</label>
                 <select class="form-control" name="is_active" :value="String(editVariant?.is_active)">

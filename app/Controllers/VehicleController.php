@@ -211,8 +211,11 @@ class VehicleController extends Controller
         $vehicleId = (int)$id;
         $sku = $this->input('sku') ?: strtoupper(substr(slugify($this->input('name')), 0, 8)) . '-' . random_int(100, 999);
 
+        $batteryType = $this->validBatteryType($this->input('battery_type'));
+        $batterySpec = $this->validBatterySpec($batteryType, $this->input('battery_spec'));
+
         $this->db()->prepare(
-            'INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_capacity_kwh, battery_type, range_km, is_active)
+            'INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_type, battery_spec, range_km, is_active)
              VALUES (?,?,?,?,?,?,?,?,1)'
         )->execute([
             $vehicleId,
@@ -220,8 +223,8 @@ class VehicleController extends Controller
             $sku,
             $this->input('color'),
             (float)$this->input('price'),
-            $this->input('battery_capacity_kwh') !== '' ? (float)$this->input('battery_capacity_kwh') : null,
-            $this->validBatteryType($this->input('battery_type')),
+            $batteryType,
+            $batterySpec,
             $this->input('range_km') !== '' ? (int)$this->input('range_km') : null,
         ]);
         Audit::log('create', 'vehicles', 'vehicle_variants', (int)$this->db()->lastInsertId());
@@ -248,16 +251,19 @@ class VehicleController extends Controller
             $sku = strtoupper(substr(slugify($this->input('name')), 0, 8)) . '-' . random_int(100, 999);
         }
 
+        $batteryType = $this->validBatteryType($this->input('battery_type'));
+        $batterySpec = $this->validBatterySpec($batteryType, $this->input('battery_spec'));
+
         $this->db()->prepare(
-            'UPDATE vehicle_variants SET name=?, sku=?, color=?, price=?, battery_capacity_kwh=?, battery_type=?, range_km=?, is_active=?
+            'UPDATE vehicle_variants SET name=?, sku=?, color=?, price=?, battery_type=?, battery_spec=?, range_km=?, is_active=?
              WHERE id=? AND vehicle_id=?'
         )->execute([
             $this->input('name'),
             $sku,
             $this->input('color'),
             (float)$this->input('price'),
-            $this->input('battery_capacity_kwh') !== '' ? (float)$this->input('battery_capacity_kwh') : null,
-            $this->validBatteryType($this->input('battery_type')),
+            $batteryType,
+            $batterySpec,
             $this->input('range_km') !== '' ? (int)$this->input('range_km') : null,
             (int)$this->input('is_active', '1'),
             $variantId,
@@ -398,5 +404,32 @@ class VehicleController extends Controller
     {
         $allowed = ['Lithium Ion', 'Lead Acid'];
         return in_array($type, $allowed, true) ? $type : null;
+    }
+
+    /** @return array<string, list<string>> */
+    public static function batterySpecOptions(): array
+    {
+        return [
+            'Lithium Ion' => [
+                '60V / 30AH',
+                '72V / 30AH',
+                '60VH / 40AH',
+            ],
+            'Lead Acid' => [
+                '48V / 32AH',
+                '60V / 32AH',
+                '72V / 32AH (7.0kg)',
+                '72V / 45AH (9.0kg)',
+            ],
+        ];
+    }
+
+    private function validBatterySpec(?string $batteryType, ?string $spec): ?string
+    {
+        if ($batteryType === null || $spec === null || $spec === '') {
+            return null;
+        }
+        $options = self::batterySpecOptions()[$batteryType] ?? [];
+        return in_array($spec, $options, true) ? $spec : null;
     }
 }

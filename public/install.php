@@ -6,7 +6,7 @@
  *  /install.php
  *  /install.php?reset_admin=1
  *  /install.php?migrate_invoice=1   ← SAI KUBER tax invoice columns + company settings
- *  /install.php?migrate_variant=1   ← vehicle variant battery type column
+ *  /install.php?migrate_variant=1   ← vehicle variant battery type + capacity options
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -137,6 +137,7 @@ try {
             echo "added {$table}.{$column}\n";
         };
         $addCol($db, 'vehicle_variants', 'battery_type', "ENUM('Lithium Ion','Lead Acid') NULL AFTER battery_capacity_kwh");
+        $addCol($db, 'vehicle_variants', 'battery_spec', 'VARCHAR(100) NULL AFTER battery_type');
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

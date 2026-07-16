@@ -148,6 +148,7 @@ CREATE TABLE vehicle_variants (
   price DECIMAL(12,2) NOT NULL,
   battery_capacity_kwh DECIMAL(5,2) NULL,
   battery_type ENUM('Lithium Ion','Lead Acid') NULL,
+  battery_spec VARCHAR(100) NULL,
   range_km INT NULL,
   specifications JSON NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
