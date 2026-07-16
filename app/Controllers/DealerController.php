@@ -152,6 +152,50 @@ class DealerController extends Controller
             $this->input('pan_number'),
             $dealerId,
         ]);
+
+        $addressLine1 = trim((string)$this->input('address_line1'));
+        $addressLine2 = trim((string)$this->input('address_line2'));
+        $city = trim((string)$this->input('city'));
+        $state = trim((string)$this->input('state'));
+        $pincode = trim((string)$this->input('pincode'));
+
+        $addrStmt = $this->db()->prepare(
+            'SELECT id FROM dealer_addresses WHERE dealer_id = ? AND is_primary = 1 LIMIT 1'
+        );
+        $addrStmt->execute([$dealerId]);
+        $primaryAddressId = $addrStmt->fetchColumn();
+
+        if ($addressLine1 !== '') {
+            if ($primaryAddressId) {
+                $this->db()->prepare(
+                    'UPDATE dealer_addresses
+                     SET address_line1=?, address_line2=?, city=?, state=?, pincode=?
+                     WHERE id=?'
+                )->execute([
+                    $addressLine1,
+                    $addressLine2 !== '' ? $addressLine2 : null,
+                    $city,
+                    $state,
+                    $pincode,
+                    (int)$primaryAddressId,
+                ]);
+            } else {
+                $this->db()->prepare(
+                    'INSERT INTO dealer_addresses (dealer_id, address_line1, address_line2, city, state, pincode, is_primary)
+                     VALUES (?,?,?,?,?,?,1)'
+                )->execute([
+                    $dealerId,
+                    $addressLine1,
+                    $addressLine2 !== '' ? $addressLine2 : null,
+                    $city,
+                    $state,
+                    $pincode,
+                ]);
+            }
+        } elseif ($primaryAddressId) {
+            $this->db()->prepare('DELETE FROM dealer_addresses WHERE id = ?')->execute([(int)$primaryAddressId]);
+        }
+
         Audit::log('update', 'dealers', 'dealers', $dealerId);
         flash('success', 'Dealer updated.');
         $this->redirect('/dealers/' . $dealerId);

@@ -162,6 +162,18 @@
 
 <div class="modal-backdrop" id="editDealerModal" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal">
+    <?php
+      $primaryAddress = null;
+      foreach ($addresses as $a) {
+          if (!empty($a['is_primary'])) {
+              $primaryAddress = $a;
+              break;
+          }
+      }
+      if (!$primaryAddress && $addresses) {
+          $primaryAddress = $addresses[0];
+      }
+    ?>
     <form method="post" action="<?= url('dealers/' . $dealer['id']) ?>">
       <?= csrf_field() ?>
       <div class="modal-header">
@@ -175,6 +187,11 @@
         <div class="form-group"><label>Email</label><input class="form-control" type="email" name="email" value="<?= e($dealer['email']) ?>" required></div>
         <div class="form-group"><label>GST</label><input class="form-control" name="gst_number" value="<?= e($dealer['gst_number'] ?? '') ?>"></div>
         <div class="form-group"><label>PAN</label><input class="form-control" name="pan_number" value="<?= e($dealer['pan_number'] ?? '') ?>"></div>
+        <div class="form-group full"><label>Address</label><textarea class="form-control" name="address_line1" rows="2" placeholder="Street, area, landmark"><?= e($primaryAddress['address_line1'] ?? '') ?></textarea></div>
+        <div class="form-group full"><label>Address line 2</label><input class="form-control" name="address_line2" value="<?= e($primaryAddress['address_line2'] ?? '') ?>" placeholder="Optional"></div>
+        <div class="form-group"><label>City</label><input class="form-control" name="city" value="<?= e($primaryAddress['city'] ?? '') ?>"></div>
+        <div class="form-group"><label>State</label><input class="form-control" name="state" value="<?= e($primaryAddress['state'] ?? '') ?>"></div>
+        <div class="form-group"><label>Pincode</label><input class="form-control" name="pincode" value="<?= e($primaryAddress['pincode'] ?? '') ?>"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="document.getElementById('editDealerModal').classList.remove('open')">Cancel</button>
