@@ -53,6 +53,8 @@ $router->post('/dealers/{id}', [DealerController::class, 'update'], ['require_au
 $router->post('/dealers/{id}/delete', [DealerController::class, 'destroy'], ['require_auth']);
 $router->get('/dealers/{id}', [DealerController::class, 'show'], ['require_auth']);
 $router->post('/dealers/{id}/approve', [DealerController::class, 'approve'], ['require_auth']);
+$router->post('/dealers/{id}/documents/{docId}/delete', [DealerController::class, 'destroyDocument'], ['require_auth']);
+$router->post('/dealers/{id}/documents/{docId}', [DealerController::class, 'updateDocument'], ['require_auth']);
 $router->post('/dealers/{id}/documents', [DealerController::class, 'uploadDocument'], ['require_auth']);
 $router->post('/dealers/{id}/password', [DealerController::class, 'resetPassword'], ['require_auth']);
 $router->post('/dealers/{id}/toggle-login', [DealerController::class, 'toggleUser'], ['require_auth']);

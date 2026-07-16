@@ -334,7 +334,12 @@ class DealerController extends Controller
         require_permission('manage_dealers');
         $this->validateCsrf();
         $dealerId = (int)$id;
-        $type = $this->input('document_type') ?: 'other';
+        if (!$this->dealerExists($dealerId)) {
+            flash('error', 'Dealer not found.');
+            $this->redirect('/dealers');
+        }
+
+        $type = $this->validDocumentType($this->input('document_type'));
         $path = Upload::store($_FILES['document'] ?? [], 'dealer-documents');
         if (!$path) {
             flash('error', 'Upload failed. Allowed: images or PDF.');
@@ -346,6 +351,83 @@ class DealerController extends Controller
         Audit::log('create', 'dealers', 'dealer_documents', (int)$this->db()->lastInsertId());
         flash('success', 'Document uploaded.');
         $this->redirect('/dealers/' . $dealerId);
+    }
+
+    public function updateDocument(string $id, string $docId): void
+    {
+        require_permission('manage_dealers');
+        $this->validateCsrf();
+        $dealerId = (int)$id;
+        $documentId = (int)$docId;
+
+        $doc = $this->findDealerDocument($dealerId, $documentId);
+        if (!$doc) {
+            flash('error', 'Document not found.');
+            $this->redirect('/dealers/' . $dealerId);
+        }
+
+        $type = $this->validDocumentType($this->input('document_type'));
+        $verified = isset($_POST['is_verified']) && $_POST['is_verified'] === '1' ? 1 : 0;
+        $fileUrl = $doc['file_url'];
+
+        $newPath = Upload::store($_FILES['document'] ?? [], 'dealer-documents');
+        if ($newPath) {
+            Upload::delete($fileUrl);
+            $fileUrl = $newPath;
+        }
+
+        $this->db()->prepare(
+            'UPDATE dealer_documents SET document_type = ?, file_url = ?, is_verified = ? WHERE id = ? AND dealer_id = ?'
+        )->execute([$type, $fileUrl, $verified, $documentId, $dealerId]);
+
+        Audit::log('update', 'dealers', 'dealer_documents', $documentId);
+        flash('success', 'Document updated.');
+        $this->redirect('/dealers/' . $dealerId);
+    }
+
+    public function destroyDocument(string $id, string $docId): void
+    {
+        require_permission('manage_dealers');
+        $this->validateCsrf();
+        $dealerId = (int)$id;
+        $documentId = (int)$docId;
+
+        $doc = $this->findDealerDocument($dealerId, $documentId);
+        if (!$doc) {
+            flash('error', 'Document not found.');
+            $this->redirect('/dealers/' . $dealerId);
+        }
+
+        Upload::delete($doc['file_url']);
+        $this->db()->prepare('DELETE FROM dealer_documents WHERE id = ? AND dealer_id = ?')
+            ->execute([$documentId, $dealerId]);
+
+        Audit::log('delete', 'dealers', 'dealer_documents', $documentId);
+        flash('success', 'Document deleted.');
+        $this->redirect('/dealers/' . $dealerId);
+    }
+
+    private function dealerExists(int $dealerId): bool
+    {
+        $stmt = $this->db()->prepare('SELECT id FROM dealers WHERE id = ?');
+        $stmt->execute([$dealerId]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    private function findDealerDocument(int $dealerId, int $documentId): ?array
+    {
+        $stmt = $this->db()->prepare(
+            'SELECT * FROM dealer_documents WHERE id = ? AND dealer_id = ? LIMIT 1'
+        );
+        $stmt->execute([$documentId, $dealerId]);
+        $doc = $stmt->fetch();
+        return $doc ?: null;
+    }
+
+    private function validDocumentType(?string $type): string
+    {
+        $allowed = ['gst', 'pan', 'aadhar', 'bank', 'license', 'other'];
+        return in_array($type, $allowed, true) ? $type : 'other';
     }
 
     /**

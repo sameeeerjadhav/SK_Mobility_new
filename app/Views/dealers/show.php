@@ -129,34 +129,103 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" x-data="{ editDoc: null }">
     <h3 class="card-title">Documents</h3>
-    <form method="post" action="<?= url('dealers/' . $dealer['id'] . '/documents') ?>" enctype="multipart/form-data" style="margin-bottom:1rem;">
+    <form method="post" action="<?= url('dealers/' . $dealer['id'] . '/documents') ?>" enctype="multipart/form-data" style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
       <?= csrf_field() ?>
-      <div class="form-group">
-        <label>Type</label>
-        <select class="form-control" name="document_type">
-          <?php foreach (['gst','pan','aadhar','bank','license','other'] as $t): ?>
-            <option value="<?= $t ?>"><?= strtoupper($t) ?></option>
-          <?php endforeach; ?>
-        </select>
+      <p class="muted" style="margin:0 0 0.75rem;font-size:0.85rem;">Upload GST, PAN, Aadhaar, bank, license, or other dealer documents.</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Type</label>
+          <select class="form-control" name="document_type">
+            <?php foreach (['gst','pan','aadhar','bank','license','other'] as $t): ?>
+              <option value="<?= $t ?>"><?= strtoupper($t) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>File</label>
+          <input class="form-control" type="file" name="document" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" required>
+        </div>
       </div>
-      <div class="form-group">
-        <label>File</label>
-        <input class="form-control" type="file" name="document" required>
-      </div>
-      <button class="btn btn-primary" type="submit">Upload</button>
+      <button class="btn btn-primary btn-sm" type="submit">Add document</button>
     </form>
-    <ul style="padding-left:1.1rem;margin:0;">
-      <?php foreach ($documents as $doc): ?>
-        <li style="margin-bottom:0.4rem;">
-          <?= e(strtoupper($doc['document_type'])) ?> —
-          <a href="<?= asset($doc['file_url']) ?>" target="_blank">View file</a>
-          <span class="muted">(<?= india_date($doc['created_at']) ?>)</span>
-        </li>
-      <?php endforeach; ?>
-      <?php if (!$documents): ?><li class="muted">No documents uploaded.</li><?php endif; ?>
-    </ul>
+
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Uploaded</th>
+            <th>File</th>
+            <th style="width:9rem;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($documents as $doc): ?>
+          <tr>
+            <td><strong><?= e(strtoupper($doc['document_type'])) ?></strong></td>
+            <td><?= !empty($doc['is_verified']) ? status_chip('approved') : status_chip('pending') ?></td>
+            <td class="muted"><?= india_datetime($doc['created_at']) ?></td>
+            <td><a href="<?= asset($doc['file_url']) ?>" target="_blank" rel="noopener">View</a></td>
+            <td>
+              <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm btn-outline"
+                  @click="editDoc = { id: <?= (int)$doc['id'] ?>, document_type: '<?= e($doc['document_type']) ?>', is_verified: <?= !empty($doc['is_verified']) ? 'true' : 'false' ?> }">
+                  Edit
+                </button>
+                <form method="post" action="<?= url('dealers/' . $dealer['id'] . '/documents/' . $doc['id'] . '/delete') ?>"
+                  onsubmit="return confirm('Delete this document?');">
+                  <?= csrf_field() ?>
+                  <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        <?php if (!$documents): ?>
+          <tr><td colspan="5" class="muted">No documents uploaded yet.</td></tr>
+        <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-backdrop" :class="{ open: !!editDoc }" @click.self="editDoc=null" x-show="editDoc" x-cloak>
+      <div class="modal">
+        <form method="post" :action="'<?= url('dealers/' . $dealer['id'] . '/documents') ?>/' + editDoc.id" enctype="multipart/form-data">
+          <?= csrf_field() ?>
+          <div class="modal-header">
+            <h3 class="modal-title">Edit document</h3>
+            <button type="button" class="btn btn-sm btn-outline" @click="editDoc=null">Close</button>
+          </div>
+          <div class="modal-body form-grid">
+            <div class="form-group">
+              <label>Type</label>
+              <select class="form-control" name="document_type" x-model="editDoc.document_type">
+                <?php foreach (['gst','pan','aadhar','bank','license','other'] as $t): ?>
+                  <option value="<?= $t ?>"><?= strtoupper($t) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label>Replace file <span class="muted">(optional)</span></label>
+              <input class="form-control" type="file" name="document" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf">
+            </div>
+            <div class="form-group full">
+              <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+                <input type="checkbox" name="is_verified" value="1" x-model="editDoc.is_verified">
+                Mark as verified
+              </label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" @click="editDoc=null">Cancel</button>
+            <button class="btn btn-primary" type="submit">Save changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </div>
 

@@ -28,4 +28,21 @@ class Upload
 
         return 'uploads/' . trim($subdir, '/') . '/' . $name;
     }
+
+    public static function delete(?string $relativePath): void
+    {
+        if ($relativePath === null || $relativePath === '') {
+            return;
+        }
+
+        $relativePath = ltrim(str_replace('\\', '/', $relativePath), '/');
+        if (str_contains($relativePath, '..')) {
+            return;
+        }
+
+        $full = BASE_PATH . '/public/' . $relativePath;
+        if (is_file($full)) {
+            unlink($full);
+        }
+    }
 }
