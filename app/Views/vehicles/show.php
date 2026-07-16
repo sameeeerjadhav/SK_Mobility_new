@@ -8,6 +8,7 @@ $tabInit = match ($_GET['tab'] ?? '') {
     default => 'overview',
 };
 ?>
+<?php $batteryTypes = ['Lithium Ion', 'Lead Acid']; ?>
 <style>
 .vp{max-width:1100px}
 .vp-back{display:inline-block;font-size:.82rem;font-weight:600;color:#64748b;margin:0 0 .7rem}
@@ -197,6 +198,7 @@ $tabInit = match ($_GET['tab'] ?? '') {
                       'color' => $vv['color'] ?? '',
                       'price' => $vv['price'],
                       'battery_capacity_kwh' => $vv['battery_capacity_kwh'] ?? '',
+                      'battery_type' => $vv['battery_type'] ?? '',
                       'range_km' => $vv['range_km'] ?? '',
                       'is_active' => (int)$vv['is_active'],
                   ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>'>Edit</button>
@@ -211,6 +213,7 @@ $tabInit = match ($_GET['tab'] ?? '') {
             <div class="vv-specs">
               <div class="vv-spec price"><span>Price</span><strong><?= money($vv['price']) ?></strong></div>
               <div class="vv-spec"><span>Color</span><strong><?= e($vv['color'] ?: '—') ?></strong></div>
+              <div class="vv-spec"><span>Battery type</span><strong><?= e($vv['battery_type'] ?: '—') ?></strong></div>
               <div class="vv-spec"><span>Battery</span><strong><?= e($vv['battery_capacity_kwh'] ?? '—') ?> kWh</strong></div>
               <div class="vv-spec"><span>Range</span><strong><?= e($vv['range_km'] ?? '—') ?> km</strong></div>
             </div>
@@ -256,6 +259,14 @@ $tabInit = match ($_GET['tab'] ?? '') {
           <div class="form-group"><label>SKU</label><input class="form-control" name="sku" placeholder="Auto if blank"></div>
           <div class="form-group"><label>Color</label><input class="form-control" name="color"></div>
           <div class="form-group"><label>Price</label><input class="form-control" type="number" step="0.01" name="price" required></div>
+          <div class="form-group"><label>Battery type</label>
+            <select class="form-control" name="battery_type">
+              <option value="">Select</option>
+              <?php foreach ($batteryTypes as $bt): ?>
+                <option value="<?= e($bt) ?>"><?= e($bt) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
           <div class="form-group"><label>Battery kWh</label><input class="form-control" type="number" step="0.01" name="battery_capacity_kwh"></div>
           <div class="form-group"><label>Range km</label><input class="form-control" type="number" name="range_km"></div>
         </div>
@@ -275,6 +286,14 @@ $tabInit = match ($_GET['tab'] ?? '') {
               <div class="form-group"><label>SKU</label><input class="form-control" name="sku" :value="editVariant?.sku"></div>
               <div class="form-group"><label>Color</label><input class="form-control" name="color" :value="editVariant?.color"></div>
               <div class="form-group"><label>Price</label><input class="form-control" type="number" step="0.01" name="price" :value="editVariant?.price" required></div>
+              <div class="form-group"><label>Battery type</label>
+                <select class="form-control" name="battery_type" x-model="editVariant.battery_type">
+                  <option value="">Select</option>
+                  <?php foreach ($batteryTypes as $bt): ?>
+                    <option value="<?= e($bt) ?>"><?= e($bt) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
               <div class="form-group"><label>Battery kWh</label><input class="form-control" type="number" step="0.01" name="battery_capacity_kwh" :value="editVariant?.battery_capacity_kwh"></div>
               <div class="form-group"><label>Range km</label><input class="form-control" type="number" name="range_km" :value="editVariant?.range_km"></div>
               <div class="form-group"><label>Active</label>

@@ -10,6 +10,7 @@ foreach ($variants as $vv) {
         'vehicle_name' => $vv['vehicle_name'],
         'category_name' => $vv['category_name'] ?? '',
         'battery_capacity_kwh' => $vv['battery_capacity_kwh'] ?? '',
+        'battery_type' => $vv['battery_type'] ?? '',
         'label' => $vv['vehicle_name'] . ' — ' . $vv['name']
             . ($vv['color'] ? ' (' . $vv['color'] . ')' : '')
             . ' / ' . money($vv['price']),
@@ -39,8 +40,12 @@ foreach ($variants as $vv) {
     this.modelType = v.name;
     this.modelName = v.vehicle_name;
     this.color = v.color || '';
-    if (!this.batteryType && v.battery_capacity_kwh) {
+    if (v.battery_type) {
+      this.batteryType = v.battery_type;
+    } else if (v.battery_capacity_kwh) {
       this.batteryType = v.battery_capacity_kwh + ' kWh';
+    } else {
+      this.batteryType = '';
     }
   }
 }">

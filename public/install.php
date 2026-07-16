@@ -6,6 +6,7 @@
  *  /install.php
  *  /install.php?reset_admin=1
  *  /install.php?migrate_invoice=1   ← SAI KUBER tax invoice columns + company settings
+ *  /install.php?migrate_variant=1   ← vehicle variant battery type column
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -117,6 +118,25 @@ try {
              WHERE company_gstin IS NULL OR company_gstin = '' OR company_gstin = '27AABCS1234A1Z5' OR company_name LIKE 'SK Mobility%'"
         );
         echo "updated existing bill headers where needed\n";
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_variant']) && $_GET['migrate_variant'] === '1') {
+        echo "\n--- Variant battery type migration ---\n";
+        $addCol = static function (PDO $db, string $table, string $column, string $definition): void {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                echo "skip {$table}.{$column}\n";
+                return;
+            }
+            $db->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+            echo "added {$table}.{$column}\n";
+        };
+        $addCol($db, 'vehicle_variants', 'battery_type', "ENUM('Lithium Ion','Lead Acid') NULL AFTER battery_capacity_kwh");
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

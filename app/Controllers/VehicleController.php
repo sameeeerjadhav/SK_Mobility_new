@@ -212,8 +212,8 @@ class VehicleController extends Controller
         $sku = $this->input('sku') ?: strtoupper(substr(slugify($this->input('name')), 0, 8)) . '-' . random_int(100, 999);
 
         $this->db()->prepare(
-            'INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_capacity_kwh, range_km, is_active)
-             VALUES (?,?,?,?,?,?,?,1)'
+            'INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_capacity_kwh, battery_type, range_km, is_active)
+             VALUES (?,?,?,?,?,?,?,?,1)'
         )->execute([
             $vehicleId,
             $this->input('name'),
@@ -221,6 +221,7 @@ class VehicleController extends Controller
             $this->input('color'),
             (float)$this->input('price'),
             $this->input('battery_capacity_kwh') !== '' ? (float)$this->input('battery_capacity_kwh') : null,
+            $this->validBatteryType($this->input('battery_type')),
             $this->input('range_km') !== '' ? (int)$this->input('range_km') : null,
         ]);
         Audit::log('create', 'vehicles', 'vehicle_variants', (int)$this->db()->lastInsertId());
@@ -248,7 +249,7 @@ class VehicleController extends Controller
         }
 
         $this->db()->prepare(
-            'UPDATE vehicle_variants SET name=?, sku=?, color=?, price=?, battery_capacity_kwh=?, range_km=?, is_active=?
+            'UPDATE vehicle_variants SET name=?, sku=?, color=?, price=?, battery_capacity_kwh=?, battery_type=?, range_km=?, is_active=?
              WHERE id=? AND vehicle_id=?'
         )->execute([
             $this->input('name'),
@@ -256,6 +257,7 @@ class VehicleController extends Controller
             $this->input('color'),
             (float)$this->input('price'),
             $this->input('battery_capacity_kwh') !== '' ? (float)$this->input('battery_capacity_kwh') : null,
+            $this->validBatteryType($this->input('battery_type')),
             $this->input('range_km') !== '' ? (int)$this->input('range_km') : null,
             (int)$this->input('is_active', '1'),
             $variantId,
@@ -390,5 +392,11 @@ class VehicleController extends Controller
         Audit::log('delete', 'vehicles', 'vehicle_images', $imgId);
         flash('success', 'Image deleted.');
         $this->redirect('/vehicles/' . $vehicleId);
+    }
+
+    private function validBatteryType(?string $type): ?string
+    {
+        $allowed = ['Lithium Ion', 'Lead Acid'];
+        return in_array($type, $allowed, true) ? $type : null;
     }
 }

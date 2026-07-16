@@ -117,6 +117,6 @@ INSERT INTO spare_categories (name, description, is_active) VALUES
 INSERT INTO vehicles (id, category_id, name, slug, brand, description, base_price, is_active) VALUES
 (1, 1, 'SK Spark 3.0', 'sk-spark-3-0', 'SK Mobility', 'Urban electric scooter with long range.', 89999.00, 1);
 
-INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_capacity_kwh, range_km, is_active) VALUES
-(1, 'Standard Red', 'SPARK-STD-RED', 'Red', 89999.00, 2.5, 110, 1),
-(1, 'Pro Black', 'SPARK-PRO-BLK', 'Black', 99999.00, 3.2, 140, 1);
+INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_capacity_kwh, battery_type, range_km, is_active) VALUES
+(1, 'Standard Red', 'SPARK-STD-RED', 'Red', 89999.00, 2.5, 'Lithium Ion', 110, 1),
+(1, 'Pro Black', 'SPARK-PRO-BLK', 'Black', 99999.00, 3.2, 'Lithium Ion', 140, 1);

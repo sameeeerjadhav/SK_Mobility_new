@@ -78,7 +78,7 @@ class OrderController extends Controller
             "SELECT id, business_name, dealer_code FROM dealers WHERE status = 'approved' ORDER BY business_name"
         )->fetchAll();
         $variants = $this->db()->query(
-            "SELECT vv.id, vv.name, vv.sku, vv.color, vv.price, vv.battery_capacity_kwh,
+            "SELECT vv.id, vv.name, vv.sku, vv.color, vv.price, vv.battery_capacity_kwh, vv.battery_type,
                     v.name AS vehicle_name, c.name AS category_name
              FROM vehicle_variants vv
              JOIN vehicles v ON v.id = vv.vehicle_id
