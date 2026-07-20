@@ -152,6 +152,7 @@ class OrderController extends Controller
             'delivery_address' => $this->input('delivery_address'),
             'notes' => $this->input('notes'),
             'expected_delivery_date' => $this->input('expected_delivery_date'),
+            'billing_location' => $this->input('billing_location'),
             'items' => $items,
         ];
 

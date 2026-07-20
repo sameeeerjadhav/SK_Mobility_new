@@ -21,7 +21,10 @@ class BillPdfService
         $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check');
 
         $companyState = $bill['company_state'] ?? setting('company_state', 'Maharashtra');
-        $branch = $bill['company_branch_address'] ?? setting('company_branch_address', '');
+        $location = strtolower((string)($bill['billing_location'] ?? 'kokamthan'));
+        $mainAddress = $bill['company_address'] ?? setting('company_address', '');
+        $branchAddress = $bill['company_branch_address'] ?? setting('company_branch_address', '');
+        $invoiceAddress = $location === 'kopargaon' ? $branchAddress : $mainAddress;
 
         $battery = $bill['battery_type_no'] ?? '';
         if ($battery === '' && !empty($bill['battery_capacity'])) {
@@ -115,8 +118,7 @@ class BillPdfService
     </div>
     <div class="hdr-mid">
       <h1 class="co-name">' . htmlspecialchars($bill['company_name'] ?: 'SAI KUBER MOBILITY') . '</h1>
-      <p class="co-line">' . htmlspecialchars($bill['company_address'] ?? '') . '</p>
-      <p class="co-line">' . htmlspecialchars($branch) . '</p>
+      <p class="co-line">' . htmlspecialchars($invoiceAddress) . '</p>
       <p class="co-line"><strong>Mob. :</strong> ' . htmlspecialchars($bill['company_phone'] ?? '') . '</p>
     </div>
   </div>

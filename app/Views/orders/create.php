@@ -125,6 +125,20 @@ foreach ($variants as $vv) {
     </div>
 
     <div class="card" style="margin-bottom:0.85rem;">
+      <h3 class="card-title">Billing</h3>
+      <div class="form-grid">
+        <div class="form-group" style="max-width:280px;">
+          <label>Billing location *</label>
+          <select class="form-control" name="billing_location" required>
+            <option value="kokamthan">Kokamthan</option>
+            <option value="kopargaon">Kopargaon</option>
+          </select>
+          <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Branch address printed on the tax invoice</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:0.85rem;">
       <h3 class="card-title">2. Buyer (same for dealer &amp; customer)</h3>
       <div class="form-grid">
         <div class="form-group"><label>Cust. Name *</label><input class="form-control" name="customer_name" required></div>

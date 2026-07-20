@@ -36,6 +36,11 @@ class OrderService
             throw new RuntimeException('Buyer name and phone are required.');
         }
 
+        $billingLocation = strtolower(trim((string)($data['billing_location'] ?? 'kokamthan')));
+        if (!in_array($billingLocation, ['kokamthan', 'kopargaon'], true)) {
+            throw new RuntimeException('Select a valid billing location (Kokamthan or Kopargaon).');
+        }
+
         $requiredInvoice = [
             'sale_date' => 'Date of Sale',
             'chassis_no' => 'Chassis No.',
@@ -134,7 +139,7 @@ class OrderService
         try {
             $db->prepare(
                 'INSERT INTO orders (
-                    order_number, booking_no, order_type, dealer_id,
+                    order_number, booking_no, order_type, billing_location, dealer_id,
                     customer_name, customer_phone, customer_email, customer_address,
                     customer_aadhaar, customer_pan, chassis_no, motor_no,
                     battery_capacity, battery_no, controller_no, charger_no,
@@ -143,9 +148,9 @@ class OrderService
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
                     payment_mode, sale_date, subtotal, tax_amount, total_amount,
                     status, delivery_address, notes, expected_delivery_date, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
-                $orderNumber, $bookingNo, $orderType, $dealerId,
+                $orderNumber, $bookingNo, $orderType, $billingLocation, $dealerId,
                 $data['customer_name'] ?? null,
                 $data['customer_phone'] ?? null,
                 $data['customer_email'] ?? null,
@@ -205,7 +210,7 @@ class OrderService
 
             $db->prepare(
                 'INSERT INTO bills (
-                    bill_number, bill_type, order_id, booking_no,
+                    bill_number, bill_type, billing_location, order_id, booking_no,
                     company_name, company_address, company_branch_address, company_phone, company_email,
                     company_gstin, company_state, company_state_code, brand_name, dealer_code,
                     customer_name, customer_phone, customer_email, customer_address,
@@ -217,9 +222,9 @@ class OrderService
                     subtotal, tax_rate, cgst_rate, sgst_rate,
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
                     payment_mode, total_amount, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
-                $billNumber, 'vehicle', $orderId, $bookingNo,
+                $billNumber, 'vehicle', $billingLocation, $orderId, $bookingNo,
                 setting('company_name'), setting('company_address'), setting('company_branch_address'),
                 setting('company_phone'), setting('company_email'),
                 setting('company_gstin'), setting('company_state', 'Maharashtra'), setting('company_state_code'),

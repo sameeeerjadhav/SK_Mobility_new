@@ -2,6 +2,11 @@
 $payment = strtolower((string)($bill['payment_mode'] ?? ''));
 $paidCash = str_contains($payment, 'cash');
 $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check');
+$locationLabels = ['kokamthan' => 'Kokamthan', 'kopargaon' => 'Kopargaon'];
+$billingLoc = $bill['billing_location'] ?? 'kokamthan';
+$companyAddress = $billingLoc === 'kopargaon'
+    ? ($bill['company_branch_address'] ?? '')
+    : ($bill['company_address'] ?? '');
 ?>
 <div style="margin-bottom:1rem;"><a href="<?= url('billing') ?>">&larr; Tax Invoices</a></div>
 
@@ -9,7 +14,13 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
   <div class="toolbar">
     <div>
       <h1 class="page-title" style="margin:0;"><?= e($bill['bill_number']) ?></h1>
-      <p class="page-sub" style="margin:0.35rem 0 0;">Tax Invoice · <?= india_date($bill['vehicle_sale_date'] ?? $bill['created_at']) ?></p>
+      <p class="page-sub" style="margin:0.35rem 0 0;">
+        Tax Invoice · <?= india_date($bill['vehicle_sale_date'] ?? $bill['created_at']) ?>
+        <?php if (!empty($orderType)): ?>
+          · <?= ($orderType === 'dealer' ? 'Dealer' : 'Customer') ?> order
+        <?php endif; ?>
+        · <?= e($locationLabels[$billingLoc] ?? 'Kokamthan') ?>
+      </p>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <a class="btn btn-outline" href="<?= url('billing/' . $bill['id'] . '/preview') ?>" target="_blank">Preview / Print</a>
@@ -22,8 +33,8 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
 
   <div class="grid-2-eq">
     <div>
-      <h4>Company</h4>
-      <p><?= e($bill['company_name']) ?><br><?= nl2br(e($bill['company_address'] ?? '')) ?><br><?= nl2br(e($bill['company_branch_address'] ?? '')) ?><br>GSTIN: <?= e($bill['company_gstin'] ?? '') ?> · State code <?= e($bill['company_state_code'] ?? '') ?></p>
+      <h4>Company (<?= e($locationLabels[$billingLoc] ?? 'Kokamthan') ?>)</h4>
+      <p><?= e($bill['company_name']) ?><br><?= nl2br(e($companyAddress)) ?><br>GSTIN: <?= e($bill['company_gstin'] ?? '') ?> · State code <?= e($bill['company_state_code'] ?? '') ?></p>
     </div>
     <div>
       <h4>Customer</h4>

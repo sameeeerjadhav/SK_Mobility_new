@@ -11,6 +11,7 @@
  *  /install.php?migrate_purchase_orders=1  ← purchase orders + goods receipt tables
  *  /install.php?migrate_po_supplier=1  ← supplier company name on purchase orders (replaces partners link)
  *  /install.php?migrate_po_spare_items=1  ← spare parts / batteries on PO line items
+ *  /install.php?migrate_billing_location=1  ← Kokamthan / Kopargaon billing location on orders & invoices
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -339,6 +340,37 @@ try {
 
         $db->exec('ALTER TABLE purchase_order_receipt_lines MODIFY warehouse_id INT UNSIGNED NULL');
         echo "nullable purchase_order_receipt_lines.warehouse_id\n";
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_billing_location']) && $_GET['migrate_billing_location'] === '1') {
+        echo "\n--- Billing location migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        if (!$colExists($db, 'orders', 'billing_location')) {
+            $db->exec(
+                "ALTER TABLE orders
+                 ADD COLUMN billing_location ENUM('kokamthan','kopargaon') NOT NULL DEFAULT 'kokamthan' AFTER order_type"
+            );
+            echo "added orders.billing_location\n";
+        } else {
+            echo "skip orders.billing_location\n";
+        }
+        if (!$colExists($db, 'bills', 'billing_location')) {
+            $db->exec(
+                "ALTER TABLE bills
+                 ADD COLUMN billing_location ENUM('kokamthan','kopargaon') NOT NULL DEFAULT 'kokamthan' AFTER bill_type"
+            );
+            echo "added bills.billing_location\n";
+        } else {
+            echo "skip bills.billing_location\n";
+        }
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

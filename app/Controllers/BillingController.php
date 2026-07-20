@@ -13,15 +13,42 @@ class BillingController extends Controller
     {
         require_permission('view_billing');
 
+        $orderType = trim((string)$this->input('order_type'));
+        $billingLocation = trim((string)$this->input('billing_location'));
+
+        $where = ["b.bill_type = 'vehicle'"];
+        $params = [];
+        if ($orderType !== '' && in_array($orderType, ['dealer', 'customer'], true)) {
+            $where[] = 'o.order_type = ?';
+            $params[] = $orderType;
+        }
+        if ($billingLocation !== '' && in_array($billingLocation, ['kokamthan', 'kopargaon'], true)) {
+            $where[] = 'b.billing_location = ?';
+            $params[] = $billingLocation;
+        }
+        $sqlWhere = implode(' AND ', $where);
+
         $stmt = $this->db()->prepare(
-            "SELECT * FROM bills WHERE bill_type = 'vehicle' ORDER BY created_at DESC LIMIT 200"
+            "SELECT b.*, o.order_type
+             FROM bills b
+             LEFT JOIN orders o ON o.id = b.order_id
+             WHERE {$sqlWhere}
+             ORDER BY b.created_at DESC
+             LIMIT 200"
         );
-        $stmt->execute();
+        $stmt->execute($params);
+
+        $countStmt = $this->db()->prepare(
+            "SELECT COUNT(*) FROM bills b LEFT JOIN orders o ON o.id = b.order_id WHERE {$sqlWhere}"
+        );
+        $countStmt->execute($params);
 
         $this->view('billing/index', [
             'title' => 'Tax Invoices',
             'bills' => $stmt->fetchAll(),
-            'invoiceCount' => (int)$this->db()->query("SELECT COUNT(*) FROM bills WHERE bill_type='vehicle'")->fetchColumn(),
+            'invoiceCount' => (int)$countStmt->fetchColumn(),
+            'orderType' => $orderType,
+            'billingLocation' => $billingLocation,
             'canManage' => can('manage_billing'),
         ]);
     }
@@ -30,10 +57,17 @@ class BillingController extends Controller
     {
         require_permission('view_billing');
         [$bill, $items] = $this->loadBill((int)$id);
+        $orderType = null;
+        if (!empty($bill['order_id'])) {
+            $o = $this->db()->prepare('SELECT order_type FROM orders WHERE id = ?');
+            $o->execute([(int)$bill['order_id']]);
+            $orderType = $o->fetchColumn() ?: null;
+        }
         $this->view('billing/show', [
             'title' => $bill['bill_number'],
             'bill' => $bill,
             'items' => $items,
+            'orderType' => $orderType,
         ]);
     }
 
