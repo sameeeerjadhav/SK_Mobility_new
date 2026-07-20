@@ -15,6 +15,9 @@ $statusClass = [
 ];
 $canReceive = !in_array($po['status'], ['received', 'cancelled'], true);
 $isSparePo = ($po['product_type'] ?? 'vehicle') === 'spare_part';
+$cgstRate = (float)($po['cgst_rate'] ?? ($isSparePo ? 9 : 2.5));
+$sgstRate = (float)($po['sgst_rate'] ?? ($isSparePo ? 9 : 2.5));
+$taxRate = (float)($po['tax_rate'] ?? ($cgstRate + $sgstRate));
 $pendingItems = array_filter($items, static fn($it) => (int)$it['quantity_ordered'] > (int)$it['quantity_received']);
 $itemsJson = json_encode(array_values(array_map(static function ($it) {
     $itemType = $it['item_type'] ?? 'vehicle_variant';
@@ -101,8 +104,9 @@ document.addEventListener('alpine:init', () => {
       <div class="stat-value"><?= money($po['subtotal']) ?></div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Total GST</div>
+      <div class="stat-label">Total GST @ <?= e(rtrim(rtrim(number_format($taxRate, 2), '0'), '.')) ?>%</div>
       <div class="stat-value"><?= money($po['gst_amount']) ?></div>
+      <div class="muted" style="font-size:0.78rem;margin-top:0.2rem;">CGST <?= e(rtrim(rtrim(number_format($cgstRate, 2), '0'), '.')) ?>% + SGST <?= e(rtrim(rtrim(number_format($sgstRate, 2), '0'), '.')) ?>%</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Invoice total</div>

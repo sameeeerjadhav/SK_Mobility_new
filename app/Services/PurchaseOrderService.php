@@ -74,6 +74,18 @@ class PurchaseOrderService
         ];
     }
 
+    /** @return array{0:float,1:float} cgst, sgst */
+    public static function resolveGstRates(array $data, string $productType): array
+    {
+        $default = $productType === 'spare_part' ? 9.0 : 2.5;
+        $cgst = round((float)($data['cgst_rate'] ?? $default), 2);
+        $sgst = round((float)($data['sgst_rate'] ?? $default), 2);
+        if ($cgst < 0 || $sgst < 0 || $cgst > 100 || $sgst > 100) {
+            throw new RuntimeException('CGST and SGST rates must be between 0 and 100.');
+        }
+        return [$cgst, $sgst];
+    }
+
     /** @return array<string, mixed> */
     private function calcVehicleLine(array $row, int $lineNo): array
     {

@@ -256,6 +256,11 @@ class PurchaseOrderController extends Controller
                     throw new RuntimeException('All line items must match the purchase order type (vehicle or spare parts).');
                 }
             }
+            [$cgstRate, $sgstRate] = PurchaseOrderService::resolveGstRates([
+                'cgst_rate' => $this->input('cgst_rate'),
+                'sgst_rate' => $this->input('sgst_rate'),
+            ], $productType);
+            $taxRate = round($cgstRate + $sgstRate, 2);
             $db = $this->db();
             $db->beginTransaction();
 
@@ -263,8 +268,8 @@ class PurchaseOrderController extends Controller
             $db->prepare(
                 'INSERT INTO purchase_orders (
                     po_number, product_type, supplier_name, po_date, supplier_invoice_no, supplier_invoice_date,
-                    status, subtotal, gst_amount, total_amount, notes, created_by
-                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+                    status, subtotal, gst_amount, cgst_rate, sgst_rate, tax_rate, total_amount, notes, created_by
+                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $poNumber,
                 $productType,
@@ -275,6 +280,9 @@ class PurchaseOrderController extends Controller
                 'confirmed',
                 $lines['subtotal'],
                 $lines['gst_amount'],
+                $cgstRate,
+                $sgstRate,
+                $taxRate,
                 $lines['total_amount'],
                 $payload['notes'],
                 Auth::id(),

@@ -16,6 +16,7 @@
  *  /install.php?migrate_order_payment_partial=1  ← full vs partial payment on sell orders & invoices
  *  /install.php?migrate_sell_order_gst=1  ← custom GST rates stored on sell orders
  *  /install.php?migrate_po_product_type=1  ← vehicle vs spare parts on purchase orders
+ *  /install.php?migrate_po_gst=1  ← custom GST rates on purchase orders
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -570,6 +571,43 @@ try {
             echo "backfilled product_type from spare_part_id\n";
         } else {
             echo "skip backfill — all POs default to vehicle (run migrate_po_spare_items=1 first if needed)\n";
+        }
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_po_gst']) && $_GET['migrate_po_gst'] === '1') {
+        echo "\n--- Purchase order GST rates migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        if (!$colExists($db, 'purchase_orders', 'cgst_rate')) {
+            $db->exec(
+                'ALTER TABLE purchase_orders
+                 ADD COLUMN cgst_rate DECIMAL(5,2) NOT NULL DEFAULT 2.5 AFTER gst_amount,
+                 ADD COLUMN sgst_rate DECIMAL(5,2) NOT NULL DEFAULT 2.5 AFTER cgst_rate,
+                 ADD COLUMN tax_rate DECIMAL(5,2) NOT NULL DEFAULT 5 AFTER sgst_rate'
+            );
+            echo "added purchase_orders.cgst_rate, sgst_rate, tax_rate\n";
+            if ($colExists($db, 'purchase_orders', 'product_type')) {
+                $db->exec(
+                    "UPDATE purchase_orders
+                     SET cgst_rate = IF(product_type = 'spare_part', 9, 2.5),
+                         sgst_rate = IF(product_type = 'spare_part', 9, 2.5),
+                         tax_rate = IF(product_type = 'spare_part', 18, 5)"
+                );
+            } else {
+                $db->exec(
+                    'UPDATE purchase_orders SET cgst_rate = 2.5, sgst_rate = 2.5, tax_rate = 5'
+                );
+            }
+            echo "backfilled PO GST rates\n";
+        } else {
+            echo "skip purchase_orders GST rate columns\n";
         }
         echo "Migration complete.\n";
     }

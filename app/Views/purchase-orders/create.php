@@ -10,7 +10,9 @@ $batteryTypes = ['Lithium Ion', 'Lead Acid'];
 $defaultVariantMode = !empty($variants) ? 'existing' : 'new';
 $defaultVehicleMode = !empty($vehicles) ? 'existing' : 'new';
 $defaultSpareMode = !empty($spareParts) ? 'existing' : 'new';
-$defaultGstPercent = $isSparePo ? 18 : 5;
+$defaultCgst = $isSparePo ? 9 : 2.5;
+$defaultSgst = $isSparePo ? 9 : 2.5;
+$defaultGstPercent = $defaultCgst + $defaultSgst;
 ?>
 <script>
 document.addEventListener('alpine:init', () => {
@@ -25,9 +27,36 @@ document.addEventListener('alpine:init', () => {
     defaultVehicleMode: '<?= $defaultVehicleMode ?>',
     defaultSpareMode: '<?= $defaultSpareMode ?>',
     items: [],
-    defaultGstPercent: <?= (int)$defaultGstPercent ?>,
+    gstPreset: 'default',
+    defaultCgst: <?= $defaultCgst ?>,
+    defaultSgst: <?= $defaultSgst ?>,
+    cgstRate: <?= $defaultCgst ?>,
+    sgstRate: <?= $defaultSgst ?>,
     init() {
+      this.applyGstPreset();
       this.items = [this.blankItem()];
+    },
+    get totalGstPercent() {
+      return Math.round(((parseFloat(this.cgstRate) || 0) + (parseFloat(this.sgstRate) || 0)) * 100) / 100;
+    },
+    applyGstPreset() {
+      const presets = {
+        default: [this.defaultCgst, this.defaultSgst],
+        '28': [14, 14],
+        '18': [9, 9],
+        '12': [6, 6],
+        '5': [2.5, 2.5],
+        '0': [0, 0],
+      };
+      if (this.gstPreset === 'custom') return;
+      const p = presets[this.gstPreset] || presets.default;
+      this.cgstRate = p[0];
+      this.sgstRate = p[1];
+      this.syncGstToLines();
+    },
+    syncGstToLines() {
+      const total = this.totalGstPercent;
+      this.items.forEach(it => { it.gst_percent = total; });
     },
     blankItem() {
       const isSpare = this.productType === 'spare_part';
@@ -49,7 +78,7 @@ document.addEventListener('alpine:init', () => {
         quantity: 1,
         unit_rate: '',
         hsn_code: isSpare ? '85076000' : '87116020',
-        gst_percent: isSpare ? 18 : 5,
+        gst_percent: this.totalGstPercent,
         description: '',
       };
     },
@@ -90,9 +119,7 @@ document.addEventListener('alpine:init', () => {
       return type === 'spare_part' ? 18 : 5;
     },
     applyDefaultGstToAll() {
-      const rate = parseFloat(this.defaultGstPercent);
-      if (Number.isNaN(rate) || rate < 0 || rate > 100) return;
-      this.items.forEach(it => { it.gst_percent = rate; });
+      this.syncGstToLines();
     },
     setMode(idx, mode) {
       const it = this.items[idx];
@@ -215,7 +242,7 @@ document.addEventListener('alpine:init', () => {
         quantity: 1,
         unit_rate: src.unit_rate || '',
         hsn_code: '87116020',
-        gst_percent: src.gst_percent || this.defaultGstPercent,
+        gst_percent: src.gst_percent || this.totalGstPercent,
         description: '',
       };
       this.items = [...this.items.slice(0, idx + 1), line, ...this.items.slice(idx + 1)];
@@ -245,7 +272,7 @@ document.addEventListener('alpine:init', () => {
           quantity: 1,
           unit_rate: last.unit_rate || '',
           hsn_code: '87116020',
-          gst_percent: last.gst_percent || this.defaultGstPercent,
+          gst_percent: last.gst_percent || this.totalGstPercent,
           description: '',
         }];
         return;
@@ -334,9 +361,52 @@ document.addEventListener('alpine:init', () => {
     </div>
 
     <div class="card" style="margin-bottom:0.85rem;">
+      <h3 class="card-title">GST</h3>
+      <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">Same presets as sell orders — applied to all line items (each line can still be edited).</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>GST option *</label>
+          <select class="form-control" x-model="gstPreset" @change="applyGstPreset()">
+            <option value="default">Default — <?= $isSparePo ? '18% (9+9) spare parts' : '5% (2.5+2.5) vehicles' ?></option>
+            <option value="28">28% — CGST 14% + SGST 14%</option>
+            <option value="18">18% — CGST 9% + SGST 9%</option>
+            <option value="12">12% — CGST 6% + SGST 6%</option>
+            <option value="5">5% — CGST 2.5% + SGST 2.5%</option>
+            <option value="0">0% — No GST</option>
+            <option value="custom">Custom rates</option>
+          </select>
+        </div>
+        <template x-if="gstPreset === 'custom'">
+          <div class="form-group">
+            <label>CGST % *</label>
+            <input class="form-control" type="number" step="0.01" min="0" max="100" name="cgst_rate" x-model="cgstRate" @input="syncGstToLines()" required>
+          </div>
+        </template>
+        <template x-if="gstPreset === 'custom'">
+          <div class="form-group">
+            <label>SGST % *</label>
+            <input class="form-control" type="number" step="0.01" min="0" max="100" name="sgst_rate" x-model="sgstRate" @input="syncGstToLines()" required>
+          </div>
+        </template>
+        <template x-if="gstPreset !== 'custom'">
+          <input type="hidden" name="cgst_rate" :value="cgstRate">
+          <input type="hidden" name="sgst_rate" :value="sgstRate">
+        </template>
+        <div class="form-group">
+          <label>Total GST</label>
+          <input class="form-control" type="text" readonly tabindex="-1" style="background:#f8fafc;"
+                 :value="totalGstPercent + '% · CGST ' + cgstRate + '% + SGST ' + sgstRate + '%'">
+        </div>
+        <div class="form-group" style="display:flex;align-items:end;">
+          <button class="btn btn-sm btn-outline" type="button" @click="syncGstToLines()">Apply to all lines</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:0.85rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
         <div>
-          <h3 class="card-title" style="margin:0;" x-text="productType === 'spare_part' ? '2. Spare parts / batteries' : '2. Vehicle variants'"></h3>
+          <h3 class="card-title" style="margin:0;" x-text="productType === 'spare_part' ? '3. Spare parts / batteries' : '3. Vehicle variants'"></h3>
           <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;" x-show="productType === 'vehicle'">Use color to split variants under one vehicle — each color is a separate catalog variant on receive.</p>
           <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;" x-show="productType === 'spare_part'">Procure spare parts or batteries — stock updates on receive (no warehouse split).</p>
         </div>
@@ -561,21 +631,11 @@ document.addEventListener('alpine:init', () => {
     </div>
 
     <div class="card" style="margin-bottom:0.85rem;">
-      <h3 class="card-title">3. Totals &amp; notes</h3>
+      <h3 class="card-title">4. Totals &amp; notes</h3>
       <div style="display:grid;grid-template-columns:1fr 280px;gap:1.25rem;align-items:start;">
-        <div>
-          <div class="form-group" style="margin:0 0 0.75rem;">
-            <label>Notes</label>
-            <textarea class="form-control" name="notes" rows="4" placeholder="Payment terms, delivery instructions…"></textarea>
-          </div>
-          <div class="form-group" style="margin:0;max-width:220px;">
-            <label>Default GST %</label>
-            <div style="display:flex;gap:0.5rem;align-items:center;">
-              <input class="form-control" type="number" step="0.01" min="0" max="100" x-model="defaultGstPercent">
-              <button class="btn btn-sm btn-outline" type="button" @click="applyDefaultGstToAll()">Apply to all</button>
-            </div>
-            <div class="muted" style="font-size:0.75rem;margin-top:0.25rem;">Each line can use a different rate — <?= $isSparePo ? 'spare parts default to 18%' : 'vehicles default to 5%' ?>.</div>
-          </div>
+        <div class="form-group" style="margin:0;">
+          <label>Notes</label>
+          <textarea class="form-control" name="notes" rows="4" placeholder="Payment terms, delivery instructions…"></textarea>
         </div>
         <div style="padding:0.85rem 1rem;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);">
           <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
@@ -584,6 +644,7 @@ document.addEventListener('alpine:init', () => {
           <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
             <span>Total GST</span><span x-text="fmt(totals().gst)"></span>
           </div>
+          <div class="muted" style="font-size:0.78rem;margin-bottom:0.35rem;" x-text="'@ ' + totalGstPercent + '% (CGST ' + cgstRate + '% + SGST ' + sgstRate + '%)'"></div>
           <div style="display:flex;justify-content:space-between;font-size:1.05rem;font-weight:800;padding-top:0.5rem;border-top:1px solid var(--border);">
             <span>Grand total</span><span x-text="fmt(totals().total)"></span>
           </div>
