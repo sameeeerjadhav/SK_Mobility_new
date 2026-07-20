@@ -250,7 +250,11 @@ class PurchaseOrderController extends Controller
                 $productType = 'vehicle';
             }
             $expectedItemType = $productType === 'spare_part' ? 'spare_part' : 'vehicle_variant';
-            $lines = $this->service()->calcLines($this->input('items') ?? []);
+            $rawItems = $this->input('items');
+            if (!is_array($rawItems)) {
+                $rawItems = [];
+            }
+            $lines = $this->service()->calcLines($rawItems);
             foreach ($lines['items'] as $item) {
                 if (($item['item_type'] ?? '') !== $expectedItemType) {
                     throw new RuntimeException('All line items must match the purchase order type (vehicle or spare parts).');

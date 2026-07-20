@@ -39,7 +39,15 @@ class Controller
 
     protected function input(string $key, mixed $default = null): mixed
     {
-        return trim((string)($_POST[$key] ?? $_GET[$key] ?? $default));
+        $value = $_POST[$key] ?? $_GET[$key] ?? $default;
+        if (is_array($value)) {
+            return $value;
+        }
+        if ($value === null) {
+            return $default;
+        }
+
+        return trim((string)$value);
     }
 
     protected function db(): PDO
