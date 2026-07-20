@@ -18,6 +18,7 @@
  *  /install.php?migrate_po_product_type=1  ← vehicle vs spare parts on purchase orders
  *  /install.php?migrate_po_gst=1  ← custom GST rates on purchase orders
  *  /install.php?migrate_bank_transactions=1  ← bank ledger + order/PO bank links
+ *  /install.php?migrate_performance=1  ← speed indexes for dashboard, lists, notifications
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -693,6 +694,42 @@ try {
         } else {
             echo "skip purchase_orders payment columns\n";
         }
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_performance']) && $_GET['migrate_performance'] === '1') {
+        echo "\n--- Performance indexes migration ---\n";
+        $indexExists = static function (PDO $db, string $table, string $index): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?'
+            );
+            $stmt->execute([$table, $index]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        $addIndex = static function (PDO $db, string $table, string $index, string $columns) use ($indexExists): void {
+            if ($indexExists($db, $table, $index)) {
+                echo "skip {$table}.{$index}\n";
+                return;
+            }
+            try {
+                $db->exec("ALTER TABLE `{$table}` ADD INDEX `{$index}` ({$columns})");
+                echo "added {$table}.{$index}\n";
+            } catch (Throwable $e) {
+                echo "skip {$table}.{$index}: " . $e->getMessage() . "\n";
+            }
+        };
+
+        $addIndex($db, 'notifications', 'idx_notifications_user_read', 'user_id, is_read');
+        $addIndex($db, 'dealers', 'idx_dealers_user', 'user_id');
+        $addIndex($db, 'dealers', 'idx_dealers_status_created', 'status, created_at');
+        $addIndex($db, 'orders', 'idx_orders_status_created', 'status, created_at');
+        $addIndex($db, 'orders', 'idx_orders_dealer_created', 'dealer_id, created_at');
+        $addIndex($db, 'payments', 'idx_payments_status_date', 'status, payment_date');
+        $addIndex($db, 'leads', 'idx_leads_status_created', 'status, created_at');
+        $addIndex($db, 'leads', 'idx_leads_dealer_status', 'dealer_id, status');
+        $addIndex($db, 'expenses', 'idx_expenses_date', 'expense_date');
+        $addIndex($db, 'partner_transactions', 'idx_partner_tx_type_date', 'transaction_type, date');
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

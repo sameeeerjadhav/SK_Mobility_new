@@ -10,6 +10,7 @@ $unread = 0;
 try {
     $unread = \App\Services\NotificationService::unreadCount();
 } catch (\Throwable $e) {}
+$loadCharts = !empty($loadCharts);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -19,10 +20,13 @@ try {
   <title><?= e($title ?? 'SK Mobility') ?> — SK Mobility</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
   <link rel="stylesheet" href="<?= asset('assets/css/app.css') ?>?v=<?= @filemtime(BASE_PATH . '/public/assets/css/app.css') ?: 3 ?>">
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <?php if ($loadCharts): ?>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <?php endif; ?>
 </head>
 <body>
 <div class="app-shell" x-data="{ sidebarOpen: false, searchQ: '', searchResults: [], searchOpen: false, unread: <?= (int)$unread ?> }">

@@ -24,7 +24,7 @@ class NotificationController extends Controller
     public function unreadCount(): void
     {
         require_auth();
-        $this->json(['count' => NotificationService::unreadCount()]);
+        $this->json(['count' => NotificationService::unreadCount(null, true)]);
     }
 
     public function markRead(string $id): void
@@ -33,6 +33,7 @@ class NotificationController extends Controller
         $this->validateCsrf();
         $this->db()->prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?')
             ->execute([(int)$id, Auth::id()]);
+        NotificationService::clearUnreadCache();
         flash('success', 'Marked as read.');
         $this->redirect('/notifications');
     }
@@ -43,6 +44,7 @@ class NotificationController extends Controller
         $this->validateCsrf();
         $this->db()->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0')
             ->execute([Auth::id()]);
+        NotificationService::clearUnreadCache();
         flash('success', 'All notifications marked as read.');
         $this->redirect('/notifications');
     }

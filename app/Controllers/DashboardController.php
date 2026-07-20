@@ -34,106 +34,120 @@ class DashboardController extends Controller
 
     private function adminDashboard(): void
     {
+        $cacheKey = 'dashboard_admin_v2';
+        $cacheAt = (int)($_SESSION[$cacheKey . '_at'] ?? 0);
+        if ($cacheAt > 0 && (time() - $cacheAt) < 30 && isset($_SESSION[$cacheKey])) {
+            $payload = $_SESSION[$cacheKey];
+            $payload['loadCharts'] = true;
+            $this->view('dashboard/admin', $payload);
+            return;
+        }
+
         $db = $this->db();
+        $monthStart = date('Y-m-01');
+        $nextMonthStart = date('Y-m-01', strtotime('+1 month'));
+        $prevMonthStart = date('Y-m-01', strtotime('-1 month'));
 
-        $dealers = (int)$db->query("SELECT COUNT(*) FROM dealers WHERE status='approved'")->fetchColumn();
-        $dealersPrev = (int)$db->query(
-            "SELECT COUNT(*) FROM dealers WHERE status='approved' AND created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
-        $dealersMonth = (int)$db->query(
-            "SELECT COUNT(*) FROM dealers WHERE status='approved' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())"
-        )->fetchColumn();
-        $dealersPrevMonth = (int)$db->query(
-            "SELECT COUNT(*) FROM dealers WHERE status='approved' AND created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
+        $dealerRow = $db->query(
+            "SELECT
+                SUM(status = 'approved') AS dealers,
+                SUM(status = 'approved' AND created_at < '{$monthStart}') AS dealers_prev,
+                SUM(status = 'approved' AND created_at >= '{$monthStart}' AND created_at < '{$nextMonthStart}') AS dealers_month,
+                SUM(status = 'approved' AND created_at >= '{$prevMonthStart}' AND created_at < '{$monthStart}') AS dealers_prev_month
+             FROM dealers"
+        )->fetch();
 
-        $sold = (int)$db->query(
-            "SELECT COALESCE(SUM(oi.quantity),0) FROM order_items oi
-             JOIN orders o ON o.id = oi.order_id WHERE o.status IN ('delivered','shipped','processing','approved')"
-        )->fetchColumn();
-        $soldMonth = (int)$db->query(
-            "SELECT COALESCE(SUM(oi.quantity),0) FROM order_items oi
+        $soldStatuses = "'delivered','shipped','processing','approved'";
+        $soldRow = $db->query(
+            "SELECT
+                COALESCE(SUM(oi.quantity), 0) AS sold,
+                COALESCE(SUM(CASE WHEN o.created_at >= '{$monthStart}' AND o.created_at < '{$nextMonthStart}' THEN oi.quantity ELSE 0 END), 0) AS sold_month,
+                COALESCE(SUM(CASE WHEN o.created_at >= '{$prevMonthStart}' AND o.created_at < '{$monthStart}' THEN oi.quantity ELSE 0 END), 0) AS sold_prev
+             FROM order_items oi
              JOIN orders o ON o.id = oi.order_id
-             WHERE o.status IN ('delivered','shipped','processing','approved')
-               AND YEAR(o.created_at)=YEAR(CURDATE()) AND MONTH(o.created_at)=MONTH(CURDATE())"
-        )->fetchColumn();
-        $soldPrev = (int)$db->query(
-            "SELECT COALESCE(SUM(oi.quantity),0) FROM order_items oi
-             JOIN orders o ON o.id = oi.order_id
-             WHERE o.status IN ('delivered','shipped','processing','approved')
-               AND o.created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
-               AND o.created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
+             WHERE o.status IN ({$soldStatuses})"
+        )->fetch();
 
-        $revenue = (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='completed'")->fetchColumn();
-        $revenueMonth = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='completed' AND YEAR(payment_date)=YEAR(CURDATE()) AND MONTH(payment_date)=MONTH(CURDATE())"
-        )->fetchColumn();
-        $revenuePrev = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='completed'
-             AND payment_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
-             AND payment_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
+        $payRow = $db->query(
+            "SELECT
+                COALESCE(SUM(amount), 0) AS revenue,
+                COALESCE(SUM(CASE WHEN payment_date >= '{$monthStart}' AND payment_date < '{$nextMonthStart}' THEN amount ELSE 0 END), 0) AS revenue_month,
+                COALESCE(SUM(CASE WHEN payment_date >= '{$prevMonthStart}' AND payment_date < '{$monthStart}' THEN amount ELSE 0 END), 0) AS revenue_prev
+             FROM payments
+             WHERE status = 'completed'"
+        )->fetch();
 
-        $leads = (int)$db->query("SELECT COUNT(*) FROM leads WHERE status IN ('new','contacted','qualified')")->fetchColumn();
-        $leadsMonth = (int)$db->query(
-            "SELECT COUNT(*) FROM leads WHERE YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())"
-        )->fetchColumn();
-        $leadsPrev = (int)$db->query(
-            "SELECT COUNT(*) FROM leads WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AND created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
+        $leadRow = $db->query(
+            "SELECT
+                SUM(status IN ('new','contacted','qualified')) AS leads,
+                SUM(created_at >= '{$monthStart}' AND created_at < '{$nextMonthStart}') AS leads_month,
+                SUM(created_at >= '{$prevMonthStart}' AND created_at < '{$monthStart}') AS leads_prev
+             FROM leads"
+        )->fetch();
 
-        $payroll = (float)$db->query(
-            "SELECT COALESCE(SUM(net_salary),0) FROM salary_records WHERE month=MONTH(CURDATE()) AND year=YEAR(CURDATE())"
-        )->fetchColumn();
-        $payrollPrev = (float)$db->query(
-            "SELECT COALESCE(SUM(net_salary),0) FROM salary_records
-             WHERE month=MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND year=YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))"
-        )->fetchColumn();
+        $thisMonth = (int)date('n');
+        $thisYear = (int)date('Y');
+        $prevMonth = (int)date('n', strtotime('-1 month'));
+        $prevYear = (int)date('Y', strtotime('-1 month'));
+        $payrollStmt = $db->prepare(
+            'SELECT
+                COALESCE(SUM(CASE WHEN month = ? AND year = ? THEN net_salary ELSE 0 END), 0) AS payroll,
+                COALESCE(SUM(CASE WHEN month = ? AND year = ? THEN net_salary ELSE 0 END), 0) AS payroll_prev
+             FROM salary_records
+             WHERE (month = ? AND year = ?) OR (month = ? AND year = ?)'
+        );
+        $payrollStmt->execute([
+            $thisMonth, $thisYear, $prevMonth, $prevYear,
+            $thisMonth, $thisYear, $prevMonth, $prevYear,
+        ]);
+        $payrollRow = $payrollStmt->fetch();
 
-        $bank = (float)$db->query("SELECT COALESCE(SUM(current_balance),0) FROM bank_accounts WHERE is_active=1")->fetchColumn();
-        $expenses = (float)$db->query(
-            "SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), amount)),0) FROM expenses
-             WHERE YEAR(expense_date)=YEAR(CURDATE()) AND MONTH(expense_date)=MONTH(CURDATE())"
-        )->fetchColumn();
-        $expensesPrev = (float)$db->query(
-            "SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), amount)),0) FROM expenses
-             WHERE expense_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
-             AND expense_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
-        $expensesAll = (float)$db->query(
-            "SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), amount)),0) FROM expenses"
-        )->fetchColumn();
+        $bank = (float)$db->query('SELECT COALESCE(SUM(current_balance),0) FROM bank_accounts WHERE is_active=1')->fetchColumn();
 
-        $partnerPaid = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions WHERE transaction_type='payment'"
-        )->fetchColumn();
-        $partnerReceived = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions WHERE transaction_type='receipt'"
-        )->fetchColumn();
+        $expenseRow = $db->query(
+            "SELECT
+                COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), amount)), 0) AS expenses_all,
+                COALESCE(SUM(CASE WHEN expense_date >= '{$monthStart}' AND expense_date < '{$nextMonthStart}' THEN COALESCE(NULLIF(total_amount, 0), amount) ELSE 0 END), 0) AS expenses,
+                COALESCE(SUM(CASE WHEN expense_date >= '{$prevMonthStart}' AND expense_date < '{$monthStart}' THEN COALESCE(NULLIF(total_amount, 0), amount) ELSE 0 END), 0) AS expenses_prev
+             FROM expenses"
+        )->fetch();
+
+        $partnerRow = $db->query(
+            "SELECT
+                COALESCE(SUM(CASE WHEN transaction_type = 'payment' THEN amount ELSE 0 END), 0) AS partner_paid,
+                COALESCE(SUM(CASE WHEN transaction_type = 'receipt' THEN amount ELSE 0 END), 0) AS partner_received,
+                COALESCE(SUM(CASE WHEN transaction_type = 'payment' AND date >= '{$monthStart}' AND date < '{$nextMonthStart}' THEN amount ELSE 0 END), 0) AS partner_paid_month,
+                COALESCE(SUM(CASE WHEN transaction_type = 'receipt' AND date >= '{$monthStart}' AND date < '{$nextMonthStart}' THEN amount ELSE 0 END), 0) AS partner_received_month,
+                COALESCE(SUM(CASE WHEN transaction_type = 'payment' AND date >= '{$prevMonthStart}' AND date < '{$monthStart}' THEN amount ELSE 0 END), 0) AS partner_paid_prev,
+                COALESCE(SUM(CASE WHEN transaction_type = 'receipt' AND date >= '{$prevMonthStart}' AND date < '{$monthStart}' THEN amount ELSE 0 END), 0) AS partner_received_prev
+             FROM partner_transactions"
+        )->fetch();
+
+        $dealers = (int)($dealerRow['dealers'] ?? 0);
+        $dealersMonth = (int)($dealerRow['dealers_month'] ?? 0);
+        $dealersPrevMonth = (int)($dealerRow['dealers_prev_month'] ?? 0);
+        $sold = (int)($soldRow['sold'] ?? 0);
+        $soldMonth = (int)($soldRow['sold_month'] ?? 0);
+        $soldPrev = (int)($soldRow['sold_prev'] ?? 0);
+        $revenue = (float)($payRow['revenue'] ?? 0);
+        $revenueMonth = (float)($payRow['revenue_month'] ?? 0);
+        $revenuePrev = (float)($payRow['revenue_prev'] ?? 0);
+        $leads = (int)($leadRow['leads'] ?? 0);
+        $leadsMonth = (int)($leadRow['leads_month'] ?? 0);
+        $leadsPrev = (int)($leadRow['leads_prev'] ?? 0);
+        $payroll = (float)($payrollRow['payroll'] ?? 0);
+        $payrollPrev = (float)($payrollRow['payroll_prev'] ?? 0);
+        $expenses = (float)($expenseRow['expenses'] ?? 0);
+        $expensesPrev = (float)($expenseRow['expenses_prev'] ?? 0);
+        $expensesAll = (float)($expenseRow['expenses_all'] ?? 0);
+        $partnerPaid = (float)($partnerRow['partner_paid'] ?? 0);
+        $partnerReceived = (float)($partnerRow['partner_received'] ?? 0);
+        $partnerPaidMonth = (float)($partnerRow['partner_paid_month'] ?? 0);
+        $partnerReceivedMonth = (float)($partnerRow['partner_received_month'] ?? 0);
+        $partnerPaidPrev = (float)($partnerRow['partner_paid_prev'] ?? 0);
+        $partnerReceivedPrev = (float)($partnerRow['partner_received_prev'] ?? 0);
+
         $partnerNet = $partnerReceived - $partnerPaid;
-
-        $partnerPaidMonth = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
-             WHERE transaction_type='payment' AND YEAR(date)=YEAR(CURDATE()) AND MONTH(date)=MONTH(CURDATE())"
-        )->fetchColumn();
-        $partnerReceivedMonth = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
-             WHERE transaction_type='receipt' AND YEAR(date)=YEAR(CURDATE()) AND MONTH(date)=MONTH(CURDATE())"
-        )->fetchColumn();
-        $partnerPaidPrev = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
-             WHERE transaction_type='payment'
-               AND date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
-               AND date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
-        $partnerReceivedPrev = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
-             WHERE transaction_type='receipt'
-               AND date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
-               AND date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
-        )->fetchColumn();
-
         $partnerNetMonth = $partnerReceivedMonth - $partnerPaidMonth;
         $partnerNetPrev = $partnerReceivedPrev - $partnerPaidPrev;
         $balance = $partnerNet - $expensesAll;
@@ -159,18 +173,20 @@ class DashboardController extends Controller
         )->fetchAll();
 
         $recentOrders = $db->query(
-            "SELECT o.*, d.business_name FROM orders o
+            "SELECT o.id, o.order_number, o.order_type, o.status, o.total_amount, o.created_at, o.customer_name, d.business_name
+             FROM orders o
              LEFT JOIN dealers d ON d.id = o.dealer_id
              ORDER BY o.created_at DESC LIMIT 8"
         )->fetchAll();
 
         $recentLeads = $db->query(
-            "SELECT l.*, ls.name AS source_name FROM leads l
+            "SELECT l.id, l.customer_name, l.customer_phone, l.status, l.created_at, ls.name AS source_name
+             FROM leads l
              LEFT JOIN lead_sources ls ON ls.id = l.source_id
              ORDER BY l.created_at DESC LIMIT 8"
         )->fetchAll();
 
-        $this->view('dashboard/admin', [
+        $payload = [
             'title' => 'Dashboard',
             'stats' => [
                 ['label' => 'Dealers', 'value' => $dealers, 'trend' => mom_trend($dealersMonth, $dealersPrevMonth), 'fmt' => 'int'],
@@ -190,7 +206,13 @@ class DashboardController extends Controller
             'topDealers' => $topDealers,
             'recentOrders' => $recentOrders,
             'recentLeads' => $recentLeads,
-        ]);
+        ];
+
+        $_SESSION[$cacheKey] = $payload;
+        $_SESSION[$cacheKey . '_at'] = time();
+
+        $payload['loadCharts'] = true;
+        $this->view('dashboard/admin', $payload);
     }
 
     private function dealerDashboard(): void

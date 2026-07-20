@@ -36,6 +36,13 @@ class Auth
         $_SESSION['user'] = $user;
         $_SESSION['permissions'] = self::loadPermissions((int)$user['role_id']);
 
+        if (($user['role_slug'] ?? '') === 'dealer') {
+            $ds = $db->prepare('SELECT id FROM dealers WHERE user_id = ? LIMIT 1');
+            $ds->execute([(int)$user['id']]);
+            $dealerId = $ds->fetchColumn();
+            $_SESSION['user']['dealer_id'] = $dealerId ? (int)$dealerId : null;
+        }
+
         $db->prepare('UPDATE users SET last_login_at = NOW() WHERE id = ?')->execute([(int)$user['id']]);
         Audit::log('login', 'auth', 'users', (int)$user['id']);
 
@@ -116,10 +123,15 @@ class Auth
         if (self::role() !== 'dealer') {
             return null;
         }
+        if (array_key_exists('dealer_id', $_SESSION['user'] ?? [])) {
+            $cached = $_SESSION['user']['dealer_id'];
+            return $cached !== null ? (int)$cached : null;
+        }
         $db = Database::connection();
         $stmt = $db->prepare('SELECT id FROM dealers WHERE user_id = ? LIMIT 1');
         $stmt->execute([self::id()]);
         $id = $stmt->fetchColumn();
-        return $id ? (int)$id : null;
+        $_SESSION['user']['dealer_id'] = $id ? (int)$id : null;
+        return $_SESSION['user']['dealer_id'];
     }
 }
