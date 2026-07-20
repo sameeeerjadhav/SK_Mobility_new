@@ -122,13 +122,15 @@ class PurchaseOrderService
                     throw new RuntimeException("Line {$lineNo}: use either existing vehicle or new vehicle name, not both.");
                 }
             } else {
-                if ($vehicleId > 0) {
-                    throw new RuntimeException("Line {$lineNo}: clear existing vehicle selection when adding a new vehicle.");
-                }
+                $vehicleId = 0;
                 if ($newVehicleName === '' || $vehicleCategoryId <= 0) {
                     throw new RuntimeException("Line {$lineNo}: vehicle name and category are required for a new vehicle.");
                 }
             }
+        }
+
+        if ($vehicleMode === 'new') {
+            $vehicleId = 0;
         }
 
         $color = trim((string)($row['color'] ?? ''));
@@ -355,6 +357,11 @@ class PurchaseOrderService
              ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
         );
 
+        /** @var array<string, int> vehicle name (normalized) => id created earlier in this PO */
+        $pendingVehicles = [];
+        /** @var array<string, array{variant_id: int, vehicle_id: int, color: string}> */
+        $pendingVariants = [];
+
         foreach ($items as $item) {
             $itemType = $item['item_type'] ?? 'vehicle_variant';
             if ($itemType === 'spare_part') {
@@ -363,7 +370,7 @@ class PurchaseOrderService
                 $variantId = null;
                 $color = null;
             } else {
-                $resolved = $this->resolveLineVariant($item);
+                $resolved = $this->resolveLineVariant($item, $pendingVehicles, $pendingVariants);
                 $sparePartId = null;
                 $vehicleId = $resolved['vehicle_id'];
                 $variantId = $resolved['variant_id'];
@@ -455,12 +462,14 @@ class PurchaseOrderService
 
     /**
      * @param array<string, mixed> $item
+     * @param array<string, int> $pendingVehicles
+     * @param array<string, array{variant_id: int, vehicle_id: int, color: string}> $pendingVariants
      * @return array{variant_id: int, vehicle_id: int, color: string}
      */
-    private function resolveLineVariant(array $item): array
+    private function resolveLineVariant(array $item, array &$pendingVehicles = [], array &$pendingVariants = []): array
     {
         if (($item['variant_mode'] ?? '') === 'new') {
-            return $this->resolveNewVariant($item);
+            return $this->resolveNewVariant($item, $pendingVehicles, $pendingVariants);
         }
 
         return $this->resolveExistingVariant(
@@ -501,20 +510,38 @@ class PurchaseOrderService
         );
     }
 
-    /** @param array<string, mixed> $item @return array{variant_id: int, vehicle_id: int, color: string} */
-    private function resolveNewVariant(array $item): array
+    /**
+     * @param array<string, mixed> $item
+     * @param array<string, int> $pendingVehicles
+     * @param array<string, array{variant_id: int, vehicle_id: int, color: string}> $pendingVariants
+     * @return array{variant_id: int, vehicle_id: int, color: string}
+     */
+    private function resolveNewVariant(array $item, array &$pendingVehicles, array &$pendingVariants): array
     {
-        $vehicleId = $this->resolveVehicleId($item);
+        $vehicleId = $this->resolveVehicleId($item, $pendingVehicles);
 
-        return $this->variantCatalog()->findOrCreateVariant(
+        $variantName = trim((string)$item['new_variant_name']);
+        $color = trim((string)($item['color'] ?? ''));
+        $batteryType = $item['battery_type'] ?? null;
+        $variantKey = $vehicleId . '|' . mb_strtolower($variantName) . '|' . mb_strtolower($color)
+            . '|' . ($batteryType ?? '');
+
+        if (isset($pendingVariants[$variantKey])) {
+            return $pendingVariants[$variantKey];
+        }
+
+        $resolved = $this->variantCatalog()->findOrCreateVariant(
             $vehicleId,
-            trim((string)$item['new_variant_name']),
-            trim((string)($item['color'] ?? '')),
+            $variantName,
+            $color,
             (float)$item['unit_rate'],
-            $item['battery_type'] ?? null,
+            $batteryType,
             $item['battery_spec'] ?? null,
             null
         );
+        $pendingVariants[$variantKey] = $resolved;
+
+        return $resolved;
     }
 
     private function variantCatalog(): VariantCatalogService
@@ -543,15 +570,26 @@ class PurchaseOrderService
         );
     }
 
-    /** @param array<string, mixed> $item */
-    private function resolveVehicleId(array $item): int
+    /** @param array<string, mixed> $item @param array<string, int> $pendingVehicles */
+    private function resolveVehicleId(array $item, array &$pendingVehicles = []): int
     {
         if (($item['vehicle_mode'] ?? '') === 'new') {
-            return $this->findOrCreateVehicle(
+            $name = trim((string)$item['new_vehicle_name']);
+            $key = mb_strtolower($name);
+            if ($key !== '' && isset($pendingVehicles[$key])) {
+                return $pendingVehicles[$key];
+            }
+
+            $vehicleId = $this->findOrCreateVehicle(
                 (int)$item['vehicle_category_id'],
-                (string)$item['new_vehicle_name'],
+                $name,
                 (float)$item['unit_rate']
             );
+            if ($key !== '') {
+                $pendingVehicles[$key] = $vehicleId;
+            }
+
+            return $vehicleId;
         }
 
         $vehicleId = (int)($item['vehicle_id'] ?? 0);
@@ -591,7 +629,7 @@ class PurchaseOrderService
         }
 
         $findByName = $this->db->prepare(
-            'SELECT id FROM vehicles WHERE LOWER(TRIM(name)) = LOWER(?) AND is_active = 1 LIMIT 1'
+            'SELECT id FROM vehicles WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1'
         );
         $findByName->execute([$name]);
         $existingByName = $findByName->fetchColumn();
@@ -606,16 +644,27 @@ class PurchaseOrderService
             $slug .= '-' . random_int(100, 999);
         }
 
-        $this->db->prepare(
-            'INSERT INTO vehicles (category_id, name, slug, brand, base_price, is_active)
-             VALUES (?,?,?,?,?,1)'
-        )->execute([
-            $categoryId,
-            $name,
-            $slug,
-            'SK Mobility',
-            $basePrice > 0 ? $basePrice : 0,
-        ]);
+        try {
+            $this->db->prepare(
+                'INSERT INTO vehicles (category_id, name, slug, brand, base_price, is_active)
+                 VALUES (?,?,?,?,?,1)'
+            )->execute([
+                $categoryId,
+                $name,
+                $slug,
+                'SK Mobility',
+                $basePrice > 0 ? $basePrice : 0,
+            ]);
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') {
+                $findByName->execute([$name]);
+                $retry = $findByName->fetchColumn();
+                if ($retry) {
+                    return (int)$retry;
+                }
+            }
+            throw $e;
+        }
 
         return (int)$this->db->lastInsertId();
     }

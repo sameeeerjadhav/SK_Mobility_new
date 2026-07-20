@@ -168,6 +168,22 @@ document.addEventListener('alpine:init', () => {
     onNewVariantChange(idx) {
       this.syncDescription(idx);
     },
+    onNewVehicleNameInput(idx) {
+      const it = this.items[idx];
+      if (it.vehicle_mode === 'new' && it.new_vehicle_name) {
+        const key = it.new_vehicle_name.trim().toLowerCase();
+        const sibling = this.items.find((row, i) =>
+          i !== idx
+          && row.item_type === 'vehicle_variant'
+          && row.vehicle_mode === 'new'
+          && row.new_vehicle_name.trim().toLowerCase() === key
+        );
+        if (sibling && sibling.vehicle_category_id) {
+          it.vehicle_category_id = sibling.vehicle_category_id;
+        }
+      }
+      this.onNewVariantChange(idx);
+    },
     onColorChange(idx) {
       this.syncDescription(idx);
     },
@@ -254,16 +270,17 @@ document.addEventListener('alpine:init', () => {
       }
       const last = this.lastVehicleLine();
       if (last) {
+        const sameNewVehicle = last.vehicle_mode === 'new' && last.new_vehicle_name;
         this.items = [...this.items, {
           item_type: 'vehicle_variant',
-          variant_mode: last.variant_mode,
+          variant_mode: sameNewVehicle ? 'new' : last.variant_mode,
           vehicle_mode: last.vehicle_mode,
-          variant_id: last.variant_id,
-          vehicle_id: last.vehicle_id,
-          new_vehicle_name: last.new_vehicle_name,
-          vehicle_category_id: last.vehicle_category_id,
-          new_variant_name: last.new_variant_name,
-          battery_type: last.battery_type,
+          variant_id: '',
+          vehicle_id: '',
+          new_vehicle_name: sameNewVehicle ? last.new_vehicle_name : '',
+          vehicle_category_id: sameNewVehicle ? last.vehicle_category_id : '',
+          new_variant_name: '',
+          battery_type: '',
           spare_mode: this.defaultSpareMode,
           spare_part_id: '',
           spare_category_id: '',
@@ -498,9 +515,12 @@ document.addEventListener('alpine:init', () => {
                   <label>Vehicle name *</label>
                   <input class="form-control" type="text"
                          :name="it.variant_mode === 'new' && it.vehicle_mode === 'new' ? 'items['+idx+'][new_vehicle_name]' : null"
-                         x-model="it.new_vehicle_name" @input="onNewVariantChange(idx)"
+                         x-model="it.new_vehicle_name" @input="onNewVehicleNameInput(idx)"
                          placeholder="e.g. NX3 Series"
                          :required="it.variant_mode === 'new' && it.vehicle_mode === 'new'">
+                  <div class="muted" style="font-size:0.75rem;margin-top:0.2rem;" x-show="it.vehicle_mode === 'new'">
+                    Same vehicle name on another line reuses one vehicle — enter a different variant or color per line.
+                  </div>
                 </div>
 
                 <div class="form-group">
