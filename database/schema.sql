@@ -636,6 +636,7 @@ CREATE TABLE expense_categories (
 CREATE TABLE expenses (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   category_id INT UNSIGNED NOT NULL,
+  record_type ENUM('asset','expenditure') NOT NULL DEFAULT 'expenditure',
   amount DECIMAL(10,2) NOT NULL,
   description TEXT NULL,
   expense_date DATE NOT NULL,

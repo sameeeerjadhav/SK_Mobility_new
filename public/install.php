@@ -6,7 +6,7 @@
  *  /install.php
  *  /install.php?reset_admin=1
  *  /install.php?migrate_invoice=1   ← SAI KUBER tax invoice columns + company settings
- *  /install.php?migrate_variant=1   ← vehicle variant battery type + capacity options
+ *  /install.php?migrate_expenses=1  ← expense asset / expenditure record type
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -138,6 +138,25 @@ try {
         };
         $addCol($db, 'vehicle_variants', 'battery_type', "ENUM('Lithium Ion','Lead Acid') NULL AFTER battery_capacity_kwh");
         $addCol($db, 'vehicle_variants', 'battery_spec', 'VARCHAR(100) NULL AFTER battery_type');
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_expenses']) && $_GET['migrate_expenses'] === '1') {
+        echo "\n--- Expense record type migration ---\n";
+        $addCol = static function (PDO $db, string $table, string $column, string $definition): void {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                echo "skip {$table}.{$column}\n";
+                return;
+            }
+            $db->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+            echo "added {$table}.{$column}\n";
+        };
+        $addCol($db, 'expenses', 'record_type', "ENUM('asset','expenditure') NOT NULL DEFAULT 'expenditure' AFTER category_id");
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {
