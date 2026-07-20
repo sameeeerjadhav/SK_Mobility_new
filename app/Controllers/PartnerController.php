@@ -44,7 +44,7 @@ class PartnerController extends Controller
             trim((string)$this->input('phone')),
             trim((string)$this->input('email')),
             trim((string)$this->input('address')),
-            trim((string)$this->input('aadhar_number')),
+            trim((string)$this->input('aadhar_number')) !== '' ? format_aadhar($this->input('aadhar_number')) : null,
             trim((string)$this->input('pan_number')),
         ]);
         Audit::log('create', 'partners', 'partners', (int)$this->db()->lastInsertId());
@@ -63,7 +63,7 @@ class PartnerController extends Controller
             trim((string)$this->input('phone')),
             trim((string)$this->input('email')),
             trim((string)$this->input('address')),
-            trim((string)$this->input('aadhar_number')),
+            trim((string)$this->input('aadhar_number')) !== '' ? format_aadhar($this->input('aadhar_number')) : null,
             trim((string)$this->input('pan_number')),
             (int)$this->input('is_active'),
             (int)$id,

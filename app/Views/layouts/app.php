@@ -120,6 +120,29 @@ try {
         }
       }).catch(() => {});
   }, 60000);
+
+  window.formatAadharValue = function (value) {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 12);
+    if (!digits) return '';
+    return digits.match(/.{1,4}/g).join(' ');
+  };
+
+  const bindAadharInput = (input) => {
+    input.addEventListener('input', () => {
+      const formatted = window.formatAadharValue(input.value);
+      if (input.value !== formatted) input.value = formatted;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    input.value = window.formatAadharValue(input.value);
+  };
+
+  document.querySelectorAll('.aadhar-input').forEach(bindAadharInput);
+  document.addEventListener('focusin', (e) => {
+    if (e.target.matches('.aadhar-input:not([data-aadhar-bound])')) {
+      e.target.dataset.aadharBound = '1';
+      bindAadharInput(e.target);
+    }
+  });
 </script>
 </body>
 </html>

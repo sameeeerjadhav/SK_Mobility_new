@@ -161,6 +161,18 @@ function india_datetime(?string $date): string
     return $ts ? date('d/m/Y H:i', $ts) : '—';
 }
 
+/** Format Aadhar as XXXX XXXX XXXX (max 12 digits). */
+function format_aadhar(?string $value): string
+{
+    $digits = preg_replace('/\D/', '', (string)$value);
+    $digits = substr($digits, 0, 12);
+    if ($digits === '') {
+        return '';
+    }
+
+    return implode(' ', str_split($digits, 4));
+}
+
 function url(string $path = ''): string
 {
     $base = rtrim((string)env('APP_URL', ''), '/');

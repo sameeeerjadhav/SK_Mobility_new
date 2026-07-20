@@ -27,7 +27,7 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
     </div>
     <div>
       <h4>Customer</h4>
-      <p><?= e($bill['customer_name']) ?><br><?= e($bill['customer_phone'] ?? '') ?> · <?= e($bill['customer_email'] ?? '') ?><br><?= nl2br(e($bill['customer_address'] ?? '')) ?><br>Aadhar: <?= e($bill['customer_aadhaar'] ?? '—') ?> · PAN: <?= e($bill['customer_pan'] ?? '—') ?></p>
+      <p><?= e($bill['customer_name']) ?><br><?= e($bill['customer_phone'] ?? '') ?> · <?= e($bill['customer_email'] ?? '') ?><br><?= nl2br(e($bill['customer_address'] ?? '')) ?><br>Aadhar: <?= e(format_aadhar($bill['customer_aadhaar'] ?? '') ?: '—') ?> · PAN: <?= e($bill['customer_pan'] ?? '—') ?></p>
     </div>
   </div>
 
@@ -68,7 +68,7 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
       <div class="form-group"><label>Mob.</label><input class="form-control" name="customer_phone" value="<?= e($bill['customer_phone'] ?? '') ?>"></div>
       <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" value="<?= e($bill['customer_email'] ?? '') ?>"></div>
       <div class="form-group full"><label>Add.</label><textarea class="form-control" name="customer_address" rows="2"><?= e($bill['customer_address'] ?? '') ?></textarea></div>
-      <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="customer_aadhaar" value="<?= e($bill['customer_aadhaar'] ?? '') ?>"></div>
+      <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="customer_aadhaar" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012" value="<?= e(format_aadhar($bill['customer_aadhaar'] ?? '')) ?>"></div>
       <div class="form-group"><label>PAN No.</label><input class="form-control" name="customer_pan" value="<?= e($bill['customer_pan'] ?? '') ?>"></div>
       <div class="form-group"><label>EV Model Name</label><input class="form-control" name="vehicle_model" value="<?= e($bill['vehicle_model'] ?? '') ?>"></div>
       <div class="form-group"><label>EV Model Type</label><input class="form-control" name="vehicle_model_type" value="<?= e($bill['vehicle_model_type'] ?? '') ?>"></div>

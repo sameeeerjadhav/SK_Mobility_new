@@ -130,7 +130,7 @@ foreach ($variants as $vv) {
         <div class="form-group"><label>Cust. Name *</label><input class="form-control" name="customer_name" required></div>
         <div class="form-group"><label>Mob. *</label><input class="form-control" name="customer_phone" required></div>
         <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" type="email"></div>
-        <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="customer_aadhaar"></div>
+        <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="customer_aadhaar" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012"></div>
         <div class="form-group"><label>PAN No.</label><input class="form-control" name="customer_pan"></div>
         <div class="form-group full"><label>Add. (Address)</label><textarea class="form-control" name="customer_address" rows="2"></textarea></div>
         <div class="form-group full" x-show="orderType==='dealer'" x-cloak>

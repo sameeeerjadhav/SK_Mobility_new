@@ -123,7 +123,9 @@ class OrderController extends Controller
             'customer_phone' => $this->input('customer_phone'),
             'customer_email' => $this->input('customer_email'),
             'customer_address' => $this->input('customer_address'),
-            'customer_aadhaar' => $this->input('customer_aadhaar'),
+            'customer_aadhaar' => trim((string)$this->input('customer_aadhaar')) !== ''
+                ? format_aadhar($this->input('customer_aadhaar'))
+                : null,
             'customer_pan' => $this->input('customer_pan'),
             'chassis_no' => $this->input('chassis_no'),
             'motor_no' => $this->input('motor_no'),

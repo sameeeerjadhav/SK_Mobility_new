@@ -131,7 +131,7 @@ class BillPdfService
       <div class="field"><span class="lab">Cust. Name :</span> ' . $v('customer_name') . '</div>
       <div class="field"><span class="lab">Add. :</span> ' . nl2br($v('customer_address')) . '</div>
       <div class="field"><span class="lab">Mob. :</span> ' . $v('customer_phone') . ' &nbsp;&nbsp; <span class="lab">Email :</span> ' . $v('customer_email') . '</div>
-      <div class="field"><span class="lab">Aadhar No. :</span> ' . $v('customer_aadhaar') . '</div>
+      <div class="field"><span class="lab">Aadhar No. :</span> ' . htmlspecialchars(format_aadhar($bill['customer_aadhaar'] ?? '')) . '</div>
       <div class="field"><span class="lab">PAN No. :</span> ' . $v('customer_pan') . '</div>
     </div>
     <div class="invbox">

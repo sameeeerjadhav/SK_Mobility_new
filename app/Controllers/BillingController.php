@@ -104,7 +104,7 @@ class BillingController extends Controller
             $this->input('customer_phone'),
             $this->input('customer_email'),
             $this->input('customer_address'),
-            $this->input('customer_aadhaar'),
+            trim((string)$this->input('customer_aadhaar')) !== '' ? format_aadhar($this->input('customer_aadhaar')) : null,
             $this->input('customer_pan'),
             $this->input('vehicle_model'),
             $this->input('vehicle_model_type'),

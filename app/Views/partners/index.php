@@ -148,6 +148,9 @@ document.addEventListener('alpine:init', () => {
     },
     openEdit(partner) {
       this.editPartner = JSON.parse(JSON.stringify(partner));
+      if (this.editPartner?.aadhar_number) {
+        this.editPartner.aadhar_number = window.formatAadharValue(this.editPartner.aadhar_number);
+      }
     },
     openEditById(id) {
       const partner = this.partners.find(p => Number(p.id) === Number(id));
@@ -231,7 +234,7 @@ document.addEventListener('alpine:init', () => {
               <?php if (!empty($p['aadhar_number']) || !empty($p['pan_number'])): ?>
                 <div class="pn-docs">
                   <?php if (!empty($p['aadhar_number'])): ?>
-                    <span class="pn-doc">Aadhar: <?= e($p['aadhar_number']) ?></span>
+                    <span class="pn-doc">Aadhar: <?= e(format_aadhar($p['aadhar_number'])) ?></span>
                   <?php endif; ?>
                   <?php if (!empty($p['pan_number'])): ?>
                     <span class="pn-doc">PAN: <?= e(strtoupper($p['pan_number'])) ?></span>
@@ -315,7 +318,7 @@ document.addEventListener('alpine:init', () => {
           <div class="form-group"><label>Contact No.</label><input class="form-control" name="phone" type="tel" placeholder="10-digit mobile"></div>
           <div class="form-group"><label>Email ID</label><input class="form-control" name="email" type="email" placeholder="name@example.com"></div>
           <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" rows="2" placeholder="Street, city, pin code"></textarea></div>
-          <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="aadhar_number" maxlength="12" inputmode="numeric" placeholder="12 digits"></div>
+          <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="aadhar_number" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012"></div>
           <div class="form-group"><label>PAN Number</label><input class="form-control" name="pan_number" maxlength="10" style="text-transform:uppercase;" placeholder="ABCDE1234F"></div>
         </div>
         <div class="modal-footer">
@@ -336,7 +339,7 @@ document.addEventListener('alpine:init', () => {
           <div class="form-group"><label>Contact No.</label><input class="form-control" name="phone" type="tel" x-model="editPartner.phone"></div>
           <div class="form-group"><label>Email ID</label><input class="form-control" name="email" type="email" x-model="editPartner.email"></div>
           <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" x-model="editPartner.address" rows="2"></textarea></div>
-          <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="aadhar_number" maxlength="12" inputmode="numeric" x-model="editPartner.aadhar_number"></div>
+          <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="aadhar_number" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012" x-model="editPartner.aadhar_number" @input="editPartner.aadhar_number = formatAadharValue($event.target.value)"></div>
           <div class="form-group"><label>PAN Number</label><input class="form-control" name="pan_number" maxlength="10" style="text-transform:uppercase;" x-model="editPartner.pan_number"></div>
           <div class="form-group"><label>Status</label>
             <select class="form-control" name="is_active" x-model="editPartner.is_active">
