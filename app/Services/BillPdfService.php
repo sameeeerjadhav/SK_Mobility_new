@@ -39,6 +39,8 @@ class BillPdfService
             $battery = (string)$bill['battery_capacity'];
         }
 
+        $isDealerBill = strtolower((string)($bill['order_type'] ?? '')) === 'dealer';
+
         $rows = '';
         $itemCount = count($items);
         $rowCount = $itemCount > 0 ? max(5, $itemCount) : 5;
@@ -71,6 +73,40 @@ class BillPdfService
 
         $v = static fn (?string $k) => htmlspecialchars((string)($bill[$k] ?? ''));
         $blank = static fn (?string $val) => htmlspecialchars($val !== null && $val !== '' ? $val : '');
+
+        $specTableHtml = $isDealerBill ? '' : '
+  <table class="grid spec">
+    <tr>
+      <td class="label">EV Model Name</td><td class="val">' . $v('vehicle_model') . '</td>
+      <td class="label">EV Model Type</td><td class="val" colspan="2">' . $v('vehicle_model_type') . '</td>
+    </tr>
+    <tr>
+      <td class="label">Model Color</td><td class="val">' . $v('color') . '</td>
+      <td class="label">Date of Sale</td><td class="val" colspan="2">' . india_date($saleDate) . '</td>
+    </tr>
+    <tr>
+      <td class="label">Chassis No.</td><td class="val" colspan="4">' . $v('chassis_no') . '</td>
+    </tr>
+    <tr>
+      <td class="label">Motor No.</td><td class="val">' . $v('motor_no') . '</td>
+      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['motor_warranty'] ?? null) . '</td>
+    </tr>
+    <tr>
+      <td class="label">Battery Type &amp; No.</td><td class="val">' . htmlspecialchars($battery) . '</td>
+      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['battery_warranty'] ?? null) . '</td>
+    </tr>
+    <tr>
+      <td class="label">Controller No.</td><td class="val">' . $v('controller_no') . '</td>
+      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['controller_warranty'] ?? null) . '</td>
+    </tr>
+    <tr>
+      <td class="label">Charger No.</td><td class="val">' . $v('charger_no') . '</td>
+      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['charger_warranty'] ?? null) . '</td>
+    </tr>
+    <tr>
+      <td class="label">H.P. Name</td><td class="val" colspan="4">' . $v('hp_name') . '</td>
+    </tr>
+  </table>';
 
         return '<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Tax Invoice ' . htmlspecialchars($bill['bill_number'] ?? '') . '</title>
@@ -158,38 +194,7 @@ class BillPdfService
     </div>
   </div>
 
-  <table class="grid spec">
-    <tr>
-      <td class="label">EV Model Name</td><td class="val">' . $v('vehicle_model') . '</td>
-      <td class="label">EV Model Type</td><td class="val" colspan="2">' . $v('vehicle_model_type') . '</td>
-    </tr>
-    <tr>
-      <td class="label">Model Color</td><td class="val">' . $v('color') . '</td>
-      <td class="label">Date of Sale</td><td class="val" colspan="2">' . india_date($saleDate) . '</td>
-    </tr>
-    <tr>
-      <td class="label">Chassis No.</td><td class="val" colspan="4">' . $v('chassis_no') . '</td>
-    </tr>
-    <tr>
-      <td class="label">Motor No.</td><td class="val">' . $v('motor_no') . '</td>
-      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['motor_warranty'] ?? null) . '</td>
-    </tr>
-    <tr>
-      <td class="label">Battery Type &amp; No.</td><td class="val">' . htmlspecialchars($battery) . '</td>
-      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['battery_warranty'] ?? null) . '</td>
-    </tr>
-    <tr>
-      <td class="label">Controller No.</td><td class="val">' . $v('controller_no') . '</td>
-      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['controller_warranty'] ?? null) . '</td>
-    </tr>
-    <tr>
-      <td class="label">Charger No.</td><td class="val">' . $v('charger_no') . '</td>
-      <td class="wlab">Warrenty</td><td class="wval" colspan="2">' . $blank($bill['charger_warranty'] ?? null) . '</td>
-    </tr>
-    <tr>
-      <td class="label">H.P. Name</td><td class="val" colspan="4">' . $v('hp_name') . '</td>
-    </tr>
-  </table>
+  ' . $specTableHtml . '
 
   <table class="grid items' . $compactRows . '">
     <thead>

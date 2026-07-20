@@ -206,7 +206,9 @@ class BillingController extends Controller
 
     private function loadBill(int $id): array
     {
-        $stmt = $this->db()->prepare('SELECT * FROM bills WHERE id = ?');
+        $stmt = $this->db()->prepare(
+            'SELECT b.*, o.order_type FROM bills b LEFT JOIN orders o ON o.id = b.order_id WHERE b.id = ?'
+        );
         $stmt->execute([$id]);
         $bill = $stmt->fetch();
         if (!$bill || ($bill['bill_type'] ?? '') !== 'vehicle') {

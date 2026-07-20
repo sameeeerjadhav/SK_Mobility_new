@@ -265,6 +265,7 @@ class OrderController extends Controller
             flash('error', 'Tax invoice not found for this sell order.');
             $this->redirect('/orders/' . $orderId);
         }
+        $bill['order_type'] = $order['order_type'] ?? null;
 
         $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ?');
         $items->execute([(int)$bill['id']]);
