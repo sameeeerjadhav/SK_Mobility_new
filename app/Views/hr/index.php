@@ -37,7 +37,9 @@
     <?php endforeach; ?>
     <?php if (!$salaries): ?><tr><td colspan="8" class="muted">No salary records.</td></tr><?php endif; ?>
     </tbody>
-  </table></div></div>
+  </table></div>
+  <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
+  </div>
   <?php else: ?>
   <div class="card"><div class="table-wrap"><table class="data">
     <thead><tr><th>Code</th><th>Name</th><th>Dept</th><th>Designation</th><th>Salary</th><th>Status</th><th></th></tr></thead>
@@ -60,7 +62,9 @@
     <?php endforeach; ?>
     <?php if (!$employees): ?><tr><td colspan="7" class="muted">No employees.</td></tr><?php endif; ?>
     </tbody>
-  </table></div></div>
+  </table></div>
+  <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
+  </div>
   <?php endif; ?>
 
   <div class="modal-backdrop" :class="{open:empOpen}" @click.self="empOpen=false">
@@ -115,7 +119,7 @@
       <div class="modal-body form-grid">
         <div class="form-group full"><label>Employee</label>
           <select class="form-control" name="employee_id" required>
-            <?php foreach ($employees as $e): ?><option value="<?= (int)$e['id'] ?>"><?= e($e['employee_code'].' — '.$e['first_name'].' '.$e['last_name']) ?></option><?php endforeach; ?>
+            <?php foreach (($employeeOptions ?? $employees) as $e): ?><option value="<?= (int)$e['id'] ?>"><?= e($e['employee_code'].' — '.$e['first_name'].' '.$e['last_name']) ?></option><?php endforeach; ?>
           </select>
         </div>
         <div class="form-group"><label>Month</label><input class="form-control" type="number" min="1" max="12" name="month" value="<?= date('n') ?>" required></div>

@@ -20,12 +20,16 @@ class PartnerController extends Controller
         ];
         $stats['net'] = $stats['received'] - $stats['paid'];
         $partners = $this->db()->query('SELECT * FROM partners ORDER BY name')->fetchAll();
+
+        $txTotal = (int)$this->db()->query('SELECT COUNT(*) FROM partner_transactions')->fetchColumn();
+        $txPager = paginate($txTotal, max(1, (int)($this->input('page') ?: 1)), 25);
         $transactions = $this->db()->query(
-            'SELECT pt.*, p.name AS partner_name, u.first_name, u.last_name
+            "SELECT pt.*, p.name AS partner_name, u.first_name, u.last_name
              FROM partner_transactions pt
              JOIN partners p ON p.id = pt.partner_id
              JOIN users u ON u.id = pt.created_by
-             ORDER BY pt.date DESC, pt.id DESC LIMIT 100'
+             ORDER BY pt.date DESC, pt.id DESC
+             LIMIT {$txPager['per_page']} OFFSET {$txPager['offset']}"
         )->fetchAll();
 
         $this->view('partners/index', [
@@ -33,6 +37,8 @@ class PartnerController extends Controller
             'stats' => $stats,
             'partners' => $partners,
             'transactions' => $transactions,
+            'pagination' => $txPager,
+            'filters' => [],
         ]);
     }
 

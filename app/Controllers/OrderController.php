@@ -17,9 +17,6 @@ class OrderController extends Controller
         $orderType = $this->input('order_type');
         $productType = $this->input('product_type');
         $status = $this->input('status');
-        $page = max(1, (int)($this->input('page') ?: 1));
-        $perPage = 20;
-        $offset = ($page - 1) * $perPage;
 
         $where = ['1=1'];
         $params = [];
@@ -46,6 +43,7 @@ class OrderController extends Controller
         $count = $this->db()->prepare("SELECT COUNT(*) FROM orders o WHERE {$sqlWhere}");
         $count->execute($params);
         $total = (int)$count->fetchColumn();
+        $pager = paginate($total, max(1, (int)($this->input('page') ?: 1)), 20);
 
         $stmt = $this->db()->prepare(
             "SELECT o.*, d.business_name
@@ -53,7 +51,7 @@ class OrderController extends Controller
              LEFT JOIN dealers d ON d.id = o.dealer_id
              WHERE {$sqlWhere}
              ORDER BY o.created_at DESC
-             LIMIT {$perPage} OFFSET {$offset}"
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute($params);
 
@@ -70,8 +68,12 @@ class OrderController extends Controller
             'orderType' => $orderType,
             'productType' => $productType,
             'status' => $status,
-            'page' => $page,
-            'totalPages' => max(1, (int)ceil($total / $perPage)),
+            'pagination' => $pager,
+            'filters' => [
+                'order_type' => $orderType,
+                'product_type' => $productType,
+                'status' => $status,
+            ],
             'dealers' => $dealers,
             'canManage' => can('manage_orders'),
             'isAdmin' => Auth::role() === 'super_admin',

@@ -28,7 +28,18 @@ class InventoryController extends Controller
         }
 
         $stock = [];
+        $pager = paginate(0, 1, 30);
         if ($warehouseId) {
+            $countSql = 'SELECT COUNT(*) FROM inventory i WHERE i.warehouse_id = ?';
+            $countParams = [$warehouseId];
+            if ($vehicleId > 0) {
+                $countSql .= ' AND i.vehicle_id = ?';
+                $countParams[] = $vehicleId;
+            }
+            $countStmt = $this->db()->prepare($countSql);
+            $countStmt->execute($countParams);
+            $pager = paginate((int)$countStmt->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 30);
+
             $sql = "SELECT i.*, v.name AS vehicle_name, vv.name AS variant_name, vv.sku, vv.color
                  FROM inventory i
                  JOIN vehicles v ON v.id = i.vehicle_id
@@ -39,7 +50,7 @@ class InventoryController extends Controller
                 $sql .= ' AND i.vehicle_id = ?';
                 $params[] = $vehicleId;
             }
-            $sql .= ' ORDER BY v.name, vv.name';
+            $sql .= " ORDER BY v.name, vv.name LIMIT {$pager['per_page']} OFFSET {$pager['offset']}";
             $stmt = $this->db()->prepare($sql);
             $stmt->execute($params);
             $stock = $stmt->fetchAll();
@@ -59,7 +70,8 @@ class InventoryController extends Controller
              JOIN vehicles v ON v.id = i.vehicle_id
              JOIN vehicle_variants vv ON vv.id = i.variant_id
              WHERE i.quantity_available > 0 AND vv.is_active = 1 AND v.is_active = 1
-             ORDER BY v.name, vv.name, vv.color, vv.sku"
+             ORDER BY v.name, vv.name, vv.color, vv.sku
+             LIMIT 300"
         )->fetchAll();
 
         $this->view('inventory/index', [
@@ -72,6 +84,11 @@ class InventoryController extends Controller
             'variants' => $variants,
             'transferStock' => $transferStock,
             'canManage' => can('manage_inventory'),
+            'pagination' => $pager,
+            'filters' => [
+                'warehouse_id' => $warehouseId ?: '',
+                'vehicle_id' => $vehicleId ?: '',
+            ],
         ]);
     }
 

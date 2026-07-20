@@ -11,13 +11,19 @@ class NotificationController extends Controller
     public function index(): void
     {
         require_auth();
+        $countStmt = $this->db()->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ?');
+        $countStmt->execute([Auth::id()]);
+        $pager = paginate((int)$countStmt->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 25);
         $stmt = $this->db()->prepare(
-            'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100'
+            "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute([Auth::id()]);
         $this->view('notifications/index', [
             'title' => 'Notifications',
             'notifications' => $stmt->fetchAll(),
+            'pagination' => $pager,
+            'filters' => [],
         ]);
     }
 

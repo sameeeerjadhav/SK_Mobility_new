@@ -12,8 +12,12 @@ class AdminController extends Controller
         require_role('super_admin');
         $tab = $this->input('tab') ?: 'users';
 
+        $userTotal = (int)$this->db()->query('SELECT COUNT(*) FROM users')->fetchColumn();
+        $userPager = paginate($userTotal, max(1, (int)($this->input('page') ?: 1)), 25);
         $users = $this->db()->query(
-            'SELECT u.*, r.name AS role_name, r.slug AS role_slug FROM users u JOIN roles r ON r.id = u.role_id ORDER BY u.created_at DESC'
+            "SELECT u.*, r.name AS role_name, r.slug AS role_slug FROM users u JOIN roles r ON r.id = u.role_id
+             ORDER BY u.created_at DESC
+             LIMIT {$userPager['per_page']} OFFSET {$userPager['offset']}"
         )->fetchAll();
         $roles = $this->db()->query('SELECT * FROM roles ORDER BY id')->fetchAll();
         $permissions = $this->db()->query('SELECT * FROM permissions ORDER BY module, name')->fetchAll();
@@ -36,10 +40,14 @@ class AdminController extends Controller
             $params[] = $action;
         }
         $sqlWhere = implode(' AND ', $where);
+        $logCount = $this->db()->prepare("SELECT COUNT(*) FROM audit_logs a WHERE {$sqlWhere}");
+        $logCount->execute($params);
+        $logPager = paginate((int)$logCount->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 30);
         $logs = $this->db()->prepare(
             "SELECT a.*, u.first_name, u.last_name, u.email FROM audit_logs a
              LEFT JOIN users u ON u.id = a.user_id
-             WHERE {$sqlWhere} ORDER BY a.created_at DESC LIMIT 150"
+             WHERE {$sqlWhere} ORDER BY a.created_at DESC
+             LIMIT {$logPager['per_page']} OFFSET {$logPager['offset']}"
         );
         $logs->execute($params);
 
@@ -56,6 +64,12 @@ class AdminController extends Controller
             'settings' => $settings,
             'filterModule' => $module,
             'filterAction' => $action,
+            'pagination' => $tab === 'audit' ? $logPager : $userPager,
+            'filters' => [
+                'tab' => $tab,
+                'module' => $module,
+                'action' => $action,
+            ],
         ]);
     }
 

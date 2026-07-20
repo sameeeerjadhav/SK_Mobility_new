@@ -45,6 +45,7 @@
     <?php if (!$vehicles): ?>
       <p class="muted" style="margin:0.5rem 0 0;">No vehicles found.</p>
     <?php endif; ?>
+    <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
   </div>
 
   <?php if ($canManage): ?>

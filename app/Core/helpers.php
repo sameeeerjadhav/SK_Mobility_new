@@ -340,3 +340,39 @@ function next_code(string $prefix, string $table, string $column): string
     }
     return sprintf('%s-%s-%04d', $prefix, $date, $seq);
 }
+
+/**
+ * @return array{page:int,per_page:int,total:int,total_pages:int,offset:int,from:int,to:int}
+ */
+function paginate(int $total, ?int $page = null, int $perPage = 20): array
+{
+    $perPage = max(1, min(100, $perPage));
+    $totalPages = max(1, (int)ceil(max(0, $total) / $perPage));
+    $page = max(1, min($totalPages, $page ?? (int)($_GET['page'] ?? 1)));
+    $offset = ($page - 1) * $perPage;
+    return [
+        'page' => $page,
+        'per_page' => $perPage,
+        'total' => max(0, $total),
+        'total_pages' => $totalPages,
+        'offset' => $offset,
+        'from' => $total > 0 ? $offset + 1 : 0,
+        'to' => min($offset + $perPage, max(0, $total)),
+    ];
+}
+
+/** Build ?query string preserving filters, replacing page. */
+function pagination_qs(array $filters, int $page): string
+{
+    $query = $filters;
+    $query['page'] = $page;
+    $clean = [];
+    foreach ($query as $key => $value) {
+        if ($value === null || $value === '' || $value === false) {
+            continue;
+        }
+        $clean[$key] = $value;
+    }
+    return '?' . http_build_query($clean);
+}
+

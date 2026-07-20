@@ -41,10 +41,13 @@ class FinanceController extends Controller
         }
 
         $service = new BankTransactionService($this->db());
+        $pager = paginate($service->countForAccount($accountId), max(1, (int)($this->input('page') ?: 1)), 30);
         $this->view('finance/account', [
             'title' => $account['account_name'],
             'account' => $account,
-            'transactions' => $service->listForAccount($accountId),
+            'transactions' => $service->listForAccount($accountId, $pager['per_page'], $pager['offset']),
+            'pagination' => $pager,
+            'filters' => [],
         ]);
     }
 

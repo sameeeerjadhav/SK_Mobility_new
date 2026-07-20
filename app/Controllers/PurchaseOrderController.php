@@ -80,6 +80,10 @@ class PurchaseOrderController extends Controller
             )->fetchColumn(),
         ];
 
+        $countStmt = $db->prepare("SELECT COUNT(*) FROM purchase_orders po WHERE {$sqlWhere}");
+        $countStmt->execute($params);
+        $pager = paginate((int)$countStmt->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 20);
+
         $stmt = $db->prepare(
             "SELECT po.*,
                     (SELECT COUNT(*) FROM purchase_order_items WHERE purchase_order_id = po.id) AS line_count,
@@ -87,7 +91,7 @@ class PurchaseOrderController extends Controller
              FROM purchase_orders po
              WHERE {$sqlWhere}
              ORDER BY po.po_date DESC, po.id DESC
-             LIMIT 300"
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
@@ -102,6 +106,15 @@ class PurchaseOrderController extends Controller
             'search' => $search,
             'from' => $from,
             'to' => $to,
+            'pagination' => $pager,
+            'filters' => [
+                'status' => $status,
+                'product_type' => $productType,
+                'supplier' => $supplier,
+                'search' => $search,
+                'from' => $from,
+                'to' => $to,
+            ],
         ]);
     }
 

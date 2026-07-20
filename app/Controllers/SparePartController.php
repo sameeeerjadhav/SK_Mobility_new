@@ -29,17 +29,24 @@ class SparePartController extends Controller
         }
         $sqlWhere = implode(' AND ', $where);
 
+        $countStmt = $this->db()->prepare(
+            "SELECT COUNT(*) FROM spare_parts sp WHERE {$sqlWhere}"
+        );
+        $countStmt->execute($params);
+        $pager = paginate((int)$countStmt->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 25);
+
         $parts = $this->db()->prepare(
             "SELECT sp.*, sc.name AS category_name FROM spare_parts sp
              JOIN spare_categories sc ON sc.id = sp.category_id
-             WHERE {$sqlWhere} ORDER BY sp.name"
+             WHERE {$sqlWhere} ORDER BY sp.name
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $parts->execute($params);
 
         $jobCards = $this->db()->query(
             "SELECT jc.id, jc.job_card_number, sr.request_number
              FROM job_cards jc JOIN service_requests sr ON sr.id = jc.service_request_id
-             WHERE jc.status != 'completed' ORDER BY jc.id DESC LIMIT 100"
+             WHERE jc.status != 'completed' ORDER BY jc.id DESC LIMIT 50"
         )->fetchAll();
 
         $this->view('spare-parts/index', [
@@ -51,6 +58,12 @@ class SparePartController extends Controller
             'tab' => $tab,
             'jobCards' => $jobCards,
             'canManage' => can('manage_spare_parts'),
+            'pagination' => $pager,
+            'filters' => [
+                'search' => $search,
+                'category_id' => $categoryId,
+                'tab' => $tab,
+            ],
         ]);
     }
 

@@ -104,18 +104,27 @@ class BankTransactionService
     }
 
     /** @return list<array<string, mixed>> */
-    public function listForAccount(int $bankAccountId, int $limit = 100): array
+    public function listForAccount(int $bankAccountId, int $limit = 100, int $offset = 0): array
     {
+        $limit = max(1, min(500, $limit));
+        $offset = max(0, $offset);
         $stmt = $this->db->prepare(
             'SELECT bt.*, u.first_name, u.last_name
              FROM bank_transactions bt
              JOIN users u ON u.id = bt.created_by
              WHERE bt.bank_account_id = ?
              ORDER BY bt.transaction_date DESC, bt.id DESC
-             LIMIT ' . max(1, min(500, $limit))
+             LIMIT ' . $limit . ' OFFSET ' . $offset
         );
         $stmt->execute([$bankAccountId]);
         return $stmt->fetchAll();
+    }
+
+    public function countForAccount(int $bankAccountId): int
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM bank_transactions WHERE bank_account_id = ?');
+        $stmt->execute([$bankAccountId]);
+        return (int)$stmt->fetchColumn();
     }
 
     private function post(

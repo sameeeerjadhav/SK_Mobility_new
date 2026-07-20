@@ -36,14 +36,6 @@ class LeadController extends Controller
         }
         $sqlWhere = implode(' AND ', $where);
 
-        $funnel = [];
-        foreach (['new', 'contacted', 'qualified', 'converted', 'lost'] as $s) {
-            $fWhere = $where;
-            $fParams = $params;
-            $fWhere[] = 'l.status = ?';
-            $fParams[] = $s;
-            // rebuild without status filter for funnel counts
-        }
         $funnelParams = [];
         $funnelWhere = ['1=1'];
         if (Auth::role() === 'dealer') {
@@ -51,11 +43,19 @@ class LeadController extends Controller
             $funnelParams[] = Auth::dealerId();
         }
         $fw = implode(' AND ', $funnelWhere);
-        foreach (['new', 'contacted', 'qualified', 'converted', 'lost'] as $s) {
-            $st = $this->db()->prepare("SELECT COUNT(*) FROM leads WHERE {$fw} AND status = ?");
-            $st->execute([...$funnelParams, $s]);
-            $funnel[$s] = (int)$st->fetchColumn();
+        $funnelStmt = $this->db()->prepare(
+            "SELECT status, COUNT(*) AS cnt FROM leads WHERE {$fw} GROUP BY status"
+        );
+        $funnelStmt->execute($funnelParams);
+        $funnel = ['new' => 0, 'contacted' => 0, 'qualified' => 0, 'converted' => 0, 'lost' => 0];
+        foreach ($funnelStmt->fetchAll() as $row) {
+            $funnel[$row['status']] = (int)$row['cnt'];
         }
+
+        $countStmt = $this->db()->prepare("SELECT COUNT(*) FROM leads l WHERE {$sqlWhere}");
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
+        $pager = paginate($total, max(1, (int)($this->input('page') ?: 1)), 20);
 
         $stmt = $this->db()->prepare(
             "SELECT l.*, ls.name AS source_name, v.name AS vehicle_name, d.business_name,
@@ -66,7 +66,8 @@ class LeadController extends Controller
              LEFT JOIN dealers d ON d.id = l.dealer_id
              LEFT JOIN users u ON u.id = l.assigned_to
              WHERE {$sqlWhere}
-             ORDER BY l.created_at DESC LIMIT 200"
+             ORDER BY l.created_at DESC
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute($params);
 
@@ -83,6 +84,12 @@ class LeadController extends Controller
                 ? $this->db()->query("SELECT id, business_name FROM dealers WHERE status='approved' ORDER BY business_name")->fetchAll()
                 : [],
             'canManage' => can('manage_leads'),
+            'pagination' => $pager,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+                'source_id' => $sourceId,
+            ],
         ]);
     }
 

@@ -61,14 +61,7 @@
         </tbody>
       </table>
     </div>
-    <?php if ($totalPages > 1): ?>
-      <div style="margin-top:1rem;display:flex;gap:0.5rem;">
-        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-          <a class="btn btn-sm <?= $i === $page ? 'btn-primary' : 'btn-outline' ?>"
-             href="?page=<?= $i ?>&status=<?= urlencode($status) ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
-        <?php endfor; ?>
-      </div>
-    <?php endif; ?>
+    <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
   </div>
 
   <div class="modal-backdrop" :class="{ open: createOpen }" @click.self="createOpen=false">

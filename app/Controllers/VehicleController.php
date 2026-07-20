@@ -28,6 +28,12 @@ class VehicleController extends Controller
         }
         $sqlWhere = implode(' AND ', $where);
 
+        $countStmt = $this->db()->prepare(
+            "SELECT COUNT(*) FROM vehicles v WHERE {$sqlWhere}"
+        );
+        $countStmt->execute($params);
+        $pager = paginate((int)$countStmt->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 20);
+
         $stmt = $this->db()->prepare(
             "SELECT v.*, c.name AS category_name,
                 (SELECT vi.image_url FROM vehicle_images vi
@@ -39,7 +45,8 @@ class VehicleController extends Controller
              FROM vehicles v
              JOIN vehicle_categories c ON c.id = v.category_id
              WHERE {$sqlWhere}
-             ORDER BY v.created_at DESC"
+             ORDER BY v.created_at DESC
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute($params);
         $vehicles = $stmt->fetchAll();
@@ -52,6 +59,11 @@ class VehicleController extends Controller
             'search' => $search,
             'categoryId' => $categoryId,
             'canManage' => can('manage_vehicles'),
+            'pagination' => $pager,
+            'filters' => [
+                'search' => $search,
+                'category_id' => $categoryId,
+            ],
         ]);
     }
 

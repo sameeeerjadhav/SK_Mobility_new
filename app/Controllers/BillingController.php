@@ -43,6 +43,13 @@ class BillingController extends Controller
         }
         $sqlWhere = implode(' AND ', $where);
 
+        $countStmt = $this->db()->prepare(
+            "SELECT COUNT(*) FROM bills b LEFT JOIN orders o ON o.id = b.order_id WHERE {$sqlWhere}"
+        );
+        $countStmt->execute($params);
+        $invoiceCount = (int)$countStmt->fetchColumn();
+        $pager = paginate($invoiceCount, max(1, (int)($this->input('page') ?: 1)), 20);
+
         $totalInvoices = (int)$this->db()->query(
             "SELECT COUNT(*) FROM bills WHERE bill_type IN ('vehicle','spare')"
         )->fetchColumn();
@@ -53,26 +60,28 @@ class BillingController extends Controller
              LEFT JOIN orders o ON o.id = b.order_id
              WHERE {$sqlWhere}
              ORDER BY b.created_at DESC
-             LIMIT 200"
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute($params);
-
-        $countStmt = $this->db()->prepare(
-            "SELECT COUNT(*) FROM bills b LEFT JOIN orders o ON o.id = b.order_id WHERE {$sqlWhere}"
-        );
-        $countStmt->execute($params);
 
         $this->view('billing/index', [
             'title' => 'Tax Invoices',
             'bills' => $stmt->fetchAll(),
             'totalInvoices' => $totalInvoices,
-            'invoiceCount' => (int)$countStmt->fetchColumn(),
+            'invoiceCount' => $invoiceCount,
             'orderType' => $orderType,
             'billingLocation' => $billingLocation,
             'from' => $from,
             'to' => $to,
             'locationFilterAvailable' => $locationFilterAvailable,
             'canManage' => can('manage_billing'),
+            'pagination' => $pager,
+            'filters' => [
+                'order_type' => $orderType,
+                'billing_location' => $billingLocation,
+                'from' => $from,
+                'to' => $to,
+            ],
         ]);
     }
 

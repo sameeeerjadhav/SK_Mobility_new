@@ -31,13 +31,18 @@ class ServiceController extends Controller
         }
         $sqlWhere = implode(' AND ', $where);
 
+        $countStmt = $this->db()->prepare("SELECT COUNT(*) FROM service_requests sr WHERE {$sqlWhere}");
+        $countStmt->execute($params);
+        $pager = paginate((int)$countStmt->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 20);
+
         $stmt = $this->db()->prepare(
             "SELECT sr.*, d.business_name,
                 (SELECT COUNT(*) FROM job_cards jc WHERE jc.service_request_id = sr.id) AS job_cards_count
              FROM service_requests sr
              LEFT JOIN dealers d ON d.id = sr.dealer_id
              WHERE {$sqlWhere}
-             ORDER BY sr.created_at DESC LIMIT 200"
+             ORDER BY sr.created_at DESC
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute($params);
 
@@ -48,6 +53,11 @@ class ServiceController extends Controller
             'search' => $search,
             'technicians' => $this->db()->query('SELECT * FROM technicians WHERE is_available = 1 ORDER BY name')->fetchAll(),
             'canManage' => can('manage_services'),
+            'pagination' => $pager,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 

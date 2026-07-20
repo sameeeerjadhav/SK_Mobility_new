@@ -65,7 +65,9 @@
         </tr>
       <?php endforeach; ?>
       </tbody>
-    </table></div></div>
+    </table></div>
+    <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
+    </div>
 
   <?php elseif ($tab === 'settings'): ?>
     <div class="card">
@@ -110,7 +112,9 @@
         </tr>
       <?php endforeach; ?>
       </tbody>
-    </table></div></div>
+    </table></div>
+    <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
+    </div>
 
     <div class="modal-backdrop" :class="{open:userOpen}" @click.self="userOpen=false">
       <div class="modal"><form method="post" action="<?= url('admin/users') ?>">

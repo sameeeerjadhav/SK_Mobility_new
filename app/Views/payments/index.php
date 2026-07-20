@@ -51,6 +51,7 @@
         </tbody>
       </table>
     </div>
+    <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
   </div>
 
   <div class="card" x-show="tab==='orders'" style="display:none;">

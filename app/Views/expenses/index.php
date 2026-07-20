@@ -264,6 +264,7 @@ document.addEventListener('alpine:init', () => {
         </tbody>
       </table>
     </div>
+    <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
   </div>
 
   <div class="modal-backdrop" :class="{open:expOpen}" @click.self="expOpen=false">

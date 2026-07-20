@@ -29,4 +29,5 @@
       <?php endif; ?>
     </div>
   <?php endforeach; ?>
+  <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
 </div>

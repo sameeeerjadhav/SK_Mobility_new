@@ -22,11 +22,20 @@ class HrController extends Controller
             )->fetchColumn(),
         ];
 
-        $employees = $this->db()->query('SELECT * FROM employees ORDER BY created_at DESC')->fetchAll();
+        $empTotal = (int)$this->db()->query('SELECT COUNT(*) FROM employees')->fetchColumn();
+        $salTotal = (int)$this->db()->query('SELECT COUNT(*) FROM salary_records')->fetchColumn();
+        $empPager = paginate($empTotal, max(1, (int)($this->input('page') ?: 1)), 20);
+        $salPager = paginate($salTotal, max(1, (int)($this->input('page') ?: 1)), 20);
+
+        $employees = $this->db()->query(
+            "SELECT * FROM employees ORDER BY created_at DESC
+             LIMIT {$empPager['per_page']} OFFSET {$empPager['offset']}"
+        )->fetchAll();
         $salaries = $this->db()->query(
-            'SELECT sr.*, e.first_name, e.last_name, e.employee_code
+            "SELECT sr.*, e.first_name, e.last_name, e.employee_code
              FROM salary_records sr JOIN employees e ON e.id = sr.employee_id
-             ORDER BY sr.created_at DESC LIMIT 100'
+             ORDER BY sr.created_at DESC
+             LIMIT {$salPager['per_page']} OFFSET {$salPager['offset']}"
         )->fetchAll();
 
         $this->view('hr/index', [
@@ -35,6 +44,11 @@ class HrController extends Controller
             'employees' => $employees,
             'salaries' => $salaries,
             'tab' => $tab,
+            'pagination' => $tab === 'payroll' ? $salPager : $empPager,
+            'filters' => ['tab' => $tab],
+            'employeeOptions' => $this->db()->query(
+                "SELECT id, employee_code, first_name, last_name FROM employees WHERE status='active' ORDER BY first_name"
+            )->fetchAll(),
         ]);
     }
 

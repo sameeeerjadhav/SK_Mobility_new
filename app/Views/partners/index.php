@@ -350,6 +350,7 @@ document.addEventListener('alpine:init', () => {
           </table>
         </div>
         <div class="pn-empty" x-show="txSearch.trim() && !transactions.some(t => matchesTx(t))" x-cloak>No transactions match your search.</div>
+        <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
       <?php else: ?>
         <div class="pn-empty">No transactions recorded yet.</div>
       <?php endif; ?>

@@ -62,6 +62,7 @@ class ExpenseController extends Controller
         );
         $filteredTotalStmt->execute($params);
         [$filteredSum, $filteredCount] = $filteredTotalStmt->fetch(\PDO::FETCH_NUM);
+        $pager = paginate((int)$filteredCount, max(1, (int)($this->input('page') ?: 1)), 25);
 
         $expenses = $this->db()->prepare(
             "SELECT e.*, ec.name AS category_name,
@@ -71,7 +72,7 @@ class ExpenseController extends Controller
              JOIN users u ON u.id = e.created_by
              WHERE {$sqlWhere}
              ORDER BY e.expense_date DESC, e.id DESC
-             LIMIT 500"
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $expenses->execute($params);
         $rows = $expenses->fetchAll();
@@ -96,6 +97,15 @@ class ExpenseController extends Controller
             'filteredSum' => (float)$filteredSum,
             'filteredCount' => (int)$filteredCount,
             'editExpense' => $editExpense,
+            'pagination' => $pager,
+            'filters' => [
+                'category_id' => $categoryId,
+                'record_type' => $recordType,
+                'payment_mode' => $paymentMode,
+                'search' => $search,
+                'from' => $from,
+                'to' => $to,
+            ],
         ]);
     }
 

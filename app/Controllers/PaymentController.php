@@ -31,11 +31,16 @@ class PaymentController extends Controller
         }
         $sqlWhere = implode(' AND ', $where);
 
+        $paymentsCount = $db->prepare("SELECT COUNT(*) FROM payments p WHERE {$sqlWhere}");
+        $paymentsCount->execute($params);
+        $pager = paginate((int)$paymentsCount->fetchColumn(), max(1, (int)($this->input('page') ?: 1)), 20);
+
         $payments = $db->prepare(
             "SELECT p.*, o.order_number FROM payments p
              JOIN orders o ON o.id = p.order_id
              WHERE {$sqlWhere}
-             ORDER BY p.created_at DESC LIMIT 100"
+             ORDER BY p.created_at DESC
+             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $payments->execute($params);
 
@@ -46,14 +51,14 @@ class PaymentController extends Controller
              LEFT JOIN payments p ON p.order_id = o.id
              " . (Auth::role() === 'dealer' ? 'WHERE o.dealer_id = ' . (int)Auth::dealerId() : '') . "
              GROUP BY o.id
-             ORDER BY o.created_at DESC LIMIT 50"
+             ORDER BY o.created_at DESC LIMIT 30"
         );
         $orderSummaries->execute();
 
         $orders = [];
         if (can('manage_payments')) {
             $orders = $db->query(
-                "SELECT id, order_number, total_amount, dealer_id FROM orders ORDER BY created_at DESC LIMIT 200"
+                "SELECT id, order_number, total_amount, dealer_id FROM orders ORDER BY created_at DESC LIMIT 50"
             )->fetchAll();
         }
 
@@ -66,6 +71,8 @@ class PaymentController extends Controller
             'orders' => $orders,
             'canManage' => can('manage_payments'),
             'razorpayKey' => env('RAZORPAY_KEY_ID', ''),
+            'pagination' => $pager,
+            'filters' => [],
         ]);
     }
 

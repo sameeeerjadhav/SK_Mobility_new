@@ -77,9 +77,6 @@ class DealerController extends Controller
         require_permission('manage_dealers');
         $status = $this->input('status');
         $search = $this->input('search');
-        $page = max(1, (int)($this->input('page') ?: 1));
-        $perPage = 15;
-        $offset = ($page - 1) * $perPage;
 
         $where = ['1=1'];
         $params = [];
@@ -97,9 +94,10 @@ class DealerController extends Controller
         $countStmt = $this->db()->prepare("SELECT COUNT(*) FROM dealers WHERE {$sqlWhere}");
         $countStmt->execute($params);
         $total = (int)$countStmt->fetchColumn();
+        $pager = paginate($total, max(1, (int)($this->input('page') ?: 1)), 15);
 
         $stmt = $this->db()->prepare(
-            "SELECT * FROM dealers WHERE {$sqlWhere} ORDER BY created_at DESC LIMIT {$perPage} OFFSET {$offset}"
+            "SELECT * FROM dealers WHERE {$sqlWhere} ORDER BY created_at DESC LIMIT {$pager['per_page']} OFFSET {$pager['offset']}"
         );
         $stmt->execute($params);
         $dealers = $stmt->fetchAll();
@@ -109,8 +107,8 @@ class DealerController extends Controller
             'dealers' => $dealers,
             'status' => $status,
             'search' => $search,
-            'page' => $page,
-            'totalPages' => max(1, (int)ceil($total / $perPage)),
+            'pagination' => $pager,
+            'filters' => ['status' => $status, 'search' => $search],
         ]);
     }
 

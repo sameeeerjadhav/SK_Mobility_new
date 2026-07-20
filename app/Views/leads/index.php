@@ -53,6 +53,7 @@
         </tbody>
       </table>
     </div>
+    <?php \App\Core\View::partial('partials/pagination', ['pagination' => $pagination ?? [], 'filters' => $filters ?? []]); ?>
   </div>
 
   <?php if ($canManage): ?>
