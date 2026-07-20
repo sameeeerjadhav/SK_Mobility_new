@@ -157,6 +157,7 @@ try {
             echo "added {$table}.{$column}\n";
         };
         $addCol($db, 'expenses', 'record_type', "ENUM('asset','expenditure') NOT NULL DEFAULT 'expenditure' AFTER category_id");
+        $addCol($db, 'expenses', 'name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER record_type");
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

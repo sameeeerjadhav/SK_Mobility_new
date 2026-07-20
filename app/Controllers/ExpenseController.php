@@ -90,16 +90,22 @@ class ExpenseController extends Controller
     {
         require_role('super_admin');
         $this->validateCsrf();
+        $name = trim((string)$this->input('name'));
+        if ($name === '') {
+            flash('error', 'Name is required — enter what was purchased or spent on.');
+            $this->redirect('/expenses' . $this->redirectFilters());
+        }
         $receipt = null;
         if (!empty($_FILES['receipt']['name'])) {
             $receipt = Upload::store($_FILES['receipt'], 'expenses', ['jpg', 'jpeg', 'png', 'pdf']);
         }
         $this->db()->prepare(
-            'INSERT INTO expenses (category_id, record_type, amount, description, expense_date, payment_mode, receipt_url, created_by)
-             VALUES (?,?,?,?,?,?,?,?)'
+            'INSERT INTO expenses (category_id, record_type, name, amount, description, expense_date, payment_mode, receipt_url, created_by)
+             VALUES (?,?,?,?,?,?,?,?,?)'
         )->execute([
             (int)$this->input('category_id'),
             $this->validRecordType($this->input('record_type')),
+            $name,
             (float)$this->input('amount'),
             $this->input('description'),
             $this->input('expense_date') ?: date('Y-m-d'),
@@ -118,6 +124,12 @@ class ExpenseController extends Controller
         $this->validateCsrf();
         $expenseId = (int)$id;
 
+        $name = trim((string)$this->input('name'));
+        if ($name === '') {
+            flash('error', 'Name is required — enter what was purchased or spent on.');
+            $this->redirect('/expenses' . $this->redirectFilters());
+        }
+
         $receipt = null;
         if (!empty($_FILES['receipt']['name'])) {
             $receipt = Upload::store($_FILES['receipt'], 'expenses', ['jpg', 'jpeg', 'png', 'pdf']);
@@ -131,10 +143,11 @@ class ExpenseController extends Controller
                 Upload::delete((string)$oldReceipt);
             }
             $this->db()->prepare(
-                'UPDATE expenses SET category_id=?, record_type=?, amount=?, description=?, expense_date=?, payment_mode=?, receipt_url=? WHERE id=?'
+                'UPDATE expenses SET category_id=?, record_type=?, name=?, amount=?, description=?, expense_date=?, payment_mode=?, receipt_url=? WHERE id=?'
             )->execute([
                 (int)$this->input('category_id'),
                 $this->validRecordType($this->input('record_type')),
+                $name,
                 (float)$this->input('amount'),
                 $this->input('description'),
                 $this->input('expense_date'),
@@ -144,10 +157,11 @@ class ExpenseController extends Controller
             ]);
         } else {
             $this->db()->prepare(
-                'UPDATE expenses SET category_id=?, record_type=?, amount=?, description=?, expense_date=?, payment_mode=? WHERE id=?'
+                'UPDATE expenses SET category_id=?, record_type=?, name=?, amount=?, description=?, expense_date=?, payment_mode=? WHERE id=?'
             )->execute([
                 (int)$this->input('category_id'),
                 $this->validRecordType($this->input('record_type')),
+                $name,
                 (float)$this->input('amount'),
                 $this->input('description'),
                 $this->input('expense_date'),
@@ -229,9 +243,9 @@ class ExpenseController extends Controller
             $params[] = $paymentMode;
         }
         if ($search !== '') {
-            $where[] = '(e.description LIKE ? OR ec.name LIKE ?)';
+            $where[] = '(e.name LIKE ? OR e.description LIKE ? OR ec.name LIKE ?)';
             $q = '%' . $search . '%';
-            array_push($params, $q, $q);
+            array_push($params, $q, $q, $q);
         }
         if ($from !== '') {
             $where[] = 'e.expense_date >= ?';

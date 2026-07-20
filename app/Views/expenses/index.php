@@ -88,7 +88,7 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
       </div>
       <div class="form-group" style="margin:0;min-width:180px;flex:1;">
         <label>Search</label>
-        <input class="form-control" type="search" name="search" value="<?= e($search) ?>" placeholder="Description or category">
+        <input class="form-control" type="search" name="search" value="<?= e($search) ?>" placeholder="Name, description or category">
       </div>
       <button class="btn btn-primary" type="submit">Apply</button>
       <?php if ($filterQuery !== ''): ?>
@@ -103,11 +103,12 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
         <thead>
           <tr>
             <th>Date</th>
+            <th>Name</th>
             <th>Type</th>
             <th>Category</th>
             <th>Amount</th>
             <th>Mode</th>
-            <th>Description</th>
+            <th>Notes</th>
             <th>Receipt</th>
             <th>Recorded by</th>
             <th></th>
@@ -117,6 +118,7 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
         <?php foreach ($expenses as $e): ?>
           <tr>
             <td><?= india_date($e['expense_date']) ?></td>
+            <td><strong><?= e($e['name'] ?: '—') ?></strong></td>
             <td>
               <?php if (($e['record_type'] ?? 'expenditure') === 'asset'): ?>
                 <span class="chip chip-info">Asset</span>
@@ -147,7 +149,7 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
           </tr>
         <?php endforeach; ?>
         <?php if (!$expenses): ?>
-          <tr><td colspan="9" class="muted">No records match your filters.</td></tr>
+          <tr><td colspan="10" class="muted">No records match your filters.</td></tr>
         <?php endif; ?>
         </tbody>
       </table>
@@ -176,6 +178,10 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
               <?php endforeach; ?>
             </select>
           </div>
+          <div class="form-group full">
+            <label>Name *</label>
+            <input class="form-control" name="name" required placeholder="e.g. Office laptop, March electricity bill">
+          </div>
           <div class="form-group"><label>Amount *</label><input class="form-control" type="number" step="0.01" name="amount" required></div>
           <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" value="<?= date('Y-m-d') ?>"></div>
           <div class="form-group">
@@ -186,7 +192,7 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="form-group full"><label>Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
+          <div class="form-group full"><label>Notes</label><textarea class="form-control" name="description" rows="2" placeholder="Optional extra details"></textarea></div>
           <div class="form-group full"><label>Receipt</label><input class="form-control" type="file" name="receipt" accept=".jpg,.jpeg,.png,.pdf"></div>
         </div>
         <div class="modal-footer">
@@ -219,6 +225,10 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
               <?php endforeach; ?>
             </select>
           </div>
+          <div class="form-group full">
+            <label>Name *</label>
+            <input class="form-control" name="name" x-model="editExp.name" required placeholder="What was purchased or spent on">
+          </div>
           <div class="form-group"><label>Amount *</label><input class="form-control" type="number" step="0.01" name="amount" x-model="editExp.amount" required></div>
           <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" x-model="editExp.expense_date"></div>
           <div class="form-group">
@@ -229,7 +239,7 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="form-group full"><label>Description</label><textarea class="form-control" name="description" x-model="editExp.description" rows="2"></textarea></div>
+          <div class="form-group full"><label>Notes</label><textarea class="form-control" name="description" x-model="editExp.description" rows="2" placeholder="Optional extra details"></textarea></div>
           <div class="form-group full"><label>Replace receipt</label><input class="form-control" type="file" name="receipt" accept=".jpg,.jpeg,.png,.pdf"></div>
         </div>
         <div class="modal-footer">
