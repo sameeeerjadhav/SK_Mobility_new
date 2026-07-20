@@ -94,6 +94,23 @@ foreach ($spareParts ?? [] as $sp) {
   get balanceDue() {
     return Math.max(0, Math.round((this.grandTotal - this.totalPaidNow) * 100) / 100);
   },
+  onPaymentStatusChange() {
+    if (this.paymentStatus !== 'full' || this.grandTotal <= 0) return;
+    const paid = this.totalPaidNow;
+    const sell = this.lineSubtotal;
+    if (paid <= 0 || Math.abs(paid - sell) < 0.03) {
+      this.paidCash = String(this.grandTotal);
+      this.paidBank = '';
+      this.paidLoan = '';
+    }
+  },
+  fillInvoiceTotal() {
+    if (this.grandTotal <= 0) return;
+    this.paidCash = String(this.grandTotal);
+    this.paidBank = '';
+    this.paidLoan = '';
+    this.paymentStatus = 'full';
+  },
   money(n) {
     return '₹' + (Math.round((parseFloat(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   },
@@ -461,16 +478,32 @@ foreach ($spareParts ?? [] as $sp) {
 
     <div class="card" style="margin-bottom:0.85rem;">
       <h3 class="card-title">4. Payment</h3>
+      <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">Payment is against the <strong>invoice total (sell amount + GST)</strong>, not the pre-GST sell amount alone.</p>
       <div class="form-grid">
         <div class="form-group full">
           <label>Payment status *</label>
-          <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.35rem;">
+          <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.35rem;align-items:center;">
             <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
-              <input type="radio" name="payment_status" value="full" x-model="paymentStatus"> Full paid
+              <input type="radio" name="payment_status" value="full" x-model="paymentStatus" @change="onPaymentStatusChange()"> Full paid
             </label>
             <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
               <input type="radio" name="payment_status" value="partial" x-model="paymentStatus"> Partial paid
             </label>
+            <button class="btn btn-sm btn-outline" type="button" @click="fillInvoiceTotal()" x-show="grandTotal > 0">Use invoice total in cash</button>
+          </div>
+        </div>
+
+        <div class="form-group full" x-show="lineSubtotal > 0" style="grid-column:1 / -1;">
+          <div style="padding:0.75rem 1rem;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;max-width:420px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.25rem;">
+              <span>Sell amount (before GST)</span><span x-text="money(lineSubtotal)"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.25rem;">
+              <span x-text="'GST @ ' + totalGstPercent + '%'"></span><span x-text="money(gstAmount)"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.35rem;border-top:1px solid #bfdbfe;">
+              <span>Invoice total (pay this)</span><span x-text="money(grandTotal)"></span>
+            </div>
           </div>
         </div>
 
@@ -500,21 +533,20 @@ foreach ($spareParts ?? [] as $sp) {
         <?php endif; ?>
 
         <div class="form-group full">
-          <div style="padding:0.85rem 1rem;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);max-width:380px;">
+          <div style="padding:0.85rem 1rem;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);max-width:420px;">
             <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem;">
-              <span>Order total</span><span x-text="money(grandTotal)"></span>
+              <span>Invoice total</span><span x-text="money(grandTotal)"></span>
             </div>
             <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem;">
-              <span>Cash + bank + loan</span><span x-text="money(totalPaidNow)"></span>
+              <span>Cash + bank + loan entered</span><span x-text="money(totalPaidNow)"></span>
             </div>
-            <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.5rem;border-top:1px solid var(--border);color:#b45309;">
-              <span>Balance due</span><span x-text="money(balanceDue)"></span>
+            <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.5rem;border-top:1px solid var(--border);"
+                 :style="paymentStatus === 'full' && Math.abs(totalPaidNow - grandTotal) > 0.02 && totalPaidNow > 0 ? 'color:#b91c1c;' : 'color:#b45309;'">
+              <span x-text="paymentStatus === 'full' ? 'Must equal invoice total' : 'Balance due'"></span>
+              <span x-text="paymentStatus === 'full' ? money(Math.abs(grandTotal - totalPaidNow)) : money(balanceDue)"></span>
             </div>
-            <p class="muted" style="margin:0.5rem 0 0;font-size:0.75rem;" x-show="paymentStatus === 'full'">
-              Full paid: cash + bank + loan must equal order total.
-            </p>
-            <p class="muted" style="margin:0.5rem 0 0;font-size:0.75rem;" x-show="paymentStatus === 'partial'">
-              Partial paid: remaining balance is due later.
+            <p class="muted" style="margin:0.5rem 0 0;font-size:0.75rem;" x-show="paymentStatus === 'full' && lineSubtotal > 0">
+              Full paid = cash + bank + loan must match invoice total (<span x-text="money(grandTotal)"></span>), not sell amount (<span x-text="money(lineSubtotal)"></span>) alone.
             </p>
           </div>
         </div>

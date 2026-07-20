@@ -102,7 +102,12 @@ class OrderService
         $taxAmount = round($cgst + $sgst, 2);
         $totalAmount = round($taxable + $taxAmount, 2);
 
-        [$paymentStatus, $amountPaid, $amountDue, $paidCash, $paidBank, $paidLoan] = self::resolvePaymentBreakdown($data, $totalAmount);
+        [$paymentStatus, $amountPaid, $amountDue, $paidCash, $paidBank, $paidLoan] = self::resolvePaymentBreakdown(
+            $data,
+            $totalAmount,
+            $subtotal,
+            $taxAmount
+        );
         $loanAmount = $paidLoan;
 
         $bankAccountId = (int)($data['bank_account_id'] ?? 0);
@@ -446,7 +451,7 @@ class OrderService
     }
 
     /** @return array{0:string,1:float,2:float,3:float,4:float,5:float} status, paid, due, cash, bank, loan */
-    public static function resolvePaymentBreakdown(array $data, float $totalAmount): array
+    public static function resolvePaymentBreakdown(array $data, float $totalAmount, float $subtotal, float $taxAmount): array
     {
         $cash = max(0, round((float)($data['paid_cash_amount'] ?? 0), 2));
         $bank = max(0, round((float)($data['paid_bank_amount'] ?? 0), 2));
@@ -458,21 +463,61 @@ class OrderService
             $status = 'full';
         }
 
+        $subtotal = round($subtotal, 2);
+        $totalAmount = round($totalAmount, 2);
+        $taxAmount = round($taxAmount, 2);
+
+        if ($status === 'full' && $totalPaid <= 0 && $totalAmount > 0) {
+            return ['full', $totalAmount, 0.0, $totalAmount, 0.0, 0.0];
+        }
+
         if ($totalPaid <= 0) {
             throw new RuntimeException('Enter payment in cash, bank (online), and/or loan fields.');
+        }
+
+        // Full paid but user entered pre-GST sell amount only — scale payment to invoice total.
+        if ($status === 'full' && $subtotal > 0 && $taxAmount > 0
+            && abs($totalPaid - $subtotal) <= 0.02
+            && abs($totalPaid - $totalAmount) > 0.02
+        ) {
+            $factor = $totalAmount / $subtotal;
+            $cash = round($cash * $factor, 2);
+            $bank = round($bank * $factor, 2);
+            $loan = round($loan * $factor, 2);
+            $totalPaid = round($cash + $bank + $loan, 2);
+            $diff = round($totalAmount - $totalPaid, 2);
+            if ($diff !== 0.0) {
+                if ($cash >= $bank && $cash >= $loan) {
+                    $cash = round($cash + $diff, 2);
+                } elseif ($bank >= $loan) {
+                    $bank = round($bank + $diff, 2);
+                } else {
+                    $loan = round($loan + $diff, 2);
+                }
+                $totalPaid = round($cash + $bank + $loan, 2);
+            }
+            return ['full', $totalPaid, 0.0, $cash, $bank, $loan];
         }
 
         if ($status === 'full') {
             if (abs($totalPaid - $totalAmount) > 0.02) {
                 throw new RuntimeException(
-                    'Full paid: cash + bank + loan must equal the order total (' . number_format($totalAmount, 2) . ').'
+                    'Full paid: cash + bank + loan (₹' . number_format($totalPaid, 2)
+                    . ') must equal the invoice total including GST (₹' . number_format($totalAmount, 2)
+                    . '). Sell amount before GST was ₹' . number_format($subtotal, 2)
+                    . ' + GST ₹' . number_format($taxAmount, 2)
+                    . ' — enter payment against the invoice total, not the pre-GST amount.'
                 );
             }
             return ['full', $totalPaid, 0.0, $cash, $bank, $loan];
         }
 
         if ($totalPaid >= $totalAmount) {
-            throw new RuntimeException('Partial payment total must be less than the order total, or choose Full paid.');
+            throw new RuntimeException(
+                'Partial paid: payment (₹' . number_format($totalPaid, 2)
+                . ') must be less than the invoice total (₹' . number_format($totalAmount, 2)
+                . ' incl. GST), or choose Full paid.'
+            );
         }
 
         return ['partial', $totalPaid, round($totalAmount - $totalPaid, 2), $cash, $bank, $loan];
