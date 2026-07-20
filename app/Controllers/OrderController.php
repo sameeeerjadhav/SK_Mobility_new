@@ -235,7 +235,7 @@ class OrderController extends Controller
         $this->outputTaxInvoice((int)$id, true);
     }
 
-    private function outputTaxInvoice(int $orderId, bool asPdf): void
+    private function outputTaxInvoice(int $orderId, bool $asPdf): void
     {
         require_permission('view_orders');
 
