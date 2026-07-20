@@ -44,7 +44,7 @@ class Controller
             return $value;
         }
         if ($value === null) {
-            return $default;
+            return $default ?? '';
         }
 
         return trim((string)$value);
