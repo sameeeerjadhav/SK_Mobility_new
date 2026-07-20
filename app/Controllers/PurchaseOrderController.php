@@ -106,6 +106,9 @@ class PurchaseOrderController extends Controller
             'title' => 'New Purchase Order',
             'variants' => $this->loadVariants(),
             'vehicles' => $this->loadVehicles(),
+            'vehicleCategories' => $this->loadVehicleCategories(),
+            'spareParts' => $this->loadSpareParts(),
+            'spareCategories' => $this->loadSpareCategories(),
         ]);
     }
 
@@ -113,6 +116,13 @@ class PurchaseOrderController extends Controller
     {
         return $this->db()->query(
             'SELECT id, name FROM vehicles WHERE is_active = 1 ORDER BY name'
+        )->fetchAll();
+    }
+
+    private function loadVehicleCategories(): array
+    {
+        return $this->db()->query(
+            'SELECT id, name FROM vehicle_categories WHERE is_active = 1 ORDER BY name'
         )->fetchAll();
     }
 
@@ -125,6 +135,25 @@ class PurchaseOrderController extends Controller
              JOIN vehicles v ON v.id = vv.vehicle_id
              WHERE vv.is_active = 1 AND v.is_active = 1
              ORDER BY v.name, vv.name, vv.color"
+        )->fetchAll();
+    }
+
+    private function loadSpareParts(): array
+    {
+        return $this->db()->query(
+            "SELECT sp.id, sp.name, sp.part_number, sp.unit_price, sp.quantity_in_stock,
+                    sp.category_id, sc.name AS category_name
+             FROM spare_parts sp
+             JOIN spare_categories sc ON sc.id = sp.category_id
+             WHERE sp.is_active = 1 AND sc.is_active = 1
+             ORDER BY sc.name, sp.name"
+        )->fetchAll();
+    }
+
+    private function loadSpareCategories(): array
+    {
+        return $this->db()->query(
+            'SELECT id, name FROM spare_categories WHERE is_active = 1 ORDER BY name'
         )->fetchAll();
     }
 
@@ -157,12 +186,16 @@ class PurchaseOrderController extends Controller
         if ($receiptRows) {
             $ids = implode(',', array_map('intval', array_column($receiptRows, 'id')));
             $lines = $this->db()->query(
-                "SELECT rl.*, w.name AS warehouse_name, poi.description, vv.name AS variant_name, v.name AS vehicle_name
+                "SELECT rl.*, w.name AS warehouse_name, poi.description, poi.item_type,
+                        vv.name AS variant_name, v.name AS vehicle_name,
+                        sp.name AS spare_part_name, sc.name AS spare_category_name
                  FROM purchase_order_receipt_lines rl
-                 JOIN warehouses w ON w.id = rl.warehouse_id
+                 LEFT JOIN warehouses w ON w.id = rl.warehouse_id
                  JOIN purchase_order_items poi ON poi.id = rl.po_item_id
-                 JOIN vehicle_variants vv ON vv.id = poi.variant_id
-                 JOIN vehicles v ON v.id = poi.vehicle_id
+                 LEFT JOIN vehicle_variants vv ON vv.id = poi.variant_id
+                 LEFT JOIN vehicles v ON v.id = poi.vehicle_id
+                 LEFT JOIN spare_parts sp ON sp.id = poi.spare_part_id
+                 LEFT JOIN spare_categories sc ON sc.id = sp.category_id
                  WHERE rl.receipt_id IN ({$ids})
                  ORDER BY rl.id"
             )->fetchAll();

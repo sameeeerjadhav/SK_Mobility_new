@@ -10,6 +10,7 @@
  *  /install.php?migrate_partners=1  ← partner Aadhar & PAN fields
  *  /install.php?migrate_purchase_orders=1  ← purchase orders + goods receipt tables
  *  /install.php?migrate_po_supplier=1  ← supplier company name on purchase orders (replaces partners link)
+ *  /install.php?migrate_po_spare_items=1  ← spare parts / batteries on PO line items
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -287,6 +288,57 @@ try {
             $db->exec('ALTER TABLE purchase_orders DROP COLUMN partner_id');
             echo "dropped purchase_orders.partner_id\n";
         }
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_po_spare_items']) && $_GET['migrate_po_spare_items'] === '1') {
+        echo "\n--- PO spare parts line items migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        if (!$colExists($db, 'purchase_order_items', 'item_type')) {
+            $db->exec(
+                "ALTER TABLE purchase_order_items
+                 ADD COLUMN item_type ENUM('vehicle_variant','spare_part') NOT NULL DEFAULT 'vehicle_variant' AFTER purchase_order_id"
+            );
+            echo "added purchase_order_items.item_type\n";
+        } else {
+            echo "skip purchase_order_items.item_type\n";
+        }
+        if (!$colExists($db, 'purchase_order_items', 'spare_part_id')) {
+            $db->exec('ALTER TABLE purchase_order_items ADD COLUMN spare_part_id INT UNSIGNED NULL AFTER variant_id');
+            echo "added purchase_order_items.spare_part_id\n";
+        } else {
+            echo "skip purchase_order_items.spare_part_id\n";
+        }
+        $db->exec('ALTER TABLE purchase_order_items MODIFY vehicle_id INT UNSIGNED NULL');
+        $db->exec('ALTER TABLE purchase_order_items MODIFY variant_id INT UNSIGNED NULL');
+        echo "nullable vehicle_id / variant_id\n";
+
+        $fkStmt = $db->prepare(
+            "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_order_items'
+               AND COLUMN_NAME = 'spare_part_id' AND REFERENCED_TABLE_NAME IS NOT NULL
+             LIMIT 1"
+        );
+        $fkStmt->execute();
+        if (!$fkStmt->fetchColumn()) {
+            $db->exec(
+                'ALTER TABLE purchase_order_items
+                 ADD CONSTRAINT fk_po_items_spare_part FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id) ON DELETE SET NULL'
+            );
+            echo "added fk_po_items_spare_part\n";
+        } else {
+            echo "skip fk_po_items_spare_part\n";
+        }
+
+        $db->exec('ALTER TABLE purchase_order_receipt_lines MODIFY warehouse_id INT UNSIGNED NULL');
+        echo "nullable purchase_order_receipt_lines.warehouse_id\n";
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

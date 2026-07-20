@@ -442,8 +442,10 @@ CREATE TABLE purchase_orders (
 CREATE TABLE purchase_order_items (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   purchase_order_id INT UNSIGNED NOT NULL,
-  vehicle_id INT UNSIGNED NOT NULL,
-  variant_id INT UNSIGNED NOT NULL,
+  item_type ENUM('vehicle_variant','spare_part') NOT NULL DEFAULT 'vehicle_variant',
+  vehicle_id INT UNSIGNED NULL,
+  variant_id INT UNSIGNED NULL,
+  spare_part_id INT UNSIGNED NULL,
   color VARCHAR(50) NULL,
   hsn_code VARCHAR(20) NOT NULL DEFAULT '87116020',
   description VARCHAR(255) NULL,
@@ -458,6 +460,7 @@ CREATE TABLE purchase_order_items (
   FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE,
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
   FOREIGN KEY (variant_id) REFERENCES vehicle_variants(id),
+  FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id) ON DELETE SET NULL,
   INDEX idx_po_items_po (purchase_order_id)
 ) ENGINE=InnoDB;
 
@@ -475,7 +478,7 @@ CREATE TABLE purchase_order_receipt_lines (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   receipt_id INT UNSIGNED NOT NULL,
   po_item_id INT UNSIGNED NOT NULL,
-  warehouse_id INT UNSIGNED NOT NULL,
+  warehouse_id INT UNSIGNED NULL,
   quantity INT NOT NULL,
   FOREIGN KEY (receipt_id) REFERENCES purchase_order_receipts(id) ON DELETE CASCADE,
   FOREIGN KEY (po_item_id) REFERENCES purchase_order_items(id) ON DELETE CASCADE,
