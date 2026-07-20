@@ -119,6 +119,11 @@ class PurchaseOrderService
             }
         }
 
+        $color = trim((string)($row['color'] ?? ''));
+        if ($color === '') {
+            throw new RuntimeException("Line {$lineNo}: color is required — each color is stored as its own variant under the same vehicle.");
+        }
+
         return [
             'variant_mode' => $mode,
             'variant_id' => $variantId,
@@ -129,7 +134,7 @@ class PurchaseOrderService
             'new_variant_name' => $newVariantName,
             'battery_type' => trim((string)($row['battery_type'] ?? '')) ?: null,
             'battery_spec' => trim((string)($row['battery_spec'] ?? '')) ?: null,
-            'color' => trim((string)($row['color'] ?? '')),
+            'color' => $color,
             'spare_mode' => null,
             'spare_part_id' => 0,
             'spare_category_id' => 0,
@@ -465,7 +470,7 @@ class PurchaseOrderService
 
         $color = trim($color);
         $baseColor = trim((string)($base['color'] ?? ''));
-        if ($color === '' || strcasecmp($color, $baseColor) === 0) {
+        if (strcasecmp($color, $baseColor) === 0) {
             return [
                 'variant_id' => $variantId,
                 'vehicle_id' => (int)$base['vehicle_id'],
@@ -544,6 +549,15 @@ class PurchaseOrderService
         $existing = $find->fetchColumn();
         if ($existing) {
             return (int)$existing;
+        }
+
+        $findByName = $this->db->prepare(
+            'SELECT id FROM vehicles WHERE LOWER(TRIM(name)) = LOWER(?) AND is_active = 1 LIMIT 1'
+        );
+        $findByName->execute([$name]);
+        $existingByName = $findByName->fetchColumn();
+        if ($existingByName) {
+            return (int)$existingByName;
         }
 
         $slug = slugify($name);

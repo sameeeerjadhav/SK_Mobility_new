@@ -130,24 +130,38 @@ document.addEventListener('alpine:init', () => {
       const it = this.items[idx];
       const v = this.variants.find(x => String(x.id) === String(it.variant_id));
       if (!v) return;
-      it.color = v.color || '';
+      if (!it.color) it.color = v.color || '';
       if (!it.unit_rate && v.price) it.unit_rate = v.price;
-      it.description = this.describeVariant(v.vehicle_name, v.name, v.battery_type);
+      this.syncDescription(idx);
     },
     onNewVariantChange(idx) {
+      this.syncDescription(idx);
+    },
+    onColorChange(idx) {
+      this.syncDescription(idx);
+    },
+    syncDescription(idx) {
       const it = this.items[idx];
+      if (it.item_type !== 'vehicle_variant') return;
       let vehicleName = '';
-      if (it.vehicle_mode === 'existing') {
-        const vehicle = this.vehicles.find(v => String(v.id) === String(it.vehicle_id));
-        if (!vehicle || !it.new_variant_name) return;
-        vehicleName = vehicle.name;
+      let variantName = '';
+      if (it.variant_mode === 'existing') {
+        const v = this.variants.find(x => String(x.id) === String(it.variant_id));
+        if (!v) return;
+        vehicleName = v.vehicle_name;
+        variantName = v.name;
       } else {
-        if (!it.new_vehicle_name || !it.new_variant_name) return;
-        vehicleName = it.new_vehicle_name;
+        if (it.vehicle_mode === 'existing') {
+          const vehicle = this.vehicles.find(v => String(v.id) === String(it.vehicle_id));
+          if (!vehicle || !it.new_variant_name) return;
+          vehicleName = vehicle.name;
+        } else {
+          if (!it.new_vehicle_name || !it.new_variant_name) return;
+          vehicleName = it.new_vehicle_name;
+        }
+        variantName = it.new_variant_name;
       }
-      if (!it.description) {
-        it.description = this.describeVariant(vehicleName, it.new_variant_name, it.battery_type);
-      }
+      it.description = this.describeVariant(vehicleName, variantName, it.battery_type, it.color);
     },
     onSpareChange(idx) {
       const it = this.items[idx];
@@ -161,10 +175,74 @@ document.addEventListener('alpine:init', () => {
       if (!it.new_part_name) return;
       if (!it.description) it.description = it.new_part_name;
     },
-    describeVariant(vehicleName, variantName, batteryType) {
+    describeVariant(vehicleName, variantName, batteryType, color) {
       let d = vehicleName + ' ' + variantName;
-      if (batteryType) d += ' (' + batteryType + ')';
+      if (color) d += ' — ' + color;
+      else if (batteryType) d += ' (' + batteryType + ')';
       return d;
+    },
+    lastVehicleLine() {
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        if (this.items[i].item_type === 'vehicle_variant') return this.items[i];
+      }
+      return null;
+    },
+    addColorLine(idx) {
+      const src = this.items[idx];
+      if (src.item_type !== 'vehicle_variant') {
+        this.addItem();
+        return;
+      }
+      const line = {
+        item_type: 'vehicle_variant',
+        variant_mode: src.variant_mode,
+        vehicle_mode: src.vehicle_mode,
+        variant_id: src.variant_id,
+        vehicle_id: src.vehicle_id,
+        new_vehicle_name: src.new_vehicle_name,
+        vehicle_category_id: src.vehicle_category_id,
+        new_variant_name: src.new_variant_name,
+        battery_type: src.battery_type,
+        spare_mode: this.defaultSpareMode,
+        spare_part_id: '',
+        spare_category_id: '',
+        new_part_name: '',
+        color: '',
+        quantity: 1,
+        unit_rate: src.unit_rate || '',
+        hsn_code: '87116020',
+        gst_percent: src.gst_percent || this.defaultGstPercent,
+        description: '',
+      };
+      this.items = [...this.items.slice(0, idx + 1), line, ...this.items.slice(idx + 1)];
+    },
+    addItem() {
+      const last = this.lastVehicleLine();
+      if (last) {
+        this.items = [...this.items, {
+          item_type: 'vehicle_variant',
+          variant_mode: last.variant_mode,
+          vehicle_mode: last.vehicle_mode,
+          variant_id: last.variant_id,
+          vehicle_id: last.vehicle_id,
+          new_vehicle_name: last.new_vehicle_name,
+          vehicle_category_id: last.vehicle_category_id,
+          new_variant_name: last.new_variant_name,
+          battery_type: last.battery_type,
+          spare_mode: this.defaultSpareMode,
+          spare_part_id: '',
+          spare_category_id: '',
+          new_part_name: '',
+          color: '',
+          quantity: 1,
+          unit_rate: last.unit_rate || '',
+          hsn_code: '87116020',
+          gst_percent: last.gst_percent || this.defaultGstPercent,
+          description: '',
+        }];
+        return;
+      }
+      this.items = [...this.items, this.blankItem()];
     },
     lineCalc(it) {
       const qty = parseInt(it.quantity, 10) || 0;
@@ -189,9 +267,6 @@ document.addEventListener('alpine:init', () => {
     },
     fmt(n) {
       return '\u20B9' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    },
-    addItem() {
-      this.items = [...this.items, this.blankItem()];
     },
     removeItem(idx) {
       if (this.items.length <= 1) return;
@@ -243,7 +318,7 @@ document.addEventListener('alpine:init', () => {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
         <div>
           <h3 class="card-title" style="margin:0;">2. Line items</h3>
-          <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;">Each line is either a vehicle variant or a spare part/battery — not both</p>
+          <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;">Each line is either a vehicle variant or a spare part/battery — use color to split variants under one vehicle</p>
         </div>
         <button class="btn btn-sm btn-outline" type="button" @click="addItem()">+ Add line</button>
       </div>
@@ -372,8 +447,15 @@ document.addEventListener('alpine:init', () => {
 
               <div class="form-grid" style="margin-top:0.5rem;">
                 <div class="form-group">
-                  <label>Color</label>
-                  <input class="form-control" type="text" :name="'items['+idx+'][color]'" x-model="it.color" placeholder="e.g. Red">
+                  <label>Color *</label>
+                  <input class="form-control" type="text" :name="'items['+idx+'][color]'" x-model="it.color"
+                         @input="onColorChange(idx)" placeholder="e.g. Red" required>
+                  <div class="muted" style="font-size:0.75rem;margin-top:0.2rem;">
+                    Each color is a separate variant under the same vehicle in Vehicles catalog.
+                  </div>
+                </div>
+                <div class="form-group" style="display:flex;align-items:end;">
+                  <button class="btn btn-sm btn-outline" type="button" @click="addColorLine(idx)">+ Another color</button>
                 </div>
               </div>
             </div>
