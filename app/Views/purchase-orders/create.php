@@ -1,59 +1,64 @@
 <?php
-$variantsJson = json_encode($variants, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+$variantsJson = json_encode($variants, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 ?>
-<div x-data="{
-  variants: <?= $variantsJson ?>,
-  items: [{ variant_id: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }],
-  gstRate: 5,
-  variantLabel(v) {
-    const parts = [v.vehicle_name, v.name];
-    if (v.color) parts.push(v.color);
-    if (v.battery_type) parts.push('(' + v.battery_type + ')');
-    return parts.join(' — ');
-  },
-  onVariantChange(idx) {
-    const it = this.items[idx];
-    const v = this.variants.find(x => String(x.id) === String(it.variant_id));
-    if (!v) return;
-    it.color = v.color || '';
-    if (!it.unit_rate && v.price) it.unit_rate = v.price;
-    if (!it.description) {
-      let d = v.vehicle_name + ' ' + v.name;
-      if (v.battery_type) d += ' (' + v.battery_type + ')';
-      it.description = d;
-    }
-  },
-  lineCalc(it) {
-    const qty = parseInt(it.quantity, 10) || 0;
-    const rate = parseFloat(it.unit_rate) || 0;
-    const taxable = Math.round(rate * qty * 100) / 100;
-    const gst = Math.round(taxable * this.gstRate / 100 * 100) / 100;
-    return { taxable, gst, total: Math.round((taxable + gst) * 100) / 100 };
-  },
-  totals() {
-    let taxable = 0, gst = 0;
-    this.items.forEach(it => {
-      const c = this.lineCalc(it);
-      taxable += c.taxable;
-      gst += c.gst;
-    });
-    return {
-      taxable: Math.round(taxable * 100) / 100,
-      gst: Math.round(gst * 100) / 100,
-      total: Math.round((taxable + gst) * 100) / 100,
-    };
-  },
-  fmt(n) {
-    return '\u20B9' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  },
-  addItem() {
-    this.items = [...this.items, { variant_id: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }];
-  },
-  removeItem(idx) {
-    if (this.items.length <= 1) return;
-    this.items = this.items.filter((_, i) => i !== idx);
-  },
-}">
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('poCreatePage', () => ({
+    variants: <?= $variantsJson ?>,
+    items: [{ variant_id: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }],
+    gstRate: 5,
+    variantLabel(v) {
+      const parts = [v.vehicle_name, v.name];
+      if (v.color) parts.push(v.color);
+      if (v.battery_type) parts.push('(' + v.battery_type + ')');
+      return parts.join(' — ');
+    },
+    onVariantChange(idx) {
+      const it = this.items[idx];
+      const v = this.variants.find(x => String(x.id) === String(it.variant_id));
+      if (!v) return;
+      it.color = v.color || '';
+      if (!it.unit_rate && v.price) it.unit_rate = v.price;
+      if (!it.description) {
+        let d = v.vehicle_name + ' ' + v.name;
+        if (v.battery_type) d += ' (' + v.battery_type + ')';
+        it.description = d;
+      }
+    },
+    lineCalc(it) {
+      const qty = parseInt(it.quantity, 10) || 0;
+      const rate = parseFloat(it.unit_rate) || 0;
+      const taxable = Math.round(rate * qty * 100) / 100;
+      const gst = Math.round(taxable * this.gstRate / 100 * 100) / 100;
+      return { taxable, gst, total: Math.round((taxable + gst) * 100) / 100 };
+    },
+    totals() {
+      let taxable = 0, gst = 0;
+      this.items.forEach(it => {
+        const c = this.lineCalc(it);
+        taxable += c.taxable;
+        gst += c.gst;
+      });
+      return {
+        taxable: Math.round(taxable * 100) / 100,
+        gst: Math.round(gst * 100) / 100,
+        total: Math.round((taxable + gst) * 100) / 100,
+      };
+    },
+    fmt(n) {
+      return '\u20B9' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+    addItem() {
+      this.items = [...this.items, { variant_id: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }];
+    },
+    removeItem(idx) {
+      if (this.items.length <= 1) return;
+      this.items = this.items.filter((_, i) => i !== idx);
+    },
+  }));
+});
+</script>
+<div x-data="poCreatePage()">
   <div style="margin-bottom:0.75rem;"><a href="<?= url('purchase-orders') ?>">&larr; Purchase Orders</a></div>
 
   <div class="toolbar" style="margin-bottom:1rem;">
