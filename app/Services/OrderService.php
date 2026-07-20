@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Database;
+use App\Services\BankTransactionService;
 use PDO;
 use RuntimeException;
 
@@ -104,6 +105,11 @@ class OrderService
 
         [$paymentStatus, $amountPaid, $amountDue] = self::resolvePaymentAmounts($data, $totalAmount);
 
+        [$bankAccountId, $affectBank] = BankTransactionService::resolveBankLink($data);
+        if ($affectBank && $amountPaid <= 0) {
+            throw new RuntimeException('Payment amount must be greater than zero to credit the bank account.');
+        }
+
         $prefix = $orderType === 'dealer' ? 'ORD' : 'CORD';
         if ($productType === 'spare_part') {
             $prefix = $orderType === 'dealer' ? 'SORD' : 'SCORD';
@@ -130,9 +136,10 @@ class OrderService
                     hp_name, color, vehicle_model_type,
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
                     payment_mode, payment_status, amount_paid, amount_due,
+                    bank_account_id, affect_bank_balance,
                     sale_date, subtotal, tax_amount, cgst_rate, sgst_rate, tax_rate, total_amount,
                     status, delivery_address, notes, expected_delivery_date, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $orderNumber, $bookingNo, $orderType, $productType, $billingLocation, $dealerId,
                 $data['customer_name'] ?? null,
@@ -156,6 +163,7 @@ class OrderService
                 $vehicleModelType,
                 $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
                 $paymentMode, $paymentStatus, $amountPaid, $amountDue,
+                $bankAccountId ?: null, $affectBank,
                 $saleDate, $subtotal, $taxAmount, $cgstRate, $sgstRate, $taxRate, $totalAmount,
                 'pending',
                 $data['delivery_address'] ?? null,
@@ -284,6 +292,18 @@ class OrderService
                 $db->prepare(
                     'UPDATE dealers SET total_orders = total_orders + 1, total_revenue = total_revenue + ? WHERE id = ?'
                 )->execute([$totalAmount, $dealerId]);
+            }
+
+            if ($affectBank && $amountPaid > 0) {
+                (new BankTransactionService($db))->credit(
+                    $bankAccountId,
+                    $amountPaid,
+                    'sell_order',
+                    $orderId,
+                    'Sell order ' . $orderNumber,
+                    $userId,
+                    $saleDate
+                );
             }
 
             $db->commit();

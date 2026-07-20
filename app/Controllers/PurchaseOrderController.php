@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Controller;
+use App\Services\BankTransactionService;
 use App\Services\PurchaseOrderService;
 use RuntimeException;
 
@@ -130,6 +131,7 @@ class PurchaseOrderController extends Controller
             'vehicleCategories' => $vehicleCategories,
             'spareParts' => $spareParts,
             'spareCategories' => $spareCategories,
+            'bankAccounts' => BankTransactionService::loadActiveAccounts($this->db()),
             'canCreate' => $productType === 'spare_part' ? $canCreateSpare : $canCreateVehicle,
         ]);
     }
@@ -265,6 +267,20 @@ class PurchaseOrderController extends Controller
                 'sgst_rate' => $this->input('sgst_rate'),
             ], $productType);
             $taxRate = round($cgstRate + $sgstRate, 2);
+            [$paymentStatus, $amountPaid, $amountDue] = BankTransactionService::resolvePoPaymentAmounts(
+                [
+                    'payment_status' => $this->input('payment_status'),
+                    'amount_paid' => $this->input('amount_paid'),
+                ],
+                $lines['total_amount']
+            );
+            [$bankAccountId, $affectBank] = BankTransactionService::resolveBankLink([
+                'affect_bank' => isset($_POST['affect_bank']) ? 1 : 0,
+                'bank_account_id' => $this->input('bank_account_id'),
+            ]);
+            if ($affectBank && $amountPaid <= 0) {
+                throw new RuntimeException('Payment amount must be greater than zero to debit the bank account.');
+            }
             $db = $this->db();
             $db->beginTransaction();
 
@@ -272,8 +288,10 @@ class PurchaseOrderController extends Controller
             $db->prepare(
                 'INSERT INTO purchase_orders (
                     po_number, product_type, supplier_name, po_date, supplier_invoice_no, supplier_invoice_date,
-                    status, subtotal, gst_amount, cgst_rate, sgst_rate, tax_rate, total_amount, notes, created_by
-                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                    status, subtotal, gst_amount, cgst_rate, sgst_rate, tax_rate, total_amount,
+                    payment_status, amount_paid, amount_due, bank_account_id, affect_bank_balance,
+                    notes, created_by
+                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $poNumber,
                 $productType,
@@ -288,11 +306,27 @@ class PurchaseOrderController extends Controller
                 $sgstRate,
                 $taxRate,
                 $lines['total_amount'],
+                $paymentStatus,
+                $amountPaid,
+                $amountDue,
+                $bankAccountId ?: null,
+                $affectBank,
                 $payload['notes'],
                 Auth::id(),
             ]);
             $poId = (int)$db->lastInsertId();
             $this->service()->insertItems($poId, $lines['items']);
+            if ($affectBank && $amountPaid > 0) {
+                (new BankTransactionService($db))->debit(
+                    $bankAccountId,
+                    $amountPaid,
+                    'purchase_order',
+                    $poId,
+                    'Purchase order ' . $poNumber . ' — ' . $payload['supplier_name'],
+                    (int)Auth::id(),
+                    $payload['po_date']
+                );
+            }
             $db->commit();
 
             Audit::log('create', 'purchase_orders', 'purchase_orders', $poId);

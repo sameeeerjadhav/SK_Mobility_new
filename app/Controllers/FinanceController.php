@@ -3,7 +3,10 @@
 namespace App\Controllers;
 
 use App\Core\Audit;
+use App\Core\Auth;
 use App\Core\Controller;
+use App\Services\BankTransactionService;
+use RuntimeException;
 
 class FinanceController extends Controller
 {
@@ -25,45 +28,130 @@ class FinanceController extends Controller
         ]);
     }
 
+    public function showAccount(string $id): void
+    {
+        require_role('super_admin');
+        $accountId = (int)$id;
+        $stmt = $this->db()->prepare('SELECT * FROM bank_accounts WHERE id = ?');
+        $stmt->execute([$accountId]);
+        $account = $stmt->fetch();
+        if (!$account) {
+            flash('error', 'Bank account not found.');
+            $this->redirect('/finance?tab=banks');
+        }
+
+        $service = new BankTransactionService($this->db());
+        $this->view('finance/account', [
+            'title' => $account['account_name'],
+            'account' => $account,
+            'transactions' => $service->listForAccount($accountId),
+        ]);
+    }
+
     public function storeAccount(): void
     {
         require_role('super_admin');
         $this->validateCsrf();
-        $this->db()->prepare(
-            'INSERT INTO bank_accounts (account_name, bank_name, account_number, ifsc_code, account_type, current_balance, is_active)
-             VALUES (?,?,?,?,?,?,1)'
-        )->execute([
-            $this->input('account_name'), $this->input('bank_name'), $this->input('account_number'),
-            $this->input('ifsc_code'), $this->input('account_type') ?: 'current',
-            (float)$this->input('current_balance'),
-        ]);
-        Audit::log('create', 'finance', 'bank_accounts', (int)$this->db()->lastInsertId());
+        $opening = round((float)$this->input('current_balance'), 2);
+        $db = $this->db();
+        $db->beginTransaction();
+        try {
+            $db->prepare(
+                'INSERT INTO bank_accounts (account_name, bank_name, account_number, ifsc_code, account_type, current_balance, is_active)
+                 VALUES (?,?,?,?,?,?,1)'
+            )->execute([
+                $this->input('account_name'),
+                $this->input('bank_name'),
+                $this->input('account_number'),
+                $this->input('ifsc_code') ?: null,
+                $this->input('account_type') ?: 'current',
+                0,
+            ]);
+            $id = (int)$db->lastInsertId();
+            if ($opening > 0) {
+                (new BankTransactionService($db))->credit(
+                    $id,
+                    $opening,
+                    'opening_balance',
+                    null,
+                    'Opening balance',
+                    (int)Auth::id()
+                );
+            }
+            $db->commit();
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            flash('error', $e->getMessage());
+            $this->redirect('/finance?tab=banks');
+        }
+        Audit::log('create', 'finance', 'bank_accounts', $id);
         flash('success', 'Bank account added.');
-        $this->redirect('/finance?tab=banks');
+        $this->redirect('/finance/bank-accounts/' . $id);
     }
 
     public function updateAccount(string $id): void
     {
         require_role('super_admin');
         $this->validateCsrf();
+        $accountId = (int)$id;
         $this->db()->prepare(
-            'UPDATE bank_accounts SET account_name=?, bank_name=?, account_number=?, ifsc_code=?, account_type=?, current_balance=?, is_active=? WHERE id=?'
+            'UPDATE bank_accounts SET account_name=?, bank_name=?, account_number=?, ifsc_code=?, account_type=?, is_active=? WHERE id=?'
         )->execute([
-            $this->input('account_name'), $this->input('bank_name'), $this->input('account_number'),
-            $this->input('ifsc_code'), $this->input('account_type'),
-            (float)$this->input('current_balance'), (int)$this->input('is_active'), (int)$id,
+            $this->input('account_name'),
+            $this->input('bank_name'),
+            $this->input('account_number'),
+            $this->input('ifsc_code') ?: null,
+            $this->input('account_type'),
+            (int)$this->input('is_active'),
+            $accountId,
         ]);
-        Audit::log('update', 'finance', 'bank_accounts', (int)$id);
+        Audit::log('update', 'finance', 'bank_accounts', $accountId);
         flash('success', 'Account updated.');
-        $this->redirect('/finance?tab=banks');
+        $this->redirect('/finance/bank-accounts/' . $accountId);
+    }
+
+    public function storeTransaction(string $id): void
+    {
+        require_role('super_admin');
+        $this->validateCsrf();
+        $accountId = (int)$id;
+        $type = strtolower(trim((string)$this->input('transaction_type')));
+        $amount = round((float)$this->input('amount'), 2);
+        $description = trim((string)$this->input('description'));
+        $date = trim((string)$this->input('transaction_date')) ?: date('Y-m-d');
+
+        try {
+            $service = new BankTransactionService($this->db());
+            if ($type === 'credit') {
+                $service->credit($accountId, $amount, 'manual', null, $description, (int)Auth::id(), $date);
+            } elseif ($type === 'debit') {
+                $service->debit($accountId, $amount, 'manual', null, $description, (int)Auth::id(), $date);
+            } else {
+                throw new RuntimeException('Select credit or debit.');
+            }
+            Audit::log('create', 'finance', 'bank_transactions', $accountId, null, ['type' => $type, 'amount' => $amount]);
+            flash('success', ucfirst($type) . ' of ' . number_format($amount, 2) . ' recorded.');
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+        }
+        $this->redirect('/finance/bank-accounts/' . $accountId);
     }
 
     public function deleteAccount(string $id): void
     {
         require_role('super_admin');
         $this->validateCsrf();
-        $this->db()->prepare('DELETE FROM bank_accounts WHERE id = ?')->execute([(int)$id]);
-        Audit::log('delete', 'finance', 'bank_accounts', (int)$id);
+        $accountId = (int)$id;
+        $cnt = $this->db()->prepare('SELECT COUNT(*) FROM bank_transactions WHERE bank_account_id = ?');
+        $cnt->execute([$accountId]);
+        if ((int)$cnt->fetchColumn() > 0) {
+            flash('error', 'Cannot delete — this account has ledger transactions. Mark it inactive instead.');
+            $this->redirect('/finance/bank-accounts/' . $accountId);
+        }
+        $this->db()->prepare('DELETE FROM bank_accounts WHERE id = ?')->execute([$accountId]);
+        Audit::log('delete', 'finance', 'bank_accounts', $accountId);
         flash('success', 'Account deleted.');
         $this->redirect('/finance?tab=banks');
     }

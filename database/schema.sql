@@ -222,6 +222,8 @@ CREATE TABLE orders (
   payment_status ENUM('full','partial') NOT NULL DEFAULT 'full',
   amount_paid DECIMAL(12,2) NOT NULL DEFAULT 0,
   amount_due DECIMAL(12,2) NOT NULL DEFAULT 0,
+  bank_account_id INT UNSIGNED NULL,
+  affect_bank_balance TINYINT(1) NOT NULL DEFAULT 0,
   sale_date DATE NULL,
   subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
   tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -451,6 +453,11 @@ CREATE TABLE purchase_orders (
   sgst_rate DECIMAL(5,2) NOT NULL DEFAULT 2.5,
   tax_rate DECIMAL(5,2) NOT NULL DEFAULT 5,
   total_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  payment_status ENUM('unpaid','full','partial') NOT NULL DEFAULT 'unpaid',
+  amount_paid DECIMAL(14,2) NOT NULL DEFAULT 0,
+  amount_due DECIMAL(14,2) NOT NULL DEFAULT 0,
+  bank_account_id INT UNSIGNED NULL,
+  affect_bank_balance TINYINT(1) NOT NULL DEFAULT 0,
   notes TEXT NULL,
   created_by INT UNSIGNED NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -763,6 +770,24 @@ CREATE TABLE bank_accounts (
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE bank_transactions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  bank_account_id INT UNSIGNED NOT NULL,
+  transaction_type ENUM('credit','debit') NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  balance_after DECIMAL(15,2) NOT NULL,
+  reference_type ENUM('manual','opening_balance','sell_order','purchase_order','adjustment') NOT NULL DEFAULT 'manual',
+  reference_id INT UNSIGNED NULL,
+  description VARCHAR(255) NOT NULL,
+  transaction_date DATE NOT NULL,
+  created_by INT UNSIGNED NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id),
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  INDEX idx_bank_tx_account (bank_account_id),
+  INDEX idx_bank_tx_ref (reference_type, reference_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE loans (

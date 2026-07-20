@@ -17,6 +17,7 @@
  *  /install.php?migrate_sell_order_gst=1  ← custom GST rates stored on sell orders
  *  /install.php?migrate_po_product_type=1  ← vehicle vs spare parts on purchase orders
  *  /install.php?migrate_po_gst=1  ← custom GST rates on purchase orders
+ *  /install.php?migrate_bank_transactions=1  ← bank ledger + order/PO bank links
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -608,6 +609,89 @@ try {
             echo "backfilled PO GST rates\n";
         } else {
             echo "skip purchase_orders GST rate columns\n";
+        }
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_bank_transactions']) && $_GET['migrate_bank_transactions'] === '1') {
+        echo "\n--- Bank transactions migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        $tableExists = static function (PDO $db, string $table): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+            );
+            $stmt->execute([$table]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+
+        if (!$tableExists($db, 'bank_transactions')) {
+            $db->exec(
+                "CREATE TABLE bank_transactions (
+                  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                  bank_account_id INT UNSIGNED NOT NULL,
+                  transaction_type ENUM('credit','debit') NOT NULL,
+                  amount DECIMAL(15,2) NOT NULL,
+                  balance_after DECIMAL(15,2) NOT NULL,
+                  reference_type ENUM('manual','opening_balance','sell_order','purchase_order','adjustment') NOT NULL DEFAULT 'manual',
+                  reference_id INT UNSIGNED NULL,
+                  description VARCHAR(255) NOT NULL,
+                  transaction_date DATE NOT NULL,
+                  created_by INT UNSIGNED NOT NULL,
+                  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id),
+                  FOREIGN KEY (created_by) REFERENCES users(id),
+                  INDEX idx_bank_tx_account (bank_account_id),
+                  INDEX idx_bank_tx_ref (reference_type, reference_id),
+                  INDEX idx_bank_tx_date (transaction_date)
+                ) ENGINE=InnoDB"
+            );
+            echo "created bank_transactions\n";
+        } else {
+            echo "skip bank_transactions table\n";
+        }
+
+        if (!$colExists($db, 'orders', 'bank_account_id')) {
+            $db->exec(
+                'ALTER TABLE orders
+                 ADD COLUMN bank_account_id INT UNSIGNED NULL AFTER amount_due,
+                 ADD COLUMN affect_bank_balance TINYINT(1) NOT NULL DEFAULT 0 AFTER bank_account_id'
+            );
+            $db->exec(
+                'ALTER TABLE orders ADD CONSTRAINT fk_orders_bank_account
+                 FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id)'
+            );
+            echo "added orders bank columns\n";
+        } else {
+            echo "skip orders bank columns\n";
+        }
+
+        if (!$colExists($db, 'purchase_orders', 'payment_status')) {
+            $db->exec(
+                "ALTER TABLE purchase_orders
+                 ADD COLUMN payment_status ENUM('unpaid','full','partial') NOT NULL DEFAULT 'unpaid' AFTER total_amount,
+                 ADD COLUMN amount_paid DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER payment_status,
+                 ADD COLUMN amount_due DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER amount_paid,
+                 ADD COLUMN bank_account_id INT UNSIGNED NULL AFTER amount_due,
+                 ADD COLUMN affect_bank_balance TINYINT(1) NOT NULL DEFAULT 0 AFTER bank_account_id"
+            );
+            $db->exec(
+                'ALTER TABLE purchase_orders ADD CONSTRAINT fk_po_bank_account
+                 FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id)'
+            );
+            $db->exec(
+                'UPDATE purchase_orders SET amount_due = total_amount WHERE amount_due = 0 AND amount_paid = 0'
+            );
+            echo "added purchase_orders payment + bank columns\n";
+        } else {
+            echo "skip purchase_orders payment columns\n";
         }
         echo "Migration complete.\n";
     }

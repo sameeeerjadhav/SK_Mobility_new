@@ -32,6 +32,9 @@ document.addEventListener('alpine:init', () => {
     defaultSgst: <?= $defaultSgst ?>,
     cgstRate: <?= $defaultCgst ?>,
     sgstRate: <?= $defaultSgst ?>,
+    paymentStatus: 'unpaid',
+    amountPaid: '',
+    affectBank: false,
     init() {
       this.applyGstPreset();
       this.items = [this.blankItem()];
@@ -651,7 +654,53 @@ document.addEventListener('alpine:init', () => {
     </div>
 
     <div class="card" style="margin-bottom:0.85rem;">
-      <h3 class="card-title">4. Totals &amp; notes</h3>
+      <h3 class="card-title">4. Payment &amp; bank (optional)</h3>
+      <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">Track supplier payment status. Optionally debit a bank account when payment is made now.</p>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Payment status *</label>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.35rem;">
+            <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
+              <input type="radio" name="payment_status" value="unpaid" x-model="paymentStatus"> Unpaid
+            </label>
+            <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
+              <input type="radio" name="payment_status" value="full" x-model="paymentStatus"> Full paid
+            </label>
+            <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
+              <input type="radio" name="payment_status" value="partial" x-model="paymentStatus"> Partial payment
+            </label>
+          </div>
+        </div>
+        <template x-if="paymentStatus === 'partial'">
+          <div class="form-group" style="grid-column:1 / -1;">
+            <label>Amount paid now (₹) *</label>
+            <input class="form-control" type="number" step="0.01" min="0.01" name="amount_paid" x-model="amountPaid" placeholder="How much paid to supplier today" required>
+          </div>
+        </template>
+        <?php if (!empty($bankAccounts)): ?>
+        <div class="form-group full" style="grid-column:1 / -1;padding-top:0.35rem;border-top:1px solid var(--border);">
+          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;margin-bottom:0.5rem;">
+            <input type="checkbox" name="affect_bank" value="1" x-model="affectBank"> Debit payment from bank account
+          </label>
+          <template x-if="affectBank">
+            <div class="form-group" style="max-width:360px;">
+              <label>Bank account *</label>
+              <select class="form-control" name="bank_account_id" :required="affectBank">
+                <option value="">Select account</option>
+                <?php foreach ($bankAccounts as $ba): ?>
+                  <option value="<?= (int)$ba['id'] ?>"><?= e($ba['account_name']) ?> — <?= e($ba['bank_name']) ?> (<?= money($ba['current_balance']) ?>)</option>
+                <?php endforeach; ?>
+              </select>
+              <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Full paid debits PO total; partial debits only the amount paid now. Unpaid does not affect the bank.</p>
+            </div>
+          </template>
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:0.85rem;">
+      <h3 class="card-title">5. Totals &amp; notes</h3>
       <div style="display:grid;grid-template-columns:1fr 280px;gap:1.25rem;align-items:start;">
         <div class="form-group" style="margin:0;">
           <label>Notes</label>

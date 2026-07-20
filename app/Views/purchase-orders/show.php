@@ -112,6 +112,37 @@ document.addEventListener('alpine:init', () => {
       <div class="stat-label">Invoice total</div>
       <div class="stat-value"><?= money($po['total_amount']) ?></div>
     </div>
+    <?php
+      $poPayStatus = $po['payment_status'] ?? 'unpaid';
+      $poAmountPaid = (float)($po['amount_paid'] ?? 0);
+      $poAmountDue = (float)($po['amount_due'] ?? 0);
+      if ($poPayStatus === 'full' && $poAmountPaid <= 0) {
+          $poAmountPaid = (float)$po['total_amount'];
+      }
+      if ($poPayStatus === 'unpaid' && $poAmountDue <= 0) {
+          $poAmountDue = (float)$po['total_amount'];
+      }
+    ?>
+    <div class="stat-card">
+      <div class="stat-label">Payment</div>
+      <div class="stat-value" style="font-size:1rem;"><?= e(ucfirst(str_replace('_', ' ', $poPayStatus))) ?></div>
+      <?php if ($poPayStatus === 'partial'): ?>
+        <div class="muted" style="font-size:0.75rem;margin-top:0.2rem;">Paid <?= money($poAmountPaid) ?> · Due <?= money($poAmountDue) ?></div>
+      <?php elseif ($poPayStatus === 'full'): ?>
+        <div class="muted" style="font-size:0.75rem;margin-top:0.2rem;">Paid <?= money($poAmountPaid) ?></div>
+      <?php else: ?>
+        <div class="muted" style="font-size:0.75rem;margin-top:0.2rem;">Due <?= money($poAmountDue) ?></div>
+      <?php endif; ?>
+    </div>
+    <?php if (!empty($po['affect_bank_balance']) && !empty($po['bank_account_name'])): ?>
+    <div class="stat-card">
+      <div class="stat-label">Bank debit</div>
+      <div class="stat-value" style="font-size:0.95rem;">
+        <a href="<?= url('finance/bank-accounts/' . (int)$po['bank_account_id']) ?>"><?= e($po['bank_account_name']) ?></a>
+      </div>
+      <div class="muted" style="font-size:0.75rem;margin-top:0.2rem;">Debited <?= money($poAmountPaid) ?></div>
+    </div>
+    <?php endif; ?>
     <?php if ($po['supplier_invoice_no']): ?>
     <div class="stat-card">
       <div class="stat-label">Supplier invoice</div>

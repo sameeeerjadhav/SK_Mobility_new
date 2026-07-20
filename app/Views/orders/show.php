@@ -168,6 +168,12 @@ $gstLabel = 'GST ' . rtrim(rtrim(number_format($taxRate, 2, '.', ''), '0'), '.')
           <?php if (!empty($order['payment_mode'])): ?>
             <div class="od-row"><span class="k">Mode</span><span class="v"><?= e(str_replace('_', ' + ', ucfirst($order['payment_mode']))) ?></span></div>
           <?php endif; ?>
+          <?php if (!empty($order['affect_bank_balance']) && !empty($order['bank_account_name'])): ?>
+            <div class="od-row"><span class="k">Bank</span><span class="v">
+              <a href="<?= url('finance/bank-accounts/' . (int)$order['bank_account_id']) ?>"><?= e($order['bank_account_name']) ?></a>
+              · credited <?= money($amountPaid) ?>
+            </span></div>
+          <?php endif; ?>
         </div>
       </div>
 

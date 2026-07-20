@@ -44,6 +44,7 @@ foreach ($spareParts ?? [] as $sp) {
   batteryType: '',
   paymentStatus: 'full',
   amountPaid: '',
+  affectBank: false,
   gstPreset: 'default',
   defaultCgst: <?= $productType === 'spare_part' ? '9' : '14' ?>,
   defaultSgst: <?= $productType === 'spare_part' ? '9' : '14' ?>,
@@ -426,6 +427,26 @@ foreach ($spareParts ?? [] as $sp) {
           <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1"> Cash</label>
           <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1"> Cheque</label>
         </div>
+
+        <?php if (!empty($bankAccounts)): ?>
+        <div class="form-group full" style="grid-column:1 / -1;padding-top:0.5rem;border-top:1px solid var(--border);">
+          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;margin-bottom:0.5rem;">
+            <input type="checkbox" name="affect_bank" value="1" x-model="affectBank"> Credit received amount to bank account
+          </label>
+          <template x-if="affectBank">
+            <div class="form-group" style="max-width:360px;">
+              <label>Bank account *</label>
+              <select class="form-control" name="bank_account_id" :required="affectBank">
+                <option value="">Select account</option>
+                <?php foreach ($bankAccounts as $ba): ?>
+                  <option value="<?= (int)$ba['id'] ?>"><?= e($ba['account_name']) ?> — <?= e($ba['bank_name']) ?> (<?= money($ba['current_balance']) ?>)</option>
+                <?php endforeach; ?>
+              </select>
+              <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Full payment credits the order total; partial payment credits only the amount paid now.</p>
+            </div>
+          </template>
+        </div>
+        <?php endif; ?>
 
         <div class="form-group full">
           <label>Notes</label>

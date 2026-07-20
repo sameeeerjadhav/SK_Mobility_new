@@ -159,8 +159,10 @@ $router->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy'], ['
 
 // Finance
 $router->get('/finance', [FinanceController::class, 'index'], ['require_auth']);
+$router->get('/finance/bank-accounts/{id}', [FinanceController::class, 'showAccount'], ['require_auth']);
 $router->post('/finance/bank-accounts', [FinanceController::class, 'storeAccount'], ['require_auth']);
 $router->post('/finance/bank-accounts/{id}', [FinanceController::class, 'updateAccount'], ['require_auth']);
+$router->post('/finance/bank-accounts/{id}/transactions', [FinanceController::class, 'storeTransaction'], ['require_auth']);
 $router->post('/finance/bank-accounts/{id}/delete', [FinanceController::class, 'deleteAccount'], ['require_auth']);
 $router->post('/finance/loans', [FinanceController::class, 'storeLoan'], ['require_auth']);
 $router->post('/finance/loans/{id}', [FinanceController::class, 'updateLoan'], ['require_auth']);

@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Services\BillPdfService;
+use App\Services\BankTransactionService;
 use App\Services\OrderService;
 use RuntimeException;
 
@@ -112,6 +113,7 @@ class OrderController extends Controller
             'dealers' => $dealers,
             'variants' => $variants,
             'spareParts' => $spareParts,
+            'bankAccounts' => BankTransactionService::loadActiveAccounts($this->db()),
             'productType' => $productType,
             'isAdmin' => Auth::role() === 'super_admin',
         ]);
@@ -195,6 +197,8 @@ class OrderController extends Controller
             'notes' => $this->input('notes'),
             'expected_delivery_date' => $this->input('expected_delivery_date'),
             'billing_location' => $this->input('billing_location'),
+            'affect_bank' => isset($_POST['affect_bank']) ? 1 : 0,
+            'bank_account_id' => $this->input('bank_account_id'),
             'items' => $items,
         ];
 
@@ -216,8 +220,12 @@ class OrderController extends Controller
         require_permission('view_orders');
         $orderId = (int)$id;
         $stmt = $this->db()->prepare(
-            'SELECT o.*, d.business_name, d.dealer_code
-             FROM orders o LEFT JOIN dealers d ON d.id = o.dealer_id WHERE o.id = ?'
+            'SELECT o.*, d.business_name, d.dealer_code,
+                    ba.account_name AS bank_account_name, ba.bank_name
+             FROM orders o
+             LEFT JOIN dealers d ON d.id = o.dealer_id
+             LEFT JOIN bank_accounts ba ON ba.id = o.bank_account_id
+             WHERE o.id = ?'
         );
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
