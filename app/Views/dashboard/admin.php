@@ -12,11 +12,6 @@
       <div class="stat-value">
         <?= ($s['fmt'] ?? '') === 'money' ? money($s['value']) : number_format((float)$s['value']) ?>
       </div>
-      <?php if (isset($s['trend'])): ?>
-        <div class="stat-trend <?= $s['trend'] >= 0 ? 'up' : 'down' ?>">
-          <?= $s['trend'] >= 0 ? '▲' : '▼' ?> <?= abs($s['trend']) ?>% MoM
-        </div>
-      <?php endif; ?>
       <?php if (!empty($s['hint'])): ?>
         <div class="muted" style="font-size:0.72rem;margin-top:0.35rem;"><?= e($s['hint']) ?></div>
       <?php endif; ?>
