@@ -195,23 +195,33 @@ foreach ($spareParts ?? [] as $sp) {
           <label>Date of Sale *</label>
           <input class="form-control" type="date" name="sale_date" value="<?= date('Y-m-d') ?>" required>
         </div>
-        <div class="form-group full" x-show="productType === 'vehicle' && orderType === 'customer'" x-cloak>
-          <label>Vehicle / Variant *</label>
-          <select class="form-control" name="variant_id[0]" x-model="items[0].variant_id" @change="syncFromVariant(0)" required>
-            <option value="">Select variant</option>
-            <?php foreach ($variants as $vv): ?>
-              <option value="<?= (int)$vv['id'] ?>">
-                <?= e($vv['vehicle_name'] . ' — ' . $vv['name'] . ($vv['color'] ? ' (' . $vv['color'] . ')' : '')) ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-          <input type="hidden" name="quantity[0]" value="1">
-        </div>
-        <div class="form-group" x-show="productType === 'vehicle' && orderType === 'customer'" x-cloak>
-          <label>Sell price (₹) *</label>
-          <input class="form-control" type="number" step="0.01" min="0.01" name="unit_price[0]" x-model="items[0].unit_price" required placeholder="Amount you are selling for">
-          <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;" x-show="primary">Catalog ref: <span x-text="money(primary?.price || 0)"></span> — enter your actual sell price above.</p>
-        </div>
+        <template x-if="productType === 'vehicle' && orderType === 'customer'">
+          <div class="form-group full" style="grid-column:1 / -1;padding:0.85rem 1rem;border-radius:12px;background:#f0fdf4;border:1px solid #86efac;">
+            <div class="form-grid">
+              <div class="form-group full">
+                <label>Vehicle / Variant *</label>
+                <select class="form-control" name="variant_id[0]" x-model="items[0].variant_id" @change="syncFromVariant(0)" required>
+                  <option value="">Select variant</option>
+                  <?php foreach ($variants as $vv): ?>
+                    <option value="<?= (int)$vv['id'] ?>">
+                      <?= e($vv['vehicle_name'] . ' — ' . $vv['name'] . ($vv['color'] ? ' (' . $vv['color'] . ')' : '')) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+                <input type="hidden" name="quantity[0]" value="1">
+              </div>
+              <div class="form-group full">
+                <label>Vehicle sell amount (₹) *</label>
+                <input class="form-control" type="number" step="0.01" min="0.01" name="unit_price[0]" x-model="items[0].unit_price" required
+                       placeholder="Enter the price at which you are selling this vehicle">
+                <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">
+                  This is your <strong>selling price</strong> (before GST) — not the purchase/PO cost.
+                  <span x-show="primary"> Catalog reference: <span x-text="money(primary?.price || 0)"></span>.</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </template>
 
         <template x-if="productType === 'vehicle' && orderType === 'dealer'">
           <div class="form-group full" style="grid-column:1 / -1;">
@@ -233,8 +243,8 @@ foreach ($spareParts ?? [] as $sp) {
                   </select>
                 </div>
                 <div class="form-group" style="margin:0;width:120px;">
-                  <label x-show="idx === 0" style="font-size:0.82rem;">Sell price (₹) *</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" :name="'unit_price['+idx+']'" x-model="it.unit_price" required placeholder="Sell amt">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Sell amount (₹) *</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" :name="'unit_price['+idx+']'" x-model="it.unit_price" required placeholder="Selling price">
                 </div>
                 <div class="form-group" style="margin:0;width:100px;">
                   <label x-show="idx === 0" style="font-size:0.82rem;">Qty *</label>
@@ -243,7 +253,7 @@ foreach ($spareParts ?? [] as $sp) {
                 <button class="btn btn-sm btn-danger" type="button" @click="removeLine(idx)" x-show="items.length > 1" style="margin-bottom:0.35rem;">×</button>
               </div>
             </template>
-            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Enter the sell price per line — not the purchase/PO cost. Each line appears on the tax invoice.</p>
+            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Enter the <strong>sell amount</strong> per line — the price you are selling at, not PO/purchase cost.</p>
           </div>
         </template>
 
@@ -267,8 +277,8 @@ foreach ($spareParts ?? [] as $sp) {
                   </select>
                 </div>
                 <div class="form-group" style="margin:0;width:120px;">
-                  <label x-show="idx === 0" style="font-size:0.82rem;">Sell price (₹) *</label>
-                  <input class="form-control" type="number" step="0.01" min="0.01" :name="'unit_price['+idx+']'" x-model="it.unit_price" required placeholder="Sell amt">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Sell amount (₹) *</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" :name="'unit_price['+idx+']'" x-model="it.unit_price" required placeholder="Selling price">
                 </div>
                 <div class="form-group" style="margin:0;width:100px;">
                   <label x-show="idx === 0" style="font-size:0.82rem;">Qty *</label>
@@ -344,6 +354,19 @@ foreach ($spareParts ?? [] as $sp) {
           <label>Total GST</label>
           <input class="form-control" type="text" readonly tabindex="-1" style="background:#f8fafc;"
                  :value="totalGstPercent + '% · CGST ' + cgstRate + '% + SGST ' + sgstRate + '%'">
+        </div>
+        <div class="form-group full" x-show="productType === 'vehicle' && lineSubtotal > 0" style="grid-column:1 / -1;">
+          <div style="padding:0.75rem 1rem;border-radius:10px;background:#f8fafc;border:1px solid var(--border);max-width:420px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.3rem;">
+              <span>Vehicle sell amount</span><strong x-text="money(lineSubtotal)"></strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.3rem;">
+              <span x-text="'GST @ ' + totalGstPercent + '%'"></span><span x-text="money(gstAmount)"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.4rem;border-top:1px solid var(--border);">
+              <span>Invoice total</span><span x-text="money(grandTotal)"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
