@@ -6,6 +6,14 @@ $partnerInitials = static function (string $name): string {
     return $first . $second;
 };
 $partnersJson = json_encode($partners, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+$transactionsJson = json_encode($transactions, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+$txTypeChip = static function (string $type): string {
+    return match ($type) {
+        'payment' => 'chip-warning',
+        'receipt' => 'chip-success',
+        default => 'chip-info',
+    };
+};
 ?>
 <style>
 .pn-page { --pn-gap: 1rem; }
@@ -117,6 +125,11 @@ $partnersJson = json_encode($partners, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 .pn-amt.payment { color: #b45309; }
 .pn-amt.receipt { color: #047857; }
 .pn-amt.adjustment { color: #0369a1; }
+.pn-tx-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; white-space: nowrap; }
+.pn-view-rows { display: grid; gap: 0.55rem; }
+.pn-view-row { display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.65rem; font-size: 0.9rem; }
+.pn-view-row .k { color: var(--muted); font-weight: 600; font-size: 0.82rem; }
+.pn-view-row .v { font-weight: 600; }
 @media (max-width: 960px) {
   .pn-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pn-layout { grid-template-columns: 1fr; }
@@ -131,8 +144,12 @@ document.addEventListener('alpine:init', () => {
     partnerOpen: false,
     txOpen: false,
     editPartner: null,
+    viewTx: null,
+    editTx: null,
+    txSearch: '',
     search: '',
     partners: <?= $partnersJson ?>,
+    transactions: <?= $transactionsJson ?>,
     matches(partner) {
       const q = this.search.trim().toLowerCase();
       if (!q) return true;
@@ -162,6 +179,33 @@ document.addEventListener('alpine:init', () => {
     matchesById(id) {
       const partner = this.partners.find(p => Number(p.id) === Number(id));
       return partner ? this.matches(partner) : false;
+    },
+    matchesTx(tx) {
+      const q = this.txSearch.trim().toLowerCase();
+      if (!q) return true;
+      const hay = [
+        tx.partner_name,
+        tx.transaction_type,
+        tx.reference_number,
+        tx.description,
+        tx.amount,
+      ].join(' ').toLowerCase();
+      return hay.includes(q);
+    },
+    matchesTxById(id) {
+      const tx = this.transactions.find(t => Number(t.id) === Number(id));
+      return tx ? this.matchesTx(tx) : false;
+    },
+    openViewTx(id) {
+      const tx = this.transactions.find(t => Number(t.id) === Number(id));
+      if (tx) this.viewTx = JSON.parse(JSON.stringify(tx));
+    },
+    openEditTx(id) {
+      const tx = this.transactions.find(t => Number(t.id) === Number(id));
+      if (tx) this.editTx = JSON.parse(JSON.stringify(tx));
+    },
+    txTypeLabel(type) {
+      return ({ payment: 'Payment (outgoing)', receipt: 'Receipt (incoming)', adjustment: 'Adjustment' })[type] || type;
     },
     initials(name) {
       const parts = (name || '').trim().split(/\s+/);
@@ -265,7 +309,7 @@ document.addEventListener('alpine:init', () => {
     <div class="pn-card">
       <div class="pn-card-head">
         <h3>Recent transactions</h3>
-        <span class="muted" style="font-size:0.82rem;">Latest 100 entries</span>
+        <input class="form-control pn-search" type="search" placeholder="Search transactions…" x-model="txSearch">
       </div>
       <?php if ($transactions): ?>
         <div class="table-wrap">
@@ -276,35 +320,35 @@ document.addEventListener('alpine:init', () => {
                 <th>Type</th>
                 <th>Amount</th>
                 <th>Date</th>
+                <th>Reference</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
             <?php foreach ($transactions as $t): ?>
-              <?php
-                $txType = $t['transaction_type'];
-                $txChip = match ($txType) {
-                    'payment' => 'chip-warning',
-                    'receipt' => 'chip-success',
-                    default => 'chip-info',
-                };
-              ?>
-              <tr>
+              <?php $txType = $t['transaction_type']; ?>
+              <tr x-show="matchesTxById(<?= (int)$t['id'] ?>)" x-cloak>
                 <td><strong><?= e($t['partner_name']) ?></strong></td>
-                <td><span class="chip <?= $txChip ?>"><?= e(ucfirst($txType)) ?></span></td>
+                <td><span class="chip <?= $txTypeChip($txType) ?>"><?= e(ucfirst($txType)) ?></span></td>
                 <td class="pn-amt <?= e($txType) ?>"><?= money($t['amount']) ?></td>
                 <td><?= india_date($t['date']) ?></td>
+                <td class="muted" style="font-size:0.82rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= e($t['reference_number'] ?: '—') ?></td>
                 <td>
-                  <form method="post" action="<?= url('partner-transactions/' . $t['id'] . '/delete') ?>" onsubmit="return confirm('Delete this transaction?')">
-                    <?= csrf_field() ?>
-                    <button class="btn btn-sm btn-danger" type="submit" title="Delete">×</button>
-                  </form>
+                  <div class="pn-tx-actions">
+                    <button class="btn btn-sm btn-outline" type="button" @click="openViewTx(<?= (int)$t['id'] ?>)">View</button>
+                    <button class="btn btn-sm btn-outline" type="button" @click="openEditTx(<?= (int)$t['id'] ?>)">Edit</button>
+                    <form method="post" action="<?= url('partner-transactions/' . $t['id'] . '/delete') ?>" onsubmit="return confirm('Delete this transaction?')">
+                      <?= csrf_field() ?>
+                      <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                    </form>
+                  </div>
                 </td>
               </tr>
             <?php endforeach; ?>
             </tbody>
           </table>
         </div>
+        <div class="pn-empty" x-show="txSearch.trim() && !transactions.some(t => matchesTx(t))" x-cloak>No transactions match your search.</div>
       <?php else: ?>
         <div class="pn-empty">No transactions recorded yet.</div>
       <?php endif; ?>
@@ -389,6 +433,65 @@ document.addEventListener('alpine:init', () => {
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" @click="txOpen=false">Cancel</button>
           <button class="btn btn-primary" type="submit">Save transaction</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" :class="{open:!!viewTx}" @click.self="viewTx=null" x-show="viewTx" x-cloak>
+    <div class="modal" style="max-width:520px;" x-show="viewTx">
+      <div class="modal-header">
+        <h3 class="modal-title">Transaction details</h3>
+      </div>
+      <div class="modal-body" x-show="viewTx">
+        <div class="pn-view-rows">
+          <div class="pn-view-row"><span class="k">Partner</span><span class="v" x-text="viewTx?.partner_name"></span></div>
+          <div class="pn-view-row"><span class="k">Type</span><span class="v" x-text="viewTx ? viewTx.transaction_type.charAt(0).toUpperCase() + viewTx.transaction_type.slice(1) : ''"></span></div>
+          <div class="pn-view-row"><span class="k">Amount</span><span class="v" x-text="viewTx ? '₹' + (parseFloat(viewTx.amount)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''"></span></div>
+          <div class="pn-view-row"><span class="k">Date</span><span class="v" x-text="viewTx?.date"></span></div>
+          <div class="pn-view-row"><span class="k">Reference</span><span class="v" x-text="viewTx?.reference_number || '—'"></span></div>
+          <div class="pn-view-row"><span class="k">Description</span><span class="v" x-text="viewTx?.description || '—'"></span></div>
+          <div class="pn-view-row"><span class="k">Recorded by</span><span class="v" x-text="viewTx ? ((viewTx.first_name || '') + ' ' + (viewTx.last_name || '')).trim() || '—' : ''"></span></div>
+          <div class="pn-view-row"><span class="k">Transaction ID</span><span class="v" x-text="viewTx ? '#' + viewTx.id : ''"></span></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" @click="viewTx=null">Close</button>
+        <button type="button" class="btn btn-primary" @click="openEditTx(viewTx.id); viewTx=null">Edit</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" :class="{open:!!editTx}" @click.self="editTx=null" x-show="editTx" x-cloak>
+    <div class="modal" style="max-width:560px;" x-show="editTx">
+      <form method="post" :action="'<?= url('partner-transactions') ?>/' + editTx?.id">
+        <?= csrf_field() ?>
+        <div class="modal-header"><h3 class="modal-title">Edit transaction</h3></div>
+        <div class="modal-body form-grid" x-show="editTx">
+          <div class="form-group full">
+            <label>Partner *</label>
+            <select class="form-control" name="partner_id" x-model="editTx.partner_id" required>
+              <?php foreach ($partners as $p): ?>
+                <option value="<?= (int)$p['id'] ?>"><?= e($p['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Type *</label>
+            <select class="form-control" name="transaction_type" x-model="editTx.transaction_type">
+              <option value="payment">Payment (outgoing)</option>
+              <option value="receipt">Receipt (incoming)</option>
+              <option value="adjustment">Adjustment</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Amount *</label><input class="form-control" type="number" step="0.01" min="0.01" name="amount" x-model="editTx.amount" required></div>
+          <div class="form-group"><label>Date</label><input class="form-control" type="date" name="date" x-model="editTx.date"></div>
+          <div class="form-group full"><label>Reference no.</label><input class="form-control" name="reference_number" x-model="editTx.reference_number" placeholder="Cheque / UTR / invoice no."></div>
+          <div class="form-group full"><label>Description</label><textarea class="form-control" name="description" x-model="editTx.description" rows="2" placeholder="Optional notes"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" @click="editTx=null">Cancel</button>
+          <button class="btn btn-primary" type="submit">Update transaction</button>
         </div>
       </form>
     </div>

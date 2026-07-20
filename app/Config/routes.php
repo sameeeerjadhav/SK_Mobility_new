@@ -134,6 +134,7 @@ $router->post('/partners', [PartnerController::class, 'store'], ['require_auth']
 $router->post('/partners/{id}', [PartnerController::class, 'update'], ['require_auth']);
 $router->post('/partners/{id}/delete', [PartnerController::class, 'destroy'], ['require_auth']);
 $router->post('/partner-transactions', [PartnerController::class, 'storeTransaction'], ['require_auth']);
+$router->post('/partner-transactions/{id}', [PartnerController::class, 'updateTransaction'], ['require_auth']);
 $router->post('/partner-transactions/{id}/delete', [PartnerController::class, 'deleteTransaction'], ['require_auth']);
 
 // Expenses
