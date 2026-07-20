@@ -12,51 +12,64 @@ $expenseTotal = static function (array $e): float {
     $total = (float)($e['total_amount'] ?? 0);
     return $total > 0 ? $total : (float)$e['amount'];
 };
+$editExpenseJson = $editExpense
+    ? json_encode($editExpense, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG)
+    : 'null';
 ?>
-<div x-data="{
-  expOpen: false,
-  catOpen: false,
-  editCat: null,
-  editExp: <?= $editExpense ? json_encode($editExpense, JSON_HEX_APOS | JSON_HEX_TAG) : 'null' ?>,
-  gstApplicable: false,
-  items: [{ name: '', amount: '' }],
-  gstCalc(amount, on) {
-    const base = parseFloat(amount) || 0;
-    if (!on || base <= 0) return { cgst: 0, sgst: 0, total: base };
-    const cgst = Math.round(base * 0.09 * 100) / 100;
-    const sgst = Math.round(base * 0.09 * 100) / 100;
-    return { cgst, sgst, total: Math.round((base + cgst + sgst) * 100) / 100 };
-  },
-  itemsBase(list) {
-    return (list || []).reduce((sum, it) => sum + (parseFloat(it.amount) || 0), 0);
-  },
-  itemsTotal(list, on) {
-    return this.gstCalc(this.itemsBase(list), on);
-  },
-  fmt(n) { return '₹' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
-  openAdd() {
-    this.expOpen = true;
-    this.gstApplicable = false;
-    this.items = [{ name: '', amount: '' }];
-  },
-  addItem(listKey) {
-    this[listKey].push({ name: '', amount: '' });
-  },
-  removeItem(listKey, idx) {
-    if (this[listKey].length <= 1) return;
-    this[listKey].splice(idx, 1);
-  },
-  openEdit(row) {
-    const copy = JSON.parse(JSON.stringify(row));
-    if (!copy.items || !copy.items.length) {
-      copy.items = [{ name: copy.name || '', amount: copy.amount || '' }];
-    } else {
-      copy.items = copy.items.map(it => ({ name: it.name || '', amount: it.amount || '' }));
-    }
-    this.editExp = copy;
-  }
-}"
-  x-init="if (editExp) openEdit(editExp)">
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('expensePage', () => ({
+    expOpen: false,
+    catOpen: false,
+    editCat: null,
+    editExp: null,
+    gstApplicable: false,
+    items: [{ name: '', amount: '' }],
+    init() {
+      const seed = <?= $editExpenseJson ?>;
+      if (seed) this.openEdit(seed);
+    },
+    gstCalc(amount, on) {
+      const base = parseFloat(amount) || 0;
+      if (!on || base <= 0) return { cgst: 0, sgst: 0, total: base };
+      const cgst = Math.round(base * 0.09 * 100) / 100;
+      const sgst = Math.round(base * 0.09 * 100) / 100;
+      return { cgst, sgst, total: Math.round((base + cgst + sgst) * 100) / 100 };
+    },
+    itemsBase(list) {
+      return (list || []).reduce((sum, it) => sum + (parseFloat(it.amount) || 0), 0);
+    },
+    itemsTotal(list, on) {
+      return this.gstCalc(this.itemsBase(list), on);
+    },
+    fmt(n) {
+      return '\u20B9' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+    openAdd() {
+      this.expOpen = true;
+      this.gstApplicable = false;
+      this.items = [{ name: '', amount: '' }];
+    },
+    addItem(listKey) {
+      this[listKey].push({ name: '', amount: '' });
+    },
+    removeItem(listKey, idx) {
+      if (this[listKey].length <= 1) return;
+      this[listKey].splice(idx, 1);
+    },
+    openEdit(row) {
+      const copy = JSON.parse(JSON.stringify(row));
+      if (!copy.items || !copy.items.length) {
+        copy.items = [{ name: copy.name || '', amount: copy.amount || '' }];
+      } else {
+        copy.items = copy.items.map(it => ({ name: it.name || '', amount: it.amount || '' }));
+      }
+      this.editExp = copy;
+    },
+  }));
+});
+</script>
+<div x-data="expensePage()">
   <div class="toolbar">
     <div>
       <h1 class="page-title">Assets &amp; Expenditure</h1>
