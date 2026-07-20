@@ -220,6 +220,8 @@ class PurchaseOrderController extends Controller
             $this->redirect('/purchase-orders/create');
         }
     }
+
+    public function receive(string $id): void
     {
         require_role('super_admin');
         $this->validateCsrf();
