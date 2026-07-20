@@ -101,6 +101,44 @@ class DashboardController extends Controller
              WHERE expense_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
              AND expense_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
         )->fetchColumn();
+        $expensesAll = (float)$db->query(
+            "SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), amount)),0) FROM expenses"
+        )->fetchColumn();
+
+        $partnerPaid = (float)$db->query(
+            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions WHERE transaction_type='payment'"
+        )->fetchColumn();
+        $partnerReceived = (float)$db->query(
+            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions WHERE transaction_type='receipt'"
+        )->fetchColumn();
+        $partnerNet = $partnerReceived - $partnerPaid;
+
+        $partnerPaidMonth = (float)$db->query(
+            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
+             WHERE transaction_type='payment' AND YEAR(date)=YEAR(CURDATE()) AND MONTH(date)=MONTH(CURDATE())"
+        )->fetchColumn();
+        $partnerReceivedMonth = (float)$db->query(
+            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
+             WHERE transaction_type='receipt' AND YEAR(date)=YEAR(CURDATE()) AND MONTH(date)=MONTH(CURDATE())"
+        )->fetchColumn();
+        $partnerPaidPrev = (float)$db->query(
+            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
+             WHERE transaction_type='payment'
+               AND date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
+               AND date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
+        )->fetchColumn();
+        $partnerReceivedPrev = (float)$db->query(
+            "SELECT COALESCE(SUM(amount),0) FROM partner_transactions
+             WHERE transaction_type='receipt'
+               AND date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
+               AND date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
+        )->fetchColumn();
+
+        $partnerNetMonth = $partnerReceivedMonth - $partnerPaidMonth;
+        $partnerNetPrev = $partnerReceivedPrev - $partnerPaidPrev;
+        $balance = $partnerNet - $expensesAll;
+        $balanceMonth = $partnerNetMonth - $expenses;
+        $balancePrev = $partnerNetPrev - $expensesPrev;
 
         $monthlySales = $db->query(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COALESCE(SUM(total_amount),0) AS total
@@ -141,7 +179,11 @@ class DashboardController extends Controller
                 ['label' => 'Active Leads', 'value' => $leads, 'trend' => mom_trend($leadsMonth, $leadsPrev), 'fmt' => 'int'],
                 ['label' => 'HR Payroll', 'value' => $payroll, 'trend' => mom_trend($payroll, $payrollPrev), 'fmt' => 'money'],
                 ['label' => 'Bank Balance', 'value' => $bank, 'trend' => 0, 'fmt' => 'money'],
+                ['label' => 'Partner Received', 'value' => $partnerReceived, 'trend' => mom_trend($partnerReceivedMonth, $partnerReceivedPrev), 'fmt' => 'money'],
+                ['label' => 'Partner Paid', 'value' => $partnerPaid, 'trend' => mom_trend($partnerPaidMonth, $partnerPaidPrev), 'fmt' => 'money'],
+                ['label' => 'Partner Net', 'value' => $partnerNet, 'trend' => mom_trend($partnerNetMonth, $partnerNetPrev), 'fmt' => 'money'],
                 ['label' => 'Monthly Expenses', 'value' => $expenses, 'trend' => mom_trend($expenses, $expensesPrev), 'fmt' => 'money'],
+                ['label' => 'Available Balance', 'value' => $balance, 'trend' => mom_trend($balanceMonth, $balancePrev), 'fmt' => 'money', 'hint' => 'Partner net − all expenses'],
             ],
             'monthlySales' => $monthlySales,
             'leadSources' => $leadSources,

@@ -17,6 +17,9 @@
           <?= $s['trend'] >= 0 ? '▲' : '▼' ?> <?= abs($s['trend']) ?>% MoM
         </div>
       <?php endif; ?>
+      <?php if (!empty($s['hint'])): ?>
+        <div class="muted" style="font-size:0.72rem;margin-top:0.35rem;"><?= e($s['hint']) ?></div>
+      <?php endif; ?>
     </div>
   <?php endforeach; ?>
 </div>
