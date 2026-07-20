@@ -105,7 +105,15 @@ class PurchaseOrderController extends Controller
         $this->view('purchase-orders/create', [
             'title' => 'New Purchase Order',
             'variants' => $this->loadVariants(),
+            'vehicles' => $this->loadVehicles(),
         ]);
+    }
+
+    private function loadVehicles(): array
+    {
+        return $this->db()->query(
+            'SELECT id, name FROM vehicles WHERE is_active = 1 ORDER BY name'
+        )->fetchAll();
     }
 
     private function loadVariants(): array

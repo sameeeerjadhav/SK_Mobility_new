@@ -22,11 +22,32 @@ class PurchaseOrderService
         $gstTotal = 0.0;
 
         foreach ($rawItems as $i => $row) {
+            $lineNo = $i + 1;
+            $mode = ($row['variant_mode'] ?? '') === 'new' ? 'new' : 'existing';
             $variantId = (int)($row['variant_id'] ?? 0);
+            $vehicleId = (int)($row['vehicle_id'] ?? 0);
+            $newVariantName = trim((string)($row['new_variant_name'] ?? ''));
             $qty = (int)($row['quantity'] ?? 0);
             $unitRate = round((float)($row['unit_rate'] ?? 0), 2);
-            if ($variantId <= 0 || $qty <= 0 || $unitRate <= 0) {
+
+            if ($qty <= 0 || $unitRate <= 0) {
                 continue;
+            }
+
+            if ($mode === 'existing') {
+                if ($variantId <= 0) {
+                    throw new RuntimeException("Line {$lineNo}: select an existing variant or switch to New variant.");
+                }
+                if ($newVariantName !== '') {
+                    throw new RuntimeException("Line {$lineNo}: use either existing variant or new variant name, not both.");
+                }
+            } else {
+                if ($variantId > 0) {
+                    throw new RuntimeException("Line {$lineNo}: clear existing variant selection when adding a new variant.");
+                }
+                if ($vehicleId <= 0 || $newVariantName === '') {
+                    throw new RuntimeException("Line {$lineNo}: vehicle and new variant name are required for a new variant.");
+                }
             }
 
             $gstPercent = (float)($row['gst_percent'] ?? self::GST_RATE);
@@ -35,9 +56,12 @@ class PurchaseOrderService
             $lineTotal = round($taxable + $gst, 2);
 
             $items[] = [
+                'variant_mode' => $mode,
                 'variant_id' => $variantId,
-                'vehicle_id' => (int)($row['vehicle_id'] ?? 0),
-                'new_variant_name' => trim((string)($row['new_variant_name'] ?? '')),
+                'vehicle_id' => $vehicleId,
+                'new_variant_name' => $newVariantName,
+                'battery_type' => trim((string)($row['battery_type'] ?? '')) ?: null,
+                'battery_spec' => trim((string)($row['battery_spec'] ?? '')) ?: null,
                 'color' => trim((string)($row['color'] ?? '')),
                 'hsn_code' => trim((string)($row['hsn_code'] ?? '87116020')) ?: '87116020',
                 'description' => trim((string)($row['description'] ?? '')),
@@ -54,7 +78,7 @@ class PurchaseOrderService
         }
 
         if (!$items) {
-            throw new RuntimeException('Add at least one line item with variant, quantity and unit rate.');
+            throw new RuntimeException('Add at least one valid line item with quantity and unit rate.');
         }
 
         return [
@@ -213,12 +237,7 @@ class PurchaseOrderService
         );
 
         foreach ($items as $item) {
-            $resolved = $this->resolveVariant(
-                (int)$item['variant_id'],
-                (string)($item['color'] ?? ''),
-                (float)$item['unit_rate'],
-                (string)($item['new_variant_name'] ?? '')
-            );
+            $resolved = $this->resolveLineVariant($item);
             $item['variant_id'] = $resolved['variant_id'];
             $item['vehicle_id'] = $resolved['vehicle_id'];
             $item['color'] = $resolved['color'];
@@ -242,11 +261,31 @@ class PurchaseOrderService
     }
 
     /**
-     * Tie PO line to the correct vehicle variant. Creates a new variant when needed.
-     *
+     * @param array<string, mixed> $item
      * @return array{variant_id: int, vehicle_id: int, color: string}
      */
-    public function resolveVariant(int $variantId, string $color, float $unitRate, string $newVariantName = ''): array
+    private function resolveLineVariant(array $item): array
+    {
+        if (($item['variant_mode'] ?? '') === 'new') {
+            return $this->resolveNewVariant(
+                (int)$item['vehicle_id'],
+                (string)$item['new_variant_name'],
+                (string)($item['color'] ?? ''),
+                (float)$item['unit_rate'],
+                $item['battery_type'] ?? null,
+                $item['battery_spec'] ?? null
+            );
+        }
+
+        return $this->resolveExistingVariant(
+            (int)$item['variant_id'],
+            (string)($item['color'] ?? ''),
+            (float)$item['unit_rate']
+        );
+    }
+
+    /** @return array{variant_id: int, vehicle_id: int, color: string} */
+    private function resolveExistingVariant(int $variantId, string $color, float $unitRate): array
     {
         $stmt = $this->db->prepare('SELECT * FROM vehicle_variants WHERE id = ?');
         $stmt->execute([$variantId]);
@@ -256,23 +295,66 @@ class PurchaseOrderService
         }
 
         $color = trim($color);
-        $newVariantName = trim($newVariantName);
         $baseColor = trim((string)($base['color'] ?? ''));
-        $targetName = $newVariantName !== '' ? $newVariantName : (string)$base['name'];
-        $targetColor = $color !== '' ? $color : $baseColor;
-
-        if (
-            strcasecmp($targetName, (string)$base['name']) === 0
-            && (
-                $targetColor === ''
-                || strcasecmp($targetColor, $baseColor) === 0
-            )
-        ) {
+        if ($color === '' || strcasecmp($color, $baseColor) === 0) {
             return [
                 'variant_id' => $variantId,
                 'vehicle_id' => (int)$base['vehicle_id'],
-                'color' => $baseColor ?: $targetColor,
+                'color' => $baseColor ?: $color,
             ];
+        }
+
+        return $this->findOrCreateVariant(
+            (int)$base['vehicle_id'],
+            (string)$base['name'],
+            $color,
+            $unitRate,
+            $base['battery_type'],
+            $base['battery_spec'],
+            $base['range_km']
+        );
+    }
+
+    /** @return array{variant_id: int, vehicle_id: int, color: string} */
+    private function resolveNewVariant(
+        int $vehicleId,
+        string $name,
+        string $color,
+        float $unitRate,
+        ?string $batteryType,
+        ?string $batterySpec
+    ): array {
+        $vehicle = $this->db->prepare('SELECT id FROM vehicles WHERE id = ? AND is_active = 1');
+        $vehicle->execute([$vehicleId]);
+        if (!$vehicle->fetchColumn()) {
+            throw new RuntimeException('Invalid vehicle selected for new variant.');
+        }
+
+        return $this->findOrCreateVariant(
+            $vehicleId,
+            trim($name),
+            trim($color),
+            $unitRate,
+            $batteryType,
+            $batterySpec,
+            null
+        );
+    }
+
+    /**
+     * @return array{variant_id: int, vehicle_id: int, color: string}
+     */
+    private function findOrCreateVariant(
+        int $vehicleId,
+        string $name,
+        string $color,
+        float $unitRate,
+        ?string $batteryType,
+        ?string $batterySpec,
+        mixed $rangeKm
+    ): array {
+        if ($name === '') {
+            throw new RuntimeException('Variant name is required.');
         }
 
         $find = $this->db->prepare(
@@ -281,17 +363,17 @@ class PurchaseOrderService
                AND LOWER(TRIM(COALESCE(color, \'\'))) = LOWER(?)
              LIMIT 1'
         );
-        $find->execute([$base['vehicle_id'], $targetName, $base['battery_type'], $targetColor]);
+        $find->execute([$vehicleId, $name, $batteryType, $color]);
         $existing = $find->fetch(PDO::FETCH_ASSOC);
         if ($existing) {
             return [
                 'variant_id' => (int)$existing['id'],
                 'vehicle_id' => (int)$existing['vehicle_id'],
-                'color' => (string)($existing['color'] ?? $targetColor),
+                'color' => (string)($existing['color'] ?? $color),
             ];
         }
 
-        $skuBase = strtoupper(substr(slugify($targetName . '-' . $targetColor), 0, 12));
+        $skuBase = strtoupper(substr(slugify($name . '-' . ($color ?: 'NA')), 0, 12));
         $sku = $skuBase . '-' . random_int(100, 999);
         $skuCheck = $this->db->prepare('SELECT COUNT(*) FROM vehicle_variants WHERE sku = ?');
         for ($i = 0; $i < 5; $i++) {
@@ -302,25 +384,25 @@ class PurchaseOrderService
             $sku = $skuBase . '-' . random_int(100, 999);
         }
 
-        $sellPrice = $unitRate > 0 ? round($unitRate * 1.05, 2) : (float)$base['price'];
+        $sellPrice = $unitRate > 0 ? round($unitRate * 1.05, 2) : 0;
         $this->db->prepare(
             'INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_type, battery_spec, range_km, is_active)
              VALUES (?,?,?,?,?,?,?,?,1)'
         )->execute([
-            $base['vehicle_id'],
-            $targetName,
+            $vehicleId,
+            $name,
             $sku,
-            $targetColor,
+            $color ?: null,
             $sellPrice,
-            $base['battery_type'],
-            $base['battery_spec'],
-            $base['range_km'],
+            $batteryType,
+            $batterySpec,
+            $rangeKm !== null && $rangeKm !== '' ? (int)$rangeKm : null,
         ]);
 
         return [
             'variant_id' => (int)$this->db->lastInsertId(),
-            'vehicle_id' => (int)$base['vehicle_id'],
-            'color' => $targetColor,
+            'vehicle_id' => $vehicleId,
+            'color' => $color,
         ];
     }
 
