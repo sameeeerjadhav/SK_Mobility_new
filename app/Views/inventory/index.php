@@ -1,48 +1,56 @@
-<div x-data="{
-  adjustOpen: false,
-  transferOpen: false,
-  whOpen: false,
-  editWh: null,
-  splitOpen: false,
-  splitRow: null,
-  splitLines: [{ color: '', quantity: '' }],
-  fromWarehouseId: <?= (int)$warehouseId ?>,
-  transferVariantId: '',
-  transferStock: <?= json_encode(array_map(static function (array $row): array {
-      return [
-          'variant_id' => (int)$row['variant_id'],
-          'warehouse_id' => (int)$row['warehouse_id'],
-          'quantity_available' => (int)$row['quantity_available'],
-          'label' => variant_option_label($row),
-      ];
-  }, $transferStock ?? []), JSON_HEX_APOS | JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) ?>,
-  openTransfer() {
-    this.fromWarehouseId = <?= (int)$warehouseId ?>;
-    this.transferVariantId = '';
-    this.transferOpen = true;
-  },
-  transferOptions() {
-    return this.transferStock.filter((row) => Number(row.warehouse_id) === Number(this.fromWarehouseId));
-  },
-  transferOptionLabel(row) {
-    return row.label + ' · ' + row.quantity_available + ' avail';
-  },
-  openSplit(row) {
-    this.splitRow = row;
-    this.splitLines = [{ color: '', quantity: '' }, { color: '', quantity: '' }];
-    this.splitOpen = true;
-  },
-  addSplitLine() {
-    this.splitLines = [...this.splitLines, { color: '', quantity: '' }];
-  },
-  removeSplitLine(idx) {
-    if (this.splitLines.length <= 1) return;
-    this.splitLines = this.splitLines.filter((_, i) => i !== idx);
-  },
-  splitAllocated() {
-    return this.splitLines.reduce((s, r) => s + (parseInt(r.quantity, 10) || 0), 0);
-  }
-}">
+<?php
+$transferStockJson = json_encode(array_map(static function (array $row): array {
+    return [
+        'variant_id' => (int)$row['variant_id'],
+        'warehouse_id' => (int)$row['warehouse_id'],
+        'quantity_available' => (int)$row['quantity_available'],
+        'label' => variant_option_label($row),
+    ];
+}, $transferStock ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+?>
+<script>
+function inventoryPage() {
+  return {
+    adjustOpen: false,
+    transferOpen: false,
+    whOpen: false,
+    editWh: null,
+    splitOpen: false,
+    splitRow: null,
+    splitLines: [{ color: '', quantity: '' }],
+    fromWarehouseId: <?= (int)$warehouseId ?>,
+    transferVariantId: '',
+    transferStock: <?= $transferStockJson ?>,
+    openTransfer() {
+      this.fromWarehouseId = <?= (int)$warehouseId ?>;
+      this.transferVariantId = '';
+      this.transferOpen = true;
+    },
+    transferOptions() {
+      return this.transferStock.filter((row) => Number(row.warehouse_id) === Number(this.fromWarehouseId));
+    },
+    transferOptionLabel(row) {
+      return row.label + ' · ' + row.quantity_available + ' avail';
+    },
+    openSplit(row) {
+      this.splitRow = row;
+      this.splitLines = [{ color: '', quantity: '' }, { color: '', quantity: '' }];
+      this.splitOpen = true;
+    },
+    addSplitLine() {
+      this.splitLines = [...this.splitLines, { color: '', quantity: '' }];
+    },
+    removeSplitLine(idx) {
+      if (this.splitLines.length <= 1) return;
+      this.splitLines = this.splitLines.filter((_, i) => i !== idx);
+    },
+    splitAllocated() {
+      return this.splitLines.reduce((s, r) => s + (parseInt(r.quantity, 10) || 0), 0);
+    }
+  };
+}
+</script>
+<div x-data="inventoryPage()">
   <div class="toolbar">
     <div>
       <h1 class="page-title">Inventory</h1>
