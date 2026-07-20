@@ -20,7 +20,7 @@ class PurchaseOrderController extends Controller
         require_role('super_admin');
 
         $status = trim((string)$this->input('status'));
-        $partnerId = (int)($this->input('partner_id') ?: 0);
+        $supplier = trim((string)$this->input('supplier'));
         $search = trim((string)$this->input('search'));
         $from = $this->input('from');
         $to = $this->input('to');
@@ -31,12 +31,12 @@ class PurchaseOrderController extends Controller
             $where[] = 'po.status = ?';
             $params[] = $status;
         }
-        if ($partnerId > 0) {
-            $where[] = 'po.partner_id = ?';
-            $params[] = $partnerId;
+        if ($supplier !== '') {
+            $where[] = 'po.supplier_name LIKE ?';
+            $params[] = '%' . $supplier . '%';
         }
         if ($search !== '') {
-            $where[] = '(po.po_number LIKE ? OR po.supplier_invoice_no LIKE ? OR p.name LIKE ?)';
+            $where[] = '(po.po_number LIKE ? OR po.supplier_invoice_no LIKE ? OR po.supplier_name LIKE ?)';
             $like = '%' . $search . '%';
             $params[] = $like;
             $params[] = $like;
@@ -75,11 +75,10 @@ class PurchaseOrderController extends Controller
         ];
 
         $stmt = $db->prepare(
-            "SELECT po.*, p.name AS partner_name,
+            "SELECT po.*,
                     (SELECT COUNT(*) FROM purchase_order_items WHERE purchase_order_id = po.id) AS line_count,
                     (SELECT COALESCE(SUM(quantity_ordered), 0) FROM purchase_order_items WHERE purchase_order_id = po.id) AS total_qty
              FROM purchase_orders po
-             LEFT JOIN partners p ON p.id = po.partner_id
              WHERE {$sqlWhere}
              ORDER BY po.po_date DESC, po.id DESC
              LIMIT 300"
@@ -100,12 +99,9 @@ class PurchaseOrderController extends Controller
             'title' => 'Purchase Orders',
             'orders' => $orders,
             'stats' => $stats,
-            'partners' => $db->query(
-                "SELECT id, name FROM partners WHERE is_active = 1 ORDER BY name"
-            )->fetchAll(),
             'variants' => $variants,
             'status' => $status,
-            'partnerId' => $partnerId,
+            'supplier' => $supplier,
             'search' => $search,
             'from' => $from,
             'to' => $to,
@@ -181,12 +177,12 @@ class PurchaseOrderController extends Controller
             $poNumber = next_code('PO', 'purchase_orders', 'po_number');
             $db->prepare(
                 'INSERT INTO purchase_orders (
-                    po_number, partner_id, po_date, supplier_invoice_no, supplier_invoice_date,
+                    po_number, supplier_name, po_date, supplier_invoice_no, supplier_invoice_date,
                     status, subtotal, gst_amount, total_amount, notes, created_by
                  ) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $poNumber,
-                $payload['partner_id'],
+                $payload['supplier_name'],
                 $payload['po_date'],
                 $payload['supplier_invoice_no'],
                 $payload['supplier_invoice_date'],
@@ -283,16 +279,19 @@ class PurchaseOrderController extends Controller
         return $out;
     }
 
-    /** @return array{partner_id: ?int, po_date: string, supplier_invoice_no: ?string, supplier_invoice_date: ?string, notes: ?string} */
+    /** @return array{supplier_name: string, po_date: string, supplier_invoice_no: ?string, supplier_invoice_date: ?string, notes: ?string} */
     private function validatedHeader(): array
     {
-        $partnerId = (int)($this->input('partner_id') ?: 0);
+        $supplierName = trim((string)$this->input('supplier_name'));
+        if ($supplierName === '') {
+            throw new RuntimeException('Supplier company name is required.');
+        }
         $poDate = trim((string)$this->input('po_date'));
         if ($poDate === '') {
             $poDate = date('Y-m-d');
         }
         return [
-            'partner_id' => $partnerId > 0 ? $partnerId : null,
+            'supplier_name' => $supplierName,
             'po_date' => $poDate,
             'supplier_invoice_no' => trim((string)$this->input('supplier_invoice_no')) ?: null,
             'supplier_invoice_date' => trim((string)$this->input('supplier_invoice_date')) ?: null,

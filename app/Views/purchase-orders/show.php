@@ -60,7 +60,7 @@ document.addEventListener('alpine:init', () => {
       <a class="muted" href="<?= url('purchase-orders') ?>">&larr; Purchase Orders</a>
       <h1 class="page-title" style="margin-top:0.25rem;"><?= e($po['po_number']) ?></h1>
       <p class="page-sub">
-        <?= e($po['partner_name'] ?? 'No supplier') ?>
+        <?= e($po['supplier_name'] ?? 'No supplier') ?>
         · <?= e(date('d M Y', strtotime($po['po_date']))) ?>
         · <span class="chip <?= $statusClass[$po['status']] ?? 'chip-muted' ?>"><?= e($statusLabels[$po['status']] ?? $po['status']) ?></span>
       </p>

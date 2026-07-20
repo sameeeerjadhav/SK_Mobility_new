@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   po_number VARCHAR(40) NOT NULL UNIQUE,
-  partner_id INT UNSIGNED NULL,
+  supplier_name VARCHAR(200) NULL,
   po_date DATE NOT NULL,
   supplier_invoice_no VARCHAR(80) NULL,
   supplier_invoice_date DATE NULL,
@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   created_by INT UNSIGNED NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (partner_id) REFERENCES partners(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
 

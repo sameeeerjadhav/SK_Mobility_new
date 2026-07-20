@@ -316,9 +316,8 @@ class PurchaseOrderService
     public function findPo(int $id): array
     {
         $stmt = $this->db->prepare(
-            'SELECT po.*, p.name AS partner_name, u.first_name, u.last_name
+            'SELECT po.*, u.first_name, u.last_name
              FROM purchase_orders po
-             LEFT JOIN partners p ON p.id = po.partner_id
              JOIN users u ON u.id = po.created_by
              WHERE po.id = ?'
         );

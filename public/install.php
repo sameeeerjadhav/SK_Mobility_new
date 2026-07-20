@@ -9,6 +9,7 @@
  *  /install.php?migrate_expenses=1  ← expense types, GST, multi-item line items
  *  /install.php?migrate_partners=1  ← partner Aadhar & PAN fields
  *  /install.php?migrate_purchase_orders=1  ← purchase orders + goods receipt tables
+ *  /install.php?migrate_po_supplier=1  ← supplier company name on purchase orders (replaces partners link)
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -236,6 +237,55 @@ try {
             if (preg_match('/CREATE TABLE IF NOT EXISTS (\w+)/i', $stmt, $m)) {
                 echo "table {$m[1]}\n";
             }
+        }
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_po_supplier']) && $_GET['migrate_po_supplier'] === '1') {
+        echo "\n--- PO supplier company migration ---\n";
+        $addCol = static function (PDO $db, string $table, string $column, string $definition): void {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                echo "skip {$table}.{$column}\n";
+                return;
+            }
+            $db->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+            echo "added {$table}.{$column}\n";
+        };
+        $addCol($db, 'purchase_orders', 'supplier_name', 'VARCHAR(200) NULL AFTER po_number');
+        $db->exec(
+            'UPDATE purchase_orders po
+             LEFT JOIN partners p ON p.id = po.partner_id
+             SET po.supplier_name = p.name
+             WHERE po.partner_id IS NOT NULL AND (po.supplier_name IS NULL OR po.supplier_name = \'\')'
+        );
+        echo "backfilled supplier_name from partners\n";
+
+        $fkStmt = $db->prepare(
+            "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_orders'
+               AND COLUMN_NAME = 'partner_id' AND REFERENCED_TABLE_NAME IS NOT NULL
+             LIMIT 1"
+        );
+        $fkStmt->execute();
+        $fkName = $fkStmt->fetchColumn();
+        if ($fkName) {
+            $db->exec('ALTER TABLE purchase_orders DROP FOREIGN KEY `' . str_replace('`', '', (string)$fkName) . '`');
+            echo "dropped partner_id foreign key\n";
+        }
+
+        $colStmt = $db->prepare(
+            'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $colStmt->execute(['purchase_orders', 'partner_id']);
+        if ((int)$colStmt->fetchColumn() > 0) {
+            $db->exec('ALTER TABLE purchase_orders DROP COLUMN partner_id');
+            echo "dropped purchase_orders.partner_id\n";
         }
         echo "Migration complete.\n";
     }

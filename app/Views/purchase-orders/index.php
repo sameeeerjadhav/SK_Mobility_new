@@ -114,14 +114,9 @@ document.addEventListener('alpine:init', () => {
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="form-group" style="margin:0;min-width:160px;">
-        <label>Supplier</label>
-        <select class="form-control" name="partner_id">
-          <option value="">All</option>
-          <?php foreach ($partners as $p): ?>
-            <option value="<?= (int)$p['id'] ?>" <?= (int)$partnerId === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
+      <div class="form-group" style="margin:0;min-width:180px;">
+        <label>Supplier company</label>
+        <input class="form-control" name="supplier" value="<?= e($supplier) ?>" placeholder="e.g. Alphavector India">
       </div>
       <div class="form-group" style="margin:0;min-width:140px;">
         <label>From</label>
@@ -147,7 +142,7 @@ document.addEventListener('alpine:init', () => {
           <tr>
             <th>PO Number</th>
             <th>Date</th>
-            <th>Supplier</th>
+            <th>Supplier company</th>
             <th>Lines</th>
             <th>Qty</th>
             <th>Total (incl. 5% GST)</th>
@@ -160,7 +155,7 @@ document.addEventListener('alpine:init', () => {
           <tr>
             <td><strong><?= e($o['po_number']) ?></strong></td>
             <td><?= e(date('d M Y', strtotime($o['po_date']))) ?></td>
-            <td><?= e($o['partner_name'] ?? '—') ?></td>
+            <td><?= e($o['supplier_name'] ?? '—') ?></td>
             <td><?= (int)$o['line_count'] ?></td>
             <td><?= (int)$o['total_qty'] ?></td>
             <td><?= money($o['total_amount']) ?></td>
@@ -191,13 +186,8 @@ document.addEventListener('alpine:init', () => {
               <input class="form-control" type="date" name="po_date" value="<?= date('Y-m-d') ?>" required>
             </div>
             <div class="form-group" style="margin:0;">
-              <label>Supplier</label>
-              <select class="form-control" name="partner_id">
-                <option value="">Select supplier</option>
-                <?php foreach ($partners as $p): ?>
-                  <option value="<?= (int)$p['id'] ?>"><?= e($p['name']) ?></option>
-                <?php endforeach; ?>
-              </select>
+              <label>Supplier company</label>
+              <input class="form-control" name="supplier_name" required placeholder="e.g. Alphavector India Pvt. Ltd.">
             </div>
             <div class="form-group" style="margin:0;">
               <label>Supplier Invoice No.</label>
