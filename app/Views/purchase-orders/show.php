@@ -134,6 +134,7 @@ document.addEventListener('alpine:init', () => {
             <td><?= e($it['hsn_code']) ?></td>
             <td>
               <strong><?= e($it['vehicle_name']) ?></strong> — <?= e($it['variant_name']) ?>
+              <a class="btn btn-sm btn-outline" style="margin-left:0.35rem;padding:0.1rem 0.4rem;font-size:0.72rem;" href="<?= url('vehicles/' . (int)$it['vehicle_id']) ?>">Vehicle</a>
               <?php if ($it['battery_type']): ?><span class="muted">(<?= e($it['battery_type']) ?>)</span><?php endif; ?>
               <?php if ($it['description'] && $it['description'] !== $it['variant_name']): ?>
                 <div class="muted" style="font-size:0.78rem;"><?= e($it['description']) ?></div>

@@ -12,22 +12,34 @@ class InventoryController extends Controller
     {
         require_permission('view_inventory');
         $warehouseId = (int)($this->input('warehouse_id') ?: 0);
+        $vehicleId = (int)($this->input('vehicle_id') ?: 0);
         $warehouses = $this->db()->query('SELECT * FROM warehouses WHERE is_active = 1 ORDER BY name')->fetchAll();
         if (!$warehouseId && $warehouses) {
             $warehouseId = (int)$warehouses[0]['id'];
         }
 
+        $filterVehicle = null;
+        if ($vehicleId > 0) {
+            $fv = $this->db()->prepare('SELECT id, name FROM vehicles WHERE id = ?');
+            $fv->execute([$vehicleId]);
+            $filterVehicle = $fv->fetch() ?: null;
+        }
+
         $stock = [];
         if ($warehouseId) {
-            $stmt = $this->db()->prepare(
-                "SELECT i.*, v.name AS vehicle_name, vv.name AS variant_name, vv.sku, vv.color
+            $sql = "SELECT i.*, v.name AS vehicle_name, vv.name AS variant_name, vv.sku, vv.color
                  FROM inventory i
                  JOIN vehicles v ON v.id = i.vehicle_id
                  JOIN vehicle_variants vv ON vv.id = i.variant_id
-                 WHERE i.warehouse_id = ?
-                 ORDER BY v.name, vv.name"
-            );
-            $stmt->execute([$warehouseId]);
+                 WHERE i.warehouse_id = ?";
+            $params = [$warehouseId];
+            if ($vehicleId > 0) {
+                $sql .= ' AND i.vehicle_id = ?';
+                $params[] = $vehicleId;
+            }
+            $sql .= ' ORDER BY v.name, vv.name';
+            $stmt = $this->db()->prepare($sql);
+            $stmt->execute($params);
             $stock = $stmt->fetchAll();
         }
 
@@ -41,6 +53,8 @@ class InventoryController extends Controller
             'title' => 'Inventory',
             'warehouses' => $warehouses,
             'warehouseId' => $warehouseId,
+            'vehicleId' => $vehicleId,
+            'filterVehicle' => $filterVehicle,
             'stock' => $stock,
             'variants' => $variants,
             'canManage' => can('manage_inventory'),

@@ -78,7 +78,7 @@ document.addEventListener('alpine:init', () => {
   <div class="toolbar">
     <div>
       <h1 class="page-title">Purchase Orders</h1>
-      <p class="page-sub">Procure vehicle variants from suppliers — receipt updates inventory by warehouse &amp; color</p>
+      <p class="page-sub">Procure vehicle variants from suppliers — receipt updates inventory by warehouse &amp; color. Linked to <a href="<?= url('vehicles') ?>">Vehicles</a> and <a href="<?= url('inventory') ?>">Inventory</a>.</p>
     </div>
     <button class="btn btn-primary" type="button" @click="poOpen=true" <?= !$variants ? 'disabled title="Add vehicle variants first"' : '' ?>>+ Purchase Order</button>
   </div>

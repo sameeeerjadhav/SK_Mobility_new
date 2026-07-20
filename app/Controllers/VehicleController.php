@@ -107,6 +107,51 @@ class VehicleController extends Controller
             }
         }
 
+        $stockRows = $this->db()->prepare(
+            'SELECT variant_id,
+                    SUM(quantity_available) AS available,
+                    SUM(quantity_reserved) AS reserved
+             FROM inventory WHERE vehicle_id = ?
+             GROUP BY variant_id'
+        );
+        $stockRows->execute([$vehicleId]);
+        $stockByVariant = [];
+        $totalStock = 0;
+        foreach ($stockRows->fetchAll() as $row) {
+            $stockByVariant[(int)$row['variant_id']] = $row;
+            $totalStock += (int)$row['available'];
+        }
+
+        $pendingPo = $this->db()->prepare(
+            'SELECT poi.variant_id,
+                    SUM(GREATEST(poi.quantity_ordered - poi.quantity_received, 0)) AS pending
+             FROM purchase_order_items poi
+             JOIN purchase_orders po ON po.id = poi.purchase_order_id
+             WHERE poi.vehicle_id = ? AND po.status NOT IN (\'cancelled\', \'received\')
+             GROUP BY poi.variant_id'
+        );
+        $pendingPo->execute([$vehicleId]);
+        $pendingPoByVariant = [];
+        $totalPendingPo = 0;
+        foreach ($pendingPo->fetchAll() as $row) {
+            $pendingPoByVariant[(int)$row['variant_id']] = (int)$row['pending'];
+            $totalPendingPo += (int)$row['pending'];
+        }
+
+        $recentPos = $this->db()->prepare(
+            'SELECT po.id, po.po_number, po.po_date, po.status, po.total_amount,
+                    SUM(poi.quantity_ordered) AS qty_ordered,
+                    SUM(poi.quantity_received) AS qty_received
+             FROM purchase_orders po
+             JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+             WHERE poi.vehicle_id = ?
+             GROUP BY po.id
+             ORDER BY po.po_date DESC, po.id DESC
+             LIMIT 8'
+        );
+        $recentPos->execute([$vehicleId]);
+        $recentPos = $recentPos->fetchAll();
+
         $this->view('vehicles/show', [
             'title' => $vehicle['name'],
             'vehicle' => $vehicle,
@@ -116,6 +161,11 @@ class VehicleController extends Controller
             'coverImage' => $coverImage,
             'minPrice' => $minPrice ?? (float)$vehicle['base_price'],
             'variantCount' => count($variants),
+            'stockByVariant' => $stockByVariant,
+            'pendingPoByVariant' => $pendingPoByVariant,
+            'totalStock' => $totalStock,
+            'totalPendingPo' => $totalPendingPo,
+            'recentPos' => $recentPos,
             'canManage' => can('manage_vehicles'),
             'categories' => $this->db()->query('SELECT * FROM vehicle_categories WHERE is_active = 1')->fetchAll(),
         ]);

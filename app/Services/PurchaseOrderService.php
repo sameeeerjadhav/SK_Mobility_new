@@ -129,6 +129,14 @@ class PurchaseOrderService
                 $variantId = (int)$item['variant_id'];
                 $vehicleId = (int)$item['vehicle_id'];
 
+                // Keep inventory row aligned with vehicle catalog
+                $vCheck = $this->db->prepare('SELECT vehicle_id FROM vehicle_variants WHERE id = ?');
+                $vCheck->execute([$variantId]);
+                $linkedVehicleId = (int)$vCheck->fetchColumn();
+                if ($linkedVehicleId > 0) {
+                    $vehicleId = $linkedVehicleId;
+                }
+
                 $this->db->prepare(
                     'INSERT INTO purchase_order_receipt_lines (receipt_id, po_item_id, warehouse_id, quantity) VALUES (?,?,?,?)'
                 )->execute([$receiptId, $itemId, $warehouseId, $qty]);
@@ -204,18 +212,14 @@ class PurchaseOrderService
         );
 
         foreach ($items as $item) {
-            if ((int)$item['vehicle_id'] <= 0) {
-                $v = $this->db->prepare('SELECT vehicle_id, color FROM vehicle_variants WHERE id = ?');
-                $v->execute([(int)$item['variant_id']]);
-                $variant = $v->fetch(PDO::FETCH_ASSOC);
-                if (!$variant) {
-                    throw new RuntimeException('Invalid variant selected.');
-                }
-                $item['vehicle_id'] = (int)$variant['vehicle_id'];
-                if ($item['color'] === '') {
-                    $item['color'] = (string)($variant['color'] ?? '');
-                }
-            }
+            $resolved = $this->resolveVariant(
+                (int)$item['variant_id'],
+                (string)($item['color'] ?? ''),
+                (float)$item['unit_rate']
+            );
+            $item['variant_id'] = $resolved['variant_id'];
+            $item['vehicle_id'] = $resolved['vehicle_id'];
+            $item['color'] = $resolved['color'];
 
             $stmt->execute([
                 $poId,
@@ -233,6 +237,79 @@ class PurchaseOrderService
                 $item['sort_order'],
             ]);
         }
+    }
+
+    /**
+     * Tie PO line to the correct vehicle variant (by color). Creates a new variant when needed.
+     *
+     * @return array{variant_id: int, vehicle_id: int, color: string}
+     */
+    public function resolveVariant(int $variantId, string $color, float $unitRate): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM vehicle_variants WHERE id = ?');
+        $stmt->execute([$variantId]);
+        $base = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$base) {
+            throw new RuntimeException('Invalid vehicle variant selected.');
+        }
+
+        $color = trim($color);
+        $baseColor = trim((string)($base['color'] ?? ''));
+        if ($color === '' || strcasecmp($color, $baseColor) === 0) {
+            return [
+                'variant_id' => $variantId,
+                'vehicle_id' => (int)$base['vehicle_id'],
+                'color' => $baseColor ?: $color,
+            ];
+        }
+
+        $find = $this->db->prepare(
+            'SELECT id, vehicle_id, color FROM vehicle_variants
+             WHERE vehicle_id = ? AND name = ? AND (battery_type <=> ?)
+               AND LOWER(TRIM(COALESCE(color, \'\'))) = LOWER(?)
+             LIMIT 1'
+        );
+        $find->execute([$base['vehicle_id'], $base['name'], $base['battery_type'], $color]);
+        $existing = $find->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            return [
+                'variant_id' => (int)$existing['id'],
+                'vehicle_id' => (int)$existing['vehicle_id'],
+                'color' => (string)($existing['color'] ?? $color),
+            ];
+        }
+
+        $skuBase = strtoupper(substr(slugify($base['name'] . '-' . $color), 0, 12));
+        $sku = $skuBase . '-' . random_int(100, 999);
+        $skuCheck = $this->db->prepare('SELECT COUNT(*) FROM vehicle_variants WHERE sku = ?');
+        for ($i = 0; $i < 5; $i++) {
+            $skuCheck->execute([$sku]);
+            if ((int)$skuCheck->fetchColumn() === 0) {
+                break;
+            }
+            $sku = $skuBase . '-' . random_int(100, 999);
+        }
+
+        $sellPrice = $unitRate > 0 ? round($unitRate * 1.05, 2) : (float)$base['price'];
+        $this->db->prepare(
+            'INSERT INTO vehicle_variants (vehicle_id, name, sku, color, price, battery_type, battery_spec, range_km, is_active)
+             VALUES (?,?,?,?,?,?,?,?,1)'
+        )->execute([
+            $base['vehicle_id'],
+            $base['name'],
+            $sku,
+            $color,
+            $sellPrice,
+            $base['battery_type'],
+            $base['battery_spec'],
+            $base['range_km'],
+        ]);
+
+        return [
+            'variant_id' => (int)$this->db->lastInsertId(),
+            'vehicle_id' => (int)$base['vehicle_id'],
+            'color' => $color,
+        ];
     }
 
     /** @return array<string, mixed> */

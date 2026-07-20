@@ -3,6 +3,11 @@ $imagesByVariant = $imagesByVariant ?? [];
 $coverImage = $coverImage ?? null;
 $minPrice = $minPrice ?? (float)$vehicle['base_price'];
 $variantCount = $variantCount ?? count($variants);
+$stockByVariant = $stockByVariant ?? [];
+$pendingPoByVariant = $pendingPoByVariant ?? [];
+$totalStock = $totalStock ?? 0;
+$totalPendingPo = $totalPendingPo ?? 0;
+$recentPos = $recentPos ?? [];
 $tabInit = match ($_GET['tab'] ?? '') {
     'variants', 'media', 'edit' => $_GET['tab'],
     default => 'overview',
@@ -32,7 +37,7 @@ $batterySpecOptions = \App\Controllers\VehicleController::batterySpecOptions();
 .vp-panel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem}
 .vp-panel h3{margin:0 0 .7rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:800}
 .vp-desc{margin:0;line-height:1.55;color:#334155;font-size:.92rem}
-.vp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-top:.9rem}
+.vp-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;margin-top:.9rem}
 .vp-stat{padding:.65rem .75rem;border-radius:10px;background:#f8fffd;border:1px solid #e6f4f1}
 .vp-stat span{display:block;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
 .vp-stat strong{display:block;margin-top:.15rem;font-size:.98rem;font-weight:800}
@@ -112,6 +117,8 @@ $batterySpecOptions = \App\Controllers\VehicleController::batterySpecOptions();
       </div>
       <div class="vp-chips">
         <span class="vp-chip"><?= (int)$variantCount ?> variant<?= (int)$variantCount === 1 ? '' : 's' ?></span>
+        <span class="vp-chip"><?= (int)$totalStock ?> in stock</span>
+        <?php if ($totalPendingPo > 0): ?><span class="vp-chip"><?= (int)$totalPendingPo ?> on order</span><?php endif; ?>
         <?php if ((int)$vehicle['is_active']): ?><span class="vp-chip">Active</span><?php endif; ?>
       </div>
       <div class="vp-price"><span>From</span><?= money($minPrice) ?></div>
@@ -137,8 +144,33 @@ $batterySpecOptions = \App\Controllers\VehicleController::batterySpecOptions();
     <div class="vp-stats">
       <div class="vp-stat"><span>Base price</span><strong><?= money($vehicle['base_price']) ?></strong></div>
       <div class="vp-stat"><span>Starting at</span><strong><?= money($minPrice) ?></strong></div>
-      <div class="vp-stat"><span>Variants</span><strong><?= (int)$variantCount ?></strong></div>
+      <div class="vp-stat"><span>Total stock</span><strong><?= (int)$totalStock ?></strong></div>
+      <div class="vp-stat"><span>On order (PO)</span><strong><?= (int)$totalPendingPo ?></strong></div>
     </div>
+    <?php if ($totalStock > 0): ?>
+      <p style="margin-top:.85rem;"><a class="btn btn-sm btn-outline" href="<?= url('inventory?vehicle_id=' . (int)$vehicle['id']) ?>">View in inventory</a></p>
+    <?php endif; ?>
+    <?php if ($recentPos && (user()['role_slug'] ?? '') === 'super_admin'): ?>
+      <div style="margin-top:1.25rem;">
+        <h3 style="margin:0 0 .65rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:800;">Purchase orders</h3>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>PO</th><th>Date</th><th>Qty</th><th>Total</th><th>Status</th></tr></thead>
+            <tbody>
+            <?php foreach ($recentPos as $po): ?>
+              <tr>
+                <td><a href="<?= url('purchase-orders/' . $po['id']) ?>"><?= e($po['po_number']) ?></a></td>
+                <td><?= e(date('d M Y', strtotime($po['po_date']))) ?></td>
+                <td><?= (int)$po['qty_received'] ?> / <?= (int)$po['qty_ordered'] ?></td>
+                <td><?= money($po['total_amount']) ?></td>
+                <td><?= e(ucfirst($po['status'])) ?></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <?php endif; ?>
   </div>
 
   <div class="vp-panel" x-show="tab==='media'" x-cloak>
@@ -177,6 +209,12 @@ $batterySpecOptions = \App\Controllers\VehicleController::batterySpecOptions();
 
     <div class="vv-list">
       <?php foreach ($variants as $vv): ?>
+        <?php
+          $vid = (int)$vv['id'];
+          $stockAvail = (int)($stockByVariant[$vid]['available'] ?? 0);
+          $stockReserved = (int)($stockByVariant[$vid]['reserved'] ?? 0);
+          $pendingPo = (int)($pendingPoByVariant[$vid] ?? 0);
+        ?>
         <?php
           $vImgs = $imagesByVariant[(int)$vv['id']] ?? [];
           $primaryImg = null;
@@ -232,10 +270,18 @@ $batterySpecOptions = \App\Controllers\VehicleController::batterySpecOptions();
             <div class="vv-specs">
               <div class="vv-spec price"><span>Price</span><strong><?= money($vv['price']) ?></strong></div>
               <div class="vv-spec"><span>Color</span><strong><?= e($vv['color'] ?: '—') ?></strong></div>
+              <div class="vv-spec"><span>In stock</span><strong><?= $stockAvail ?></strong></div>
+              <div class="vv-spec"><span>On order</span><strong><?= $pendingPo > 0 ? $pendingPo : '—' ?></strong></div>
               <div class="vv-spec"><span>Battery type</span><strong><?= e($vv['battery_type'] ?: '—') ?></strong></div>
               <div class="vv-spec"><span>Capacity</span><strong><?= e($vv['battery_spec'] ?: '—') ?></strong></div>
               <div class="vv-spec"><span>Range</span><strong><?= e($vv['range_km'] ?? '—') ?> km</strong></div>
+              <?php if ($stockReserved > 0): ?>
+              <div class="vv-spec"><span>Reserved</span><strong><?= $stockReserved ?></strong></div>
+              <?php endif; ?>
             </div>
+            <?php if ($stockAvail > 0): ?>
+              <a class="btn btn-sm btn-outline" href="<?= url('inventory?vehicle_id=' . (int)$vehicle['id']) ?>" style="align-self:flex-start;">Inventory</a>
+            <?php endif; ?>
 
             <?php if (count($vImgs) > 1 || ($canManage && $vImgs)): ?>
               <div class="vv-thumbs">

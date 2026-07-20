@@ -16,9 +16,22 @@
   <div class="tabs">
     <?php foreach ($warehouses as $w): ?>
       <a class="tab <?= (int)$warehouseId === (int)$w['id'] ? 'active' : '' ?>"
-         href="<?= url('inventory?warehouse_id=' . $w['id']) ?>"><?= e($w['name']) ?></a>
+         href="<?= url('inventory?warehouse_id=' . $w['id'] . ($vehicleId ? '&vehicle_id=' . (int)$vehicleId : '')) ?>"><?= e($w['name']) ?></a>
     <?php endforeach; ?>
   </div>
+
+  <?php if ($filterVehicle): ?>
+    <div class="card" style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <div>
+        <strong>Filtered:</strong> <?= e($filterVehicle['name']) ?>
+        <span class="muted"> · stock in this warehouse</span>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <a class="btn btn-sm btn-outline" href="<?= url('vehicles/' . (int)$filterVehicle['id']) ?>">Vehicle details</a>
+        <a class="btn btn-sm btn-outline" href="<?= url('inventory?warehouse_id=' . (int)$warehouseId) ?>">Clear filter</a>
+      </div>
+    </div>
+  <?php endif; ?>
 
   <?php if ($canManage && $warehouseId): ?>
     <?php
@@ -46,13 +59,14 @@
   <div class="card">
     <div class="table-wrap">
       <table class="data">
-        <thead><tr><th>Vehicle</th><th>Variant</th><th>SKU</th><th>Available</th><th>Reserved</th><th>Min Level</th></tr></thead>
+        <thead><tr><th>Vehicle</th><th>Variant</th><th>SKU</th><th>Color</th><th>Available</th><th>Reserved</th><th>Min Level</th></tr></thead>
         <tbody>
         <?php foreach ($stock as $s): ?>
           <tr>
-            <td><?= e($s['vehicle_name']) ?></td>
-            <td><?= e($s['variant_name']) ?> <?= $s['color'] ? '(' . e($s['color']) . ')' : '' ?></td>
+            <td><a href="<?= url('vehicles/' . (int)$s['vehicle_id']) ?>"><?= e($s['vehicle_name']) ?></a></td>
+            <td><?= e($s['variant_name']) ?></td>
             <td><?= e($s['sku']) ?></td>
+            <td><?= e($s['color'] ?: '—') ?></td>
             <td><strong><?= (int)$s['quantity_available'] ?></strong>
               <?php if ((int)$s['quantity_available'] <= (int)$s['min_stock_level']): ?>
                 <span class="chip chip-warning">Low</span>
@@ -62,7 +76,7 @@
             <td><?= (int)$s['min_stock_level'] ?></td>
           </tr>
         <?php endforeach; ?>
-        <?php if (!$stock): ?><tr><td colspan="6" class="muted">No stock records for this warehouse. Use Adjust Stock to add inventory.</td></tr><?php endif; ?>
+        <?php if (!$stock): ?><tr><td colspan="7" class="muted">No stock records for this warehouse. Receive a purchase order or use Adjust Stock to add inventory.</td></tr><?php endif; ?>
         </tbody>
       </table>
     </div>
