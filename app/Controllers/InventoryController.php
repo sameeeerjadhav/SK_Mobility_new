@@ -193,15 +193,16 @@ class InventoryController extends Controller
         $warehouseId = (int)$this->input('warehouse_id');
         $notes = trim((string)$this->input('notes')) ?: null;
 
+        // Must read $_POST directly — Controller::input() casts to string and breaks arrays.
         $splits = [];
-        $raw = $this->input('splits');
+        $raw = $_POST['splits'] ?? [];
         if (is_array($raw)) {
             foreach ($raw as $row) {
                 if (!is_array($row)) {
                     continue;
                 }
                 $splits[] = [
-                    'color' => (string)($row['color'] ?? ''),
+                    'color' => trim((string)($row['color'] ?? '')),
                     'quantity' => (int)($row['quantity'] ?? 0),
                 ];
             }
