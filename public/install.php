@@ -536,6 +536,11 @@ try {
                  ADD COLUMN product_type ENUM('vehicle','spare_part') NOT NULL DEFAULT 'vehicle' AFTER po_number"
             );
             echo "added purchase_orders.product_type\n";
+        } else {
+            echo "skip purchase_orders.product_type (already exists)\n";
+        }
+
+        if ($colExists($db, 'purchase_order_items', 'item_type')) {
             $db->exec(
                 "UPDATE purchase_orders po
                  SET product_type = 'spare_part'
@@ -548,9 +553,23 @@ try {
                      WHERE poi.purchase_order_id = po.id AND poi.item_type = 'vehicle_variant'
                  )"
             );
-            echo "backfilled product_type from line items\n";
+            echo "backfilled product_type from item_type\n";
+        } elseif ($colExists($db, 'purchase_order_items', 'spare_part_id')) {
+            $db->exec(
+                "UPDATE purchase_orders po
+                 SET product_type = 'spare_part'
+                 WHERE EXISTS (
+                     SELECT 1 FROM purchase_order_items poi
+                     WHERE poi.purchase_order_id = po.id AND poi.spare_part_id IS NOT NULL
+                 )
+                 AND NOT EXISTS (
+                     SELECT 1 FROM purchase_order_items poi
+                     WHERE poi.purchase_order_id = po.id AND poi.spare_part_id IS NULL
+                 )"
+            );
+            echo "backfilled product_type from spare_part_id\n";
         } else {
-            echo "skip purchase_orders.product_type\n";
+            echo "skip backfill — all POs default to vehicle (run migrate_po_spare_items=1 first if needed)\n";
         }
         echo "Migration complete.\n";
     }
