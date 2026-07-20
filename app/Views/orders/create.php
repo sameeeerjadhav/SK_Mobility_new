@@ -13,8 +13,7 @@ foreach ($variants as $vv) {
         'battery_type' => $vv['battery_type'] ?? '',
         'battery_spec' => $vv['battery_spec'] ?? '',
         'label' => $vv['vehicle_name'] . ' — ' . $vv['name']
-            . ($vv['color'] ? ' (' . $vv['color'] . ')' : '')
-            . ' / ' . money($vv['price']),
+            . ($vv['color'] ? ' (' . $vv['color'] . ')' : ''),
     ];
 }
 $sparePartMap = [];
@@ -26,16 +25,15 @@ foreach ($spareParts ?? [] as $sp) {
         'stock' => (int)$sp['quantity_in_stock'],
         'category_name' => $sp['category_name'] ?? '',
         'label' => ($sp['category_name'] ?? '') . ' — ' . $sp['name']
-            . ' (' . $sp['part_number'] . ') / ' . money($sp['unit_price'])
-            . ' · stock ' . (int)$sp['quantity_in_stock'],
+            . ' (' . $sp['part_number'] . ') · stock ' . (int)$sp['quantity_in_stock'],
     ];
 }
 ?>
 <div x-data="{
   productType: '<?= e($productType) ?>',
   orderType: 'customer',
-  items: [{ variant_id: '', quantity: 1 }],
-  spareItems: [{ spare_part_id: '', quantity: 1 }],
+  items: [{ variant_id: '', quantity: 1, unit_price: '' }],
+  spareItems: [{ spare_part_id: '', quantity: 1, unit_price: '' }],
   variantMap: <?= htmlspecialchars(json_encode($variantMap, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>,
   sparePartMap: <?= htmlspecialchars(json_encode($sparePartMap, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>,
   color: '',
@@ -43,8 +41,10 @@ foreach ($spareParts ?? [] as $sp) {
   modelName: '',
   batteryType: '',
   paymentStatus: 'full',
-  amountPaid: '',
-  affectBank: false,
+  paidCash: '',
+  paidBank: '',
+  paidLoan: '',
+  bankAccountId: '',
   gstPreset: 'default',
   defaultCgst: <?= $productType === 'spare_part' ? '9' : '14' ?>,
   defaultSgst: <?= $productType === 'spare_part' ? '9' : '14' ?>,
@@ -66,6 +66,36 @@ foreach ($spareParts ?? [] as $sp) {
   },
   get totalGstPercent() {
     return Math.round(((parseFloat(this.cgstRate) || 0) + (parseFloat(this.sgstRate) || 0)) * 100) / 100;
+  },
+  lineQty(it) {
+    if (this.productType !== 'vehicle') return parseInt(it.quantity, 10) || 0;
+    return this.orderType === 'customer' ? 1 : (parseInt(it.quantity, 10) || 0);
+  },
+  get lineSubtotal() {
+    const rows = this.productType === 'spare_part' ? this.spareItems : this.items;
+    return rows.reduce((sum, it) => {
+      const price = parseFloat(it.unit_price) || 0;
+      const qty = this.lineQty(it);
+      return sum + price * qty;
+    }, 0);
+  },
+  get taxableAmount() {
+    return Math.max(0, this.lineSubtotal);
+  },
+  get gstAmount() {
+    return Math.round(this.taxableAmount * this.totalGstPercent / 100 * 100) / 100;
+  },
+  get grandTotal() {
+    return Math.round((this.taxableAmount + this.gstAmount) * 100) / 100;
+  },
+  get totalPaidNow() {
+    return (parseFloat(this.paidCash) || 0) + (parseFloat(this.paidBank) || 0) + (parseFloat(this.paidLoan) || 0);
+  },
+  get balanceDue() {
+    return Math.max(0, Math.round((this.grandTotal - this.totalPaidNow) * 100) / 100);
+  },
+  money(n) {
+    return '₹' + (Math.round((parseFloat(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   },
   get primary() {
     const id = String(this.items[0]?.variant_id || '');
@@ -95,16 +125,16 @@ foreach ($spareParts ?? [] as $sp) {
   },
   onOrderTypeChange() {
     if (this.orderType === 'customer') {
-      this.items = [{ variant_id: this.items[0]?.variant_id || '', quantity: 1 }];
-      this.spareItems = [{ spare_part_id: this.spareItems[0]?.spare_part_id || '', quantity: 1 }];
+      this.items = [{ variant_id: this.items[0]?.variant_id || '', quantity: 1, unit_price: this.items[0]?.unit_price || '' }];
+      this.spareItems = [{ spare_part_id: this.spareItems[0]?.spare_part_id || '', quantity: 1, unit_price: this.spareItems[0]?.unit_price || '' }];
     }
   },
   addLine() {
     if (this.productType === 'spare_part') {
-      this.spareItems = [...this.spareItems, { spare_part_id: '', quantity: 1 }];
+      this.spareItems = [...this.spareItems, { spare_part_id: '', quantity: 1, unit_price: '' }];
       return;
     }
-    this.items = [...this.items, { variant_id: '', quantity: 1 }];
+    this.items = [...this.items, { variant_id: '', quantity: 1, unit_price: '' }];
   },
   removeLine(idx) {
     if (this.productType === 'spare_part') {
@@ -171,11 +201,16 @@ foreach ($spareParts ?? [] as $sp) {
             <option value="">Select variant</option>
             <?php foreach ($variants as $vv): ?>
               <option value="<?= (int)$vv['id'] ?>">
-                <?= e($vv['vehicle_name'] . ' — ' . $vv['name'] . ($vv['color'] ? ' (' . $vv['color'] . ')' : '') . ' / ' . money($vv['price'])) ?>
+                <?= e($vv['vehicle_name'] . ' — ' . $vv['name'] . ($vv['color'] ? ' (' . $vv['color'] . ')' : '')) ?>
               </option>
             <?php endforeach; ?>
           </select>
           <input type="hidden" name="quantity[0]" value="1">
+        </div>
+        <div class="form-group" x-show="productType === 'vehicle' && orderType === 'customer'" x-cloak>
+          <label>Sell price (₹) *</label>
+          <input class="form-control" type="number" step="0.01" min="0.01" name="unit_price[0]" x-model="items[0].unit_price" required placeholder="Amount you are selling for">
+          <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;" x-show="primary">Catalog ref: <span x-text="money(primary?.price || 0)"></span> — enter your actual sell price above.</p>
         </div>
 
         <template x-if="productType === 'vehicle' && orderType === 'dealer'">
@@ -192,10 +227,14 @@ foreach ($spareParts ?? [] as $sp) {
                     <option value="">Select variant</option>
                     <?php foreach ($variants as $vv): ?>
                       <option value="<?= (int)$vv['id'] ?>">
-                        <?= e($vv['vehicle_name'] . ' — ' . $vv['name'] . ($vv['color'] ? ' (' . $vv['color'] . ')' : '') . ' / ' . money($vv['price'])) ?>
+                        <?= e($vv['vehicle_name'] . ' — ' . $vv['name'] . ($vv['color'] ? ' (' . $vv['color'] . ')' : '')) ?>
                       </option>
                     <?php endforeach; ?>
                   </select>
+                </div>
+                <div class="form-group" style="margin:0;width:120px;">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Sell price (₹) *</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" :name="'unit_price['+idx+']'" x-model="it.unit_price" required placeholder="Sell amt">
                 </div>
                 <div class="form-group" style="margin:0;width:100px;">
                   <label x-show="idx === 0" style="font-size:0.82rem;">Qty *</label>
@@ -204,7 +243,7 @@ foreach ($spareParts ?? [] as $sp) {
                 <button class="btn btn-sm btn-danger" type="button" @click="removeLine(idx)" x-show="items.length > 1" style="margin-bottom:0.35rem;">×</button>
               </div>
             </template>
-            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Each line appears on the tax invoice. Add multiple variants or increase quantity per line.</p>
+            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Enter the sell price per line — not the purchase/PO cost. Each line appears on the tax invoice.</p>
           </div>
         </template>
 
@@ -222,10 +261,14 @@ foreach ($spareParts ?? [] as $sp) {
                     <option value="">Select spare part</option>
                     <?php foreach ($spareParts ?? [] as $sp): ?>
                       <option value="<?= (int)$sp['id'] ?>">
-                        <?= e(($sp['category_name'] ?? '') . ' — ' . $sp['name'] . ' (' . $sp['part_number'] . ') / ' . money($sp['unit_price']) . ' · stock ' . (int)$sp['quantity_in_stock']) ?>
+                        <?= e(($sp['category_name'] ?? '') . ' — ' . $sp['name'] . ' (' . $sp['part_number'] . ') · stock ' . (int)$sp['quantity_in_stock']) ?>
                       </option>
                     <?php endforeach; ?>
                   </select>
+                </div>
+                <div class="form-group" style="margin:0;width:120px;">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Sell price (₹) *</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" :name="'unit_price['+idx+']'" x-model="it.unit_price" required placeholder="Sell amt">
                 </div>
                 <div class="form-group" style="margin:0;width:100px;">
                   <label x-show="idx === 0" style="font-size:0.82rem;">Qty *</label>
@@ -234,7 +277,7 @@ foreach ($spareParts ?? [] as $sp) {
                 <button class="btn btn-sm btn-danger" type="button" @click="removeSpareLine(idx)" x-show="orderType === 'dealer' && spareItems.length > 1" style="margin-bottom:0.35rem;">×</button>
               </div>
             </template>
-            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Each line appears on the tax invoice. Stock is reduced when the order is created.</p>
+            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Enter sell price per part — not catalog cost. Stock is reduced when the order is created.</p>
           </div>
         </template>
 
@@ -394,59 +437,64 @@ foreach ($spareParts ?? [] as $sp) {
     </div>
 
     <div class="card" style="margin-bottom:0.85rem;">
-      <h3 class="card-title">4. Payment &amp; incentives</h3>
-      <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">Incentives affect invoice tax. Choose full or partial payment — balance due is calculated when the order is saved.</p>
+      <h3 class="card-title">4. Payment</h3>
       <div class="form-grid">
-        <div class="form-group"><label>PM E-DRIVE Incentive (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="pm_drive_incentive" value="0"></div>
-        <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="state_subsidy" value="0"></div>
-        <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="discount_amount" value="0"></div>
-        <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="loan_amount" value="0"></div>
-
-        <div class="form-group full" style="grid-column:1 / -1;padding-top:0.35rem;border-top:1px solid var(--border);">
+        <div class="form-group full">
           <label>Payment status *</label>
           <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.35rem;">
             <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
               <input type="radio" name="payment_status" value="full" x-model="paymentStatus"> Full paid
             </label>
             <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
-              <input type="radio" name="payment_status" value="partial" x-model="paymentStatus"> Partial payment
+              <input type="radio" name="payment_status" value="partial" x-model="paymentStatus"> Partial paid
             </label>
           </div>
         </div>
 
-        <template x-if="paymentStatus === 'partial'">
-          <div class="form-group" style="grid-column:1 / -1;">
-            <label>Amount paid now (₹) *</label>
-            <input class="form-control" type="number" step="0.01" min="0.01" name="amount_paid" x-model="amountPaid" placeholder="How much received today" required>
-            <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Balance due = order total − amount paid (calculated automatically).</p>
-          </div>
-        </template>
-
-        <div class="form-group full" style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap;">
-          <span style="font-weight:700;font-size:0.82rem;color:#64748b;">Payment mode</span>
-          <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1"> Cash</label>
-          <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1"> Cheque</label>
+        <div class="form-group">
+          <label>Cash — amount paid (₹)</label>
+          <input class="form-control" type="number" step="0.01" min="0" name="paid_cash_amount" x-model="paidCash" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Bank (online) — amount paid (₹)</label>
+          <input class="form-control" type="number" step="0.01" min="0" name="paid_bank_amount" x-model="paidBank" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>From loan — amount given (₹)</label>
+          <input class="form-control" type="number" step="0.01" min="0" name="paid_loan_amount" x-model="paidLoan" placeholder="0">
         </div>
 
         <?php if (!empty($bankAccounts)): ?>
-        <div class="form-group full" style="grid-column:1 / -1;padding-top:0.5rem;border-top:1px solid var(--border);">
-          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;margin-bottom:0.5rem;">
-            <input type="checkbox" name="affect_bank" value="1" x-model="affectBank"> Credit received amount to bank account
-          </label>
-          <template x-if="affectBank">
-            <div class="form-group" style="max-width:360px;">
-              <label>Bank account *</label>
-              <select class="form-control" name="bank_account_id" :required="affectBank">
-                <option value="">Select account</option>
-                <?php foreach ($bankAccounts as $ba): ?>
-                  <option value="<?= (int)$ba['id'] ?>"><?= e($ba['account_name']) ?> — <?= e($ba['bank_name']) ?> (<?= money($ba['current_balance']) ?>)</option>
-                <?php endforeach; ?>
-              </select>
-              <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Full payment credits the order total; partial payment credits only the amount paid now.</p>
-            </div>
-          </template>
+        <div class="form-group full" x-show="parseFloat(paidBank) > 0" x-cloak>
+          <label>Bank account (for online payment) *</label>
+          <select class="form-control" name="bank_account_id" x-model="bankAccountId" :required="parseFloat(paidBank) > 0">
+            <option value="">Select account</option>
+            <?php foreach ($bankAccounts as $ba): ?>
+              <option value="<?= (int)$ba['id'] ?>"><?= e($ba['account_name']) ?> — <?= e($ba['bank_name']) ?> (<?= money($ba['current_balance']) ?>)</option>
+            <?php endforeach; ?>
+          </select>
         </div>
         <?php endif; ?>
+
+        <div class="form-group full">
+          <div style="padding:0.85rem 1rem;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);max-width:380px;">
+            <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem;">
+              <span>Order total</span><span x-text="money(grandTotal)"></span>
+            </div>
+            <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem;">
+              <span>Cash + bank + loan</span><span x-text="money(totalPaidNow)"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.5rem;border-top:1px solid var(--border);color:#b45309;">
+              <span>Balance due</span><span x-text="money(balanceDue)"></span>
+            </div>
+            <p class="muted" style="margin:0.5rem 0 0;font-size:0.75rem;" x-show="paymentStatus === 'full'">
+              Full paid: cash + bank + loan must equal order total.
+            </p>
+            <p class="muted" style="margin:0.5rem 0 0;font-size:0.75rem;" x-show="paymentStatus === 'partial'">
+              Partial paid: remaining balance is due later.
+            </p>
+          </div>
+        </div>
 
         <div class="form-group full">
           <label>Notes</label>

@@ -129,12 +129,14 @@ class OrderController extends Controller
         if ($productType === 'spare_part') {
             $spareIds = $_POST['spare_part_id'] ?? [];
             $qtys = $_POST['quantity'] ?? [];
+            $unitPrices = $_POST['unit_price'] ?? [];
             if (is_array($spareIds)) {
                 foreach ($spareIds as $i => $sid) {
                     if ((int)$sid > 0) {
                         $items[] = [
                             'spare_part_id' => (int)$sid,
                             'quantity' => (int)($qtys[$i] ?? 1),
+                            'unit_price' => (float)($unitPrices[$i] ?? 0),
                         ];
                     }
                 }
@@ -142,12 +144,14 @@ class OrderController extends Controller
         } else {
             $variantIds = $_POST['variant_id'] ?? [];
             $qtys = $_POST['quantity'] ?? [];
+            $unitPrices = $_POST['unit_price'] ?? [];
             if (is_array($variantIds)) {
                 foreach ($variantIds as $i => $vid) {
                     if ((int)$vid > 0) {
                         $items[] = [
                             'variant_id' => (int)$vid,
                             'quantity' => (int)($qtys[$i] ?? 1),
+                            'unit_price' => (float)($unitPrices[$i] ?? 0),
                         ];
                     }
                 }
@@ -182,23 +186,18 @@ class OrderController extends Controller
             'hp_name' => $this->input('hp_name'),
             'color' => $this->input('color'),
             'vehicle_model_type' => $this->input('vehicle_model_type'),
-            'pm_drive_incentive' => $this->input('pm_drive_incentive'),
-            'state_subsidy' => $this->input('state_subsidy'),
-            'loan_amount' => $this->input('loan_amount'),
-            'discount_amount' => $this->input('discount_amount'),
             'payment_status' => $this->input('payment_status'),
-            'amount_paid' => $this->input('amount_paid'),
+            'paid_cash_amount' => $this->input('paid_cash_amount'),
+            'paid_bank_amount' => $this->input('paid_bank_amount'),
+            'paid_loan_amount' => $this->input('paid_loan_amount'),
+            'bank_account_id' => $this->input('bank_account_id'),
             'cgst_rate' => $this->input('cgst_rate'),
             'sgst_rate' => $this->input('sgst_rate'),
             'sale_date' => $this->input('sale_date'),
-            'paid_cash' => isset($_POST['paid_cash']) ? 1 : 0,
-            'paid_cheque' => isset($_POST['paid_cheque']) ? 1 : 0,
             'delivery_address' => $this->input('delivery_address'),
             'notes' => $this->input('notes'),
             'expected_delivery_date' => $this->input('expected_delivery_date'),
             'billing_location' => $this->input('billing_location'),
-            'affect_bank' => isset($_POST['affect_bank']) ? 1 : 0,
-            'bank_account_id' => $this->input('bank_account_id'),
             'items' => $items,
         ];
 

@@ -91,11 +91,10 @@ class OrderService
 
         $subtotal = array_sum(array_column($lineItems, 'total_price'));
 
-        $pmIncentive = (float)($data['pm_drive_incentive'] ?? 0);
-        $stateSubsidy = (float)($data['state_subsidy'] ?? 0);
-        $extraDisc = (float)($data['discount_amount'] ?? 0);
-        $loanAmount = (float)($data['loan_amount'] ?? 0);
-        $totalDisc = $pmIncentive + $stateSubsidy + $extraDisc;
+        $pmIncentive = 0.0;
+        $stateSubsidy = 0.0;
+        $extraDisc = 0.0;
+        $totalDisc = 0.0;
 
         $taxable = max(0, $subtotal - $totalDisc);
         $cgst = round($taxable * ($cgstRate / 100), 2);
@@ -103,11 +102,13 @@ class OrderService
         $taxAmount = round($cgst + $sgst, 2);
         $totalAmount = round($taxable + $taxAmount, 2);
 
-        [$paymentStatus, $amountPaid, $amountDue] = self::resolvePaymentAmounts($data, $totalAmount);
+        [$paymentStatus, $amountPaid, $amountDue, $paidCash, $paidBank, $paidLoan] = self::resolvePaymentBreakdown($data, $totalAmount);
+        $loanAmount = $paidLoan;
 
-        [$bankAccountId, $affectBank] = BankTransactionService::resolveBankLink($data);
-        if ($affectBank && $amountPaid <= 0) {
-            throw new RuntimeException('Payment amount must be greater than zero to credit the bank account.');
+        $bankAccountId = (int)($data['bank_account_id'] ?? 0);
+        $affectBank = $paidBank > 0 && $bankAccountId > 0;
+        if ($paidBank > 0 && $bankAccountId <= 0) {
+            throw new RuntimeException('Select a bank account for the online/bank payment amount.');
         }
 
         $prefix = $orderType === 'dealer' ? 'ORD' : 'CORD';
@@ -122,7 +123,7 @@ class OrderService
             $data['battery_no'] ?? null,
         ])));
 
-        $paymentMode = self::normalizePaymentMode($data);
+        $paymentMode = self::buildPaymentMode($paidCash, $paidBank, $paidLoan);
 
         $db->beginTransaction();
         try {
@@ -139,7 +140,7 @@ class OrderService
                     bank_account_id, affect_bank_balance,
                     sale_date, subtotal, tax_amount, cgst_rate, sgst_rate, tax_rate, total_amount,
                     status, delivery_address, notes, expected_delivery_date, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $orderNumber, $bookingNo, $orderType, $productType, $billingLocation, $dealerId,
                 $data['customer_name'] ?? null,
@@ -237,7 +238,7 @@ class OrderService
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
                     payment_mode, payment_status, amount_paid, amount_due,
                     total_amount, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $billNumber, $billType, $billingLocation, $orderId, $bookingNo,
                 setting('company_name'), setting('company_address'), setting('company_branch_address'),
@@ -294,13 +295,13 @@ class OrderService
                 )->execute([$totalAmount, $dealerId]);
             }
 
-            if ($affectBank && $amountPaid > 0) {
+            if ($affectBank && $paidBank > 0) {
                 (new BankTransactionService($db))->credit(
                     $bankAccountId,
-                    $amountPaid,
+                    $paidBank,
                     'sell_order',
                     $orderId,
-                    'Sell order ' . $orderNumber,
+                    'Sell order ' . $orderNumber . ' (bank/online)',
                     $userId,
                     $saleDate
                 );
@@ -360,7 +361,10 @@ class OrderService
             if (!$variant) {
                 throw new RuntimeException('Invalid vehicle variant selected.');
             }
-            $unit = (float)$variant['price'];
+            $unit = round((float)($item['unit_price'] ?? 0), 2);
+            if ($unit <= 0) {
+                throw new RuntimeException('Enter a sell price greater than zero for each vehicle line.');
+            }
             $lineItems[] = [
                 'item_type' => 'vehicle_variant',
                 'vehicle_id' => (int)$variant['vehicle_id'],
@@ -413,7 +417,10 @@ class OrderService
                     'Insufficient stock for ' . $part['name'] . ' (available: ' . (int)$part['quantity_in_stock'] . ').'
                 );
             }
-            $unit = (float)$part['unit_price'];
+            $unit = round((float)($item['unit_price'] ?? 0), 2);
+            if ($unit <= 0) {
+                throw new RuntimeException('Enter a sell price greater than zero for each spare part line.');
+            }
             $label = trim(($part['category_name'] ?? '') . ' — ' . $part['name']);
             $lineItems[] = [
                 'item_type' => 'spare_part',
@@ -436,6 +443,54 @@ class OrderService
             throw new RuntimeException('No valid spare parts in order.');
         }
         return $lineItems;
+    }
+
+    /** @return array{0:string,1:float,2:float,3:float,4:float,5:float} status, paid, due, cash, bank, loan */
+    public static function resolvePaymentBreakdown(array $data, float $totalAmount): array
+    {
+        $cash = max(0, round((float)($data['paid_cash_amount'] ?? 0), 2));
+        $bank = max(0, round((float)($data['paid_bank_amount'] ?? 0), 2));
+        $loan = max(0, round((float)($data['paid_loan_amount'] ?? 0), 2));
+        $totalPaid = round($cash + $bank + $loan, 2);
+
+        $status = strtolower(trim((string)($data['payment_status'] ?? 'full')));
+        if (!in_array($status, ['full', 'partial'], true)) {
+            $status = 'full';
+        }
+
+        if ($totalPaid <= 0) {
+            throw new RuntimeException('Enter payment in cash, bank (online), and/or loan fields.');
+        }
+
+        if ($status === 'full') {
+            if (abs($totalPaid - $totalAmount) > 0.02) {
+                throw new RuntimeException(
+                    'Full paid: cash + bank + loan must equal the order total (' . number_format($totalAmount, 2) . ').'
+                );
+            }
+            return ['full', $totalPaid, 0.0, $cash, $bank, $loan];
+        }
+
+        if ($totalPaid >= $totalAmount) {
+            throw new RuntimeException('Partial payment total must be less than the order total, or choose Full paid.');
+        }
+
+        return ['partial', $totalPaid, round($totalAmount - $totalPaid, 2), $cash, $bank, $loan];
+    }
+
+    private static function buildPaymentMode(float $cash, float $bank, float $loan): ?string
+    {
+        $parts = [];
+        if ($cash > 0) {
+            $parts[] = 'cash';
+        }
+        if ($bank > 0) {
+            $parts[] = 'bank';
+        }
+        if ($loan > 0) {
+            $parts[] = 'loan';
+        }
+        return $parts ? implode('+', $parts) : null;
     }
 
     private static function normalizePaymentMode(array $data): ?string
