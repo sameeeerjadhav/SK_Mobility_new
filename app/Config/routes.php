@@ -14,6 +14,7 @@ use App\Controllers\NotificationController;
 use App\Controllers\OrderController;
 use App\Controllers\PartnerController;
 use App\Controllers\PaymentController;
+use App\Controllers\PurchaseOrderController;
 use App\Controllers\ProfileController;
 use App\Controllers\ReportController;
 use App\Controllers\SearchController;
@@ -98,6 +99,13 @@ $router->post('/inventory/transfer', [InventoryController::class, 'transfer'], [
 $router->post('/inventory/warehouses', [InventoryController::class, 'storeWarehouse'], ['require_auth']);
 $router->post('/inventory/warehouses/{id}', [InventoryController::class, 'updateWarehouse'], ['require_auth']);
 $router->post('/inventory/warehouses/{id}/delete', [InventoryController::class, 'deleteWarehouse'], ['require_auth']);
+
+// Purchase orders
+$router->get('/purchase-orders', [PurchaseOrderController::class, 'index'], ['require_auth']);
+$router->post('/purchase-orders', [PurchaseOrderController::class, 'store'], ['require_auth']);
+$router->get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show'], ['require_auth']);
+$router->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive'], ['require_auth']);
+$router->post('/purchase-orders/{id}/cancel', [PurchaseOrderController::class, 'cancel'], ['require_auth']);
 
 // Leads
 $router->get('/leads', [LeadController::class, 'index'], ['require_auth']);

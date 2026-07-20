@@ -8,6 +8,7 @@
  *  /install.php?migrate_invoice=1   ← SAI KUBER tax invoice columns + company settings
  *  /install.php?migrate_expenses=1  ← expense types, GST, multi-item line items
  *  /install.php?migrate_partners=1  ← partner Aadhar & PAN fields
+ *  /install.php?migrate_purchase_orders=1  ← purchase orders + goods receipt tables
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -217,6 +218,24 @@ try {
         };
         $addCol($db, 'partners', 'aadhar_number', 'VARCHAR(20) NULL AFTER address');
         $addCol($db, 'partners', 'pan_number', 'VARCHAR(20) NULL AFTER aadhar_number');
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_purchase_orders']) && $_GET['migrate_purchase_orders'] === '1') {
+        echo "\n--- Purchase orders migration ---\n";
+        $migration = file_get_contents(dirname(__DIR__) . '/database/migrations/009_purchase_orders.sql');
+        if ($migration === false) {
+            throw new RuntimeException('Migration file 009_purchase_orders.sql not found.');
+        }
+        foreach (array_filter(array_map('trim', explode(';', $migration))) as $stmt) {
+            if ($stmt === '' || str_starts_with($stmt, '--')) {
+                continue;
+            }
+            $db->exec($stmt);
+            if (preg_match('/CREATE TABLE IF NOT EXISTS (\w+)/i', $stmt, $m)) {
+                echo "table {$m[1]}\n";
+            }
+        }
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {
