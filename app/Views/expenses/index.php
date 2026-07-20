@@ -8,8 +8,32 @@ $filterQuery = http_build_query(array_filter([
     'to' => $to,
 ], static fn($v) => $v !== null && $v !== ''));
 $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
+$expenseTotal = static function (array $e): float {
+    $total = (float)($e['total_amount'] ?? 0);
+    return $total > 0 ? $total : (float)$e['amount'];
+};
 ?>
-<div x-data="{ expOpen: false, catOpen: false, editExp: null }">
+<div x-data="{
+  expOpen: false,
+  catOpen: false,
+  editCat: null,
+  editExp: null,
+  gstApplicable: false,
+  baseAmount: '',
+  gstCalc(amount, on) {
+    const base = parseFloat(amount) || 0;
+    if (!on || base <= 0) return { cgst: 0, sgst: 0, total: base };
+    const cgst = Math.round(base * 0.09 * 100) / 100;
+    const sgst = Math.round(base * 0.09 * 100) / 100;
+    return { cgst, sgst, total: Math.round((base + cgst + sgst) * 100) / 100 };
+  },
+  fmt(n) { return '₹' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+  openAdd() {
+    this.expOpen = true;
+    this.gstApplicable = false;
+    this.baseAmount = '';
+  }
+}">
   <div class="toolbar">
     <div>
       <h1 class="page-title">Assets &amp; Expenditure</h1>
@@ -17,9 +41,13 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <button class="btn btn-outline" type="button" @click="catOpen=true">+ Category</button>
-      <button class="btn btn-primary" type="button" @click="expOpen=true">+ Record</button>
+      <button class="btn btn-primary" type="button" @click="openAdd()" <?= !$categories ? 'disabled title="Add a category first"' : '' ?>>+ Record</button>
     </div>
   </div>
+
+  <?php if (!$categories): ?>
+    <div class="alert alert-warning" style="margin-bottom:1rem;">Add at least one category before recording expenses.</div>
+  <?php endif; ?>
 
   <div class="stat-grid">
     <div class="stat-card">
@@ -33,14 +61,6 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
     <div class="stat-card">
       <div class="stat-label">Total (this month)</div>
       <div class="stat-value"><?= money($stats['month_total']) ?></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Assets (this year)</div>
-      <div class="stat-value" style="font-size:1.1rem;"><?= money($stats['year_assets']) ?></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Expenditure (this year)</div>
-      <div class="stat-value" style="font-size:1.1rem;"><?= money($stats['year_expenditure']) ?></div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Filtered total</div>
@@ -88,7 +108,7 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
       </div>
       <div class="form-group" style="margin:0;min-width:180px;flex:1;">
         <label>Search</label>
-        <input class="form-control" type="search" name="search" value="<?= e($search) ?>" placeholder="Name, description or category">
+        <input class="form-control" type="search" name="search" value="<?= e($search) ?>" placeholder="Name, notes or category">
       </div>
       <button class="btn btn-primary" type="submit">Apply</button>
       <?php if ($filterQuery !== ''): ?>
@@ -96,6 +116,36 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
       <?php endif; ?>
     </div>
   </form>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <h3 class="card-title">Categories</h3>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Name</th><th>Description</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        <?php foreach ($allCategories as $c): ?>
+          <tr>
+            <td><strong><?= e($c['name']) ?></strong></td>
+            <td class="muted"><?= e($c['description'] ?: '—') ?></td>
+            <td><?= !empty($c['is_active']) ? status_chip('active') : status_chip('inactive') ?></td>
+            <td style="white-space:nowrap;">
+              <?php if (!empty($c['is_active'])): ?>
+                <button type="button" class="btn btn-sm btn-outline" @click='editCat = <?= json_encode($c, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
+                <form method="post" action="<?= url('expenses/categories/' . $c['id'] . '/delete') ?>" style="display:inline;" onsubmit="return confirm('Deactivate this category?')">
+                  <?= csrf_field() ?>
+                  <button class="btn btn-sm btn-danger" type="submit">Deactivate</button>
+                </form>
+              <?php else: ?>
+                <span class="muted">—</span>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        <?php if (!$allCategories): ?><tr><td colspan="4" class="muted">No categories yet.</td></tr><?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <div class="card">
     <div class="table-wrap">
@@ -106,11 +156,11 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
             <th>Name</th>
             <th>Type</th>
             <th>Category</th>
-            <th>Amount</th>
+            <th>Base</th>
+            <th>GST</th>
+            <th>Total</th>
             <th>Mode</th>
-            <th>Notes</th>
             <th>Receipt</th>
-            <th>Recorded by</th>
             <th></th>
           </tr>
         </thead>
@@ -118,7 +168,10 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
         <?php foreach ($expenses as $e): ?>
           <tr>
             <td><?= india_date($e['expense_date']) ?></td>
-            <td><strong><?= e($e['name'] ?: '—') ?></strong></td>
+            <td>
+              <strong><?= e($e['name'] ?: '—') ?></strong>
+              <?php if (!empty($e['description'])): ?><div class="muted" style="font-size:0.78rem;"><?= e($e['description']) ?></div><?php endif; ?>
+            </td>
             <td>
               <?php if (($e['record_type'] ?? 'expenditure') === 'asset'): ?>
                 <span class="chip chip-info">Asset</span>
@@ -127,9 +180,16 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
               <?php endif; ?>
             </td>
             <td><span class="chip chip-primary"><?= e($e['category_name']) ?></span></td>
-            <td><strong><?= money($e['amount']) ?></strong></td>
+            <td><?= money($e['amount']) ?></td>
+            <td>
+              <?php if (!empty($e['gst_applicable'])): ?>
+                <span class="muted" style="font-size:0.78rem;">CGST <?= money($e['cgst_amount'] ?? 0) ?><br>SGST <?= money($e['sgst_amount'] ?? 0) ?></span>
+              <?php else: ?>
+                <span class="muted">—</span>
+              <?php endif; ?>
+            </td>
+            <td><strong><?= money($expenseTotal($e)) ?></strong></td>
             <td><?= e(ucfirst($e['payment_mode'])) ?></td>
-            <td><?= e($e['description'] ?? '—') ?></td>
             <td>
               <?php if (!empty($e['receipt_url'])): ?>
                 <a href="<?= asset($e['receipt_url']) ?>" target="_blank" rel="noopener">View</a>
@@ -137,7 +197,6 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
                 <span class="muted">—</span>
               <?php endif; ?>
             </td>
-            <td class="muted" style="font-size:0.82rem;"><?= e(trim(($e['first_name'] ?? '') . ' ' . ($e['last_name'] ?? ''))) ?></td>
             <td style="white-space:nowrap;">
               <button class="btn btn-sm btn-outline" type="button" @click='editExp = <?= json_encode($e, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
               <form method="post" action="<?= url('expenses/' . $e['id'] . '/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete this record?')">
@@ -182,8 +241,24 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
             <label>Name *</label>
             <input class="form-control" name="name" required placeholder="e.g. Office laptop, March electricity bill">
           </div>
-          <div class="form-group"><label>Amount *</label><input class="form-control" type="number" step="0.01" name="amount" required></div>
+          <div class="form-group full">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;cursor:pointer;">
+              <input type="checkbox" name="gst_applicable" value="1" x-model="gstApplicable">
+              Include GST (9% CGST + 9% SGST)
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Base amount *</label>
+            <input class="form-control" type="number" step="0.01" min="0.01" name="amount" x-model="baseAmount" required>
+          </div>
           <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" value="<?= date('Y-m-d') ?>"></div>
+          <div class="form-group full" x-show="gstApplicable" x-cloak style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:10px;background:#f8fffd;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;font-size:0.88rem;">
+              <div><span class="muted">CGST 9%</span><br><strong x-text="fmt(gstCalc(baseAmount, gstApplicable).cgst)"></strong></div>
+              <div><span class="muted">SGST 9%</span><br><strong x-text="fmt(gstCalc(baseAmount, gstApplicable).sgst)"></strong></div>
+              <div><span class="muted">Total payable</span><br><strong style="color:#0f766e;" x-text="fmt(gstCalc(baseAmount, gstApplicable).total)"></strong></div>
+            </div>
+          </div>
           <div class="form-group">
             <label>Payment mode</label>
             <select class="form-control" name="payment_mode">
@@ -227,10 +302,26 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
           </div>
           <div class="form-group full">
             <label>Name *</label>
-            <input class="form-control" name="name" x-model="editExp.name" required placeholder="What was purchased or spent on">
+            <input class="form-control" name="name" x-model="editExp.name" required>
           </div>
-          <div class="form-group"><label>Amount *</label><input class="form-control" type="number" step="0.01" name="amount" x-model="editExp.amount" required></div>
+          <div class="form-group full">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;cursor:pointer;">
+              <input type="checkbox" name="gst_applicable" value="1" :checked="editExp.gst_applicable == 1" @change="editExp.gst_applicable = $event.target.checked ? 1 : 0">
+              Include GST (9% CGST + 9% SGST)
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Base amount *</label>
+            <input class="form-control" type="number" step="0.01" min="0.01" name="amount" x-model="editExp.amount" required>
+          </div>
           <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" x-model="editExp.expense_date"></div>
+          <div class="form-group full" x-show="editExp.gst_applicable == 1" x-cloak style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:10px;background:#f8fffd;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;font-size:0.88rem;">
+              <div><span class="muted">CGST 9%</span><br><strong x-text="fmt(gstCalc(editExp.amount, editExp.gst_applicable == 1).cgst)"></strong></div>
+              <div><span class="muted">SGST 9%</span><br><strong x-text="fmt(gstCalc(editExp.amount, editExp.gst_applicable == 1).sgst)"></strong></div>
+              <div><span class="muted">Total payable</span><br><strong style="color:#0f766e;" x-text="fmt(gstCalc(editExp.amount, editExp.gst_applicable == 1).total)"></strong></div>
+            </div>
+          </div>
           <div class="form-group">
             <label>Payment mode</label>
             <select class="form-control" name="payment_mode" x-model="editExp.payment_mode">
@@ -239,7 +330,7 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="form-group full"><label>Notes</label><textarea class="form-control" name="description" x-model="editExp.description" rows="2" placeholder="Optional extra details"></textarea></div>
+          <div class="form-group full"><label>Notes</label><textarea class="form-control" name="description" x-model="editExp.description" rows="2"></textarea></div>
           <div class="form-group full"><label>Replace receipt</label><input class="form-control" type="file" name="receipt" accept=".jpg,.jpeg,.png,.pdf"></div>
         </div>
         <div class="modal-footer">
@@ -256,12 +347,29 @@ $paymentModes = ['cash', 'bank', 'upi', 'card', 'cheque'];
         <?= csrf_field() ?>
         <div class="modal-header"><h3 class="modal-title">Add category</h3></div>
         <div class="modal-body">
-          <div class="form-group"><label>Name</label><input class="form-control" name="name" required></div>
+          <div class="form-group"><label>Name *</label><input class="form-control" name="name" required></div>
           <div class="form-group"><label>Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" @click="catOpen=false">Cancel</button>
           <button class="btn btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" :class="{open:!!editCat}" @click.self="editCat=null" x-show="editCat" x-cloak>
+    <div class="modal" x-show="editCat">
+      <form method="post" :action="'<?= url('expenses/categories') ?>/' + editCat?.id">
+        <?= csrf_field() ?>
+        <div class="modal-header"><h3 class="modal-title">Edit category</h3></div>
+        <div class="modal-body">
+          <div class="form-group"><label>Name *</label><input class="form-control" name="name" x-model="editCat.name" required></div>
+          <div class="form-group"><label>Description</label><textarea class="form-control" name="description" x-model="editCat.description" rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" @click="editCat=null">Cancel</button>
+          <button class="btn btn-primary" type="submit">Update</button>
         </div>
       </form>
     </div>

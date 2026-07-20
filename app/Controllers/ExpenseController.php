@@ -6,9 +6,14 @@ use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Upload;
+use PDOException;
+use RuntimeException;
 
 class ExpenseController extends Controller
 {
+    private const CGST_RATE = 9.0;
+    private const SGST_RATE = 9.0;
+
     /** @return list<string> */
     public static function recordTypes(): array
     {
@@ -26,22 +31,23 @@ class ExpenseController extends Controller
         $to = $this->input('to');
 
         [$sqlWhere, $params] = $this->filterClause($categoryId, $recordType, $paymentMode, $search, $from, $to);
+        $sumExpr = 'COALESCE(NULLIF(e.total_amount, 0), e.amount)';
 
         $stats = [
             'month_assets' => (float)$this->db()->query(
-                "SELECT COALESCE(SUM(amount),0) FROM expenses
+                "SELECT COALESCE(SUM({$sumExpr}),0) FROM expenses e
                  WHERE record_type='asset' AND YEAR(expense_date)=YEAR(CURDATE()) AND MONTH(expense_date)=MONTH(CURDATE())"
             )->fetchColumn(),
             'month_expenditure' => (float)$this->db()->query(
-                "SELECT COALESCE(SUM(amount),0) FROM expenses
+                "SELECT COALESCE(SUM({$sumExpr}),0) FROM expenses e
                  WHERE record_type='expenditure' AND YEAR(expense_date)=YEAR(CURDATE()) AND MONTH(expense_date)=MONTH(CURDATE())"
             )->fetchColumn(),
             'year_assets' => (float)$this->db()->query(
-                "SELECT COALESCE(SUM(amount),0) FROM expenses
+                "SELECT COALESCE(SUM({$sumExpr}),0) FROM expenses e
                  WHERE record_type='asset' AND YEAR(expense_date)=YEAR(CURDATE())"
             )->fetchColumn(),
             'year_expenditure' => (float)$this->db()->query(
-                "SELECT COALESCE(SUM(amount),0) FROM expenses
+                "SELECT COALESCE(SUM({$sumExpr}),0) FROM expenses e
                  WHERE record_type='expenditure' AND YEAR(expense_date)=YEAR(CURDATE())"
             )->fetchColumn(),
         ];
@@ -49,7 +55,7 @@ class ExpenseController extends Controller
         $stats['year_total'] = $stats['year_assets'] + $stats['year_expenditure'];
 
         $filteredTotalStmt = $this->db()->prepare(
-            "SELECT COALESCE(SUM(e.amount),0), COUNT(*)
+            "SELECT COALESCE(SUM({$sumExpr}),0), COUNT(*)
              FROM expenses e
              JOIN expense_categories ec ON ec.id = e.category_id
              WHERE {$sqlWhere}"
@@ -74,6 +80,7 @@ class ExpenseController extends Controller
             'stats' => $stats,
             'expenses' => $expenses->fetchAll(),
             'categories' => $this->db()->query('SELECT * FROM expense_categories WHERE is_active=1 ORDER BY name')->fetchAll(),
+            'allCategories' => $this->db()->query('SELECT * FROM expense_categories ORDER BY name')->fetchAll(),
             'recordTypes' => self::recordTypes(),
             'categoryId' => $categoryId,
             'recordType' => $recordType,
@@ -90,31 +97,41 @@ class ExpenseController extends Controller
     {
         require_role('super_admin');
         $this->validateCsrf();
-        $name = trim((string)$this->input('name'));
-        if ($name === '') {
-            flash('error', 'Name is required — enter what was purchased or spent on.');
-            $this->redirect('/expenses' . $this->redirectFilters());
+
+        try {
+            $payload = $this->validatedPayload();
+            $receipt = $this->uploadReceipt();
+
+            $this->db()->prepare(
+                'INSERT INTO expenses (
+                    category_id, record_type, name, amount, gst_applicable,
+                    cgst_amount, sgst_amount, total_amount,
+                    description, expense_date, payment_mode, receipt_url, created_by
+                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+            )->execute([
+                $payload['category_id'],
+                $payload['record_type'],
+                $payload['name'],
+                $payload['amount'],
+                $payload['gst_applicable'],
+                $payload['cgst_amount'],
+                $payload['sgst_amount'],
+                $payload['total_amount'],
+                $payload['description'],
+                $payload['expense_date'],
+                $payload['payment_mode'],
+                $receipt,
+                Auth::id(),
+            ]);
+
+            Audit::log('create', 'expenses', 'expenses', (int)$this->db()->lastInsertId());
+            flash('success', 'Record saved.');
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+        } catch (PDOException $e) {
+            flash('error', 'Could not save expense. Run /install.php?migrate_expenses=1 once, then try again.');
         }
-        $receipt = null;
-        if (!empty($_FILES['receipt']['name'])) {
-            $receipt = Upload::store($_FILES['receipt'], 'expenses', ['jpg', 'jpeg', 'png', 'pdf']);
-        }
-        $this->db()->prepare(
-            'INSERT INTO expenses (category_id, record_type, name, amount, description, expense_date, payment_mode, receipt_url, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?)'
-        )->execute([
-            (int)$this->input('category_id'),
-            $this->validRecordType($this->input('record_type')),
-            $name,
-            (float)$this->input('amount'),
-            $this->input('description'),
-            $this->input('expense_date') ?: date('Y-m-d'),
-            $this->input('payment_mode') ?: 'cash',
-            $receipt,
-            Auth::id(),
-        ]);
-        Audit::log('create', 'expenses', 'expenses', (int)$this->db()->lastInsertId());
-        flash('success', 'Record saved.');
+
         $this->redirect('/expenses' . $this->redirectFilters());
     }
 
@@ -124,54 +141,73 @@ class ExpenseController extends Controller
         $this->validateCsrf();
         $expenseId = (int)$id;
 
-        $name = trim((string)$this->input('name'));
-        if ($name === '') {
-            flash('error', 'Name is required — enter what was purchased or spent on.');
-            $this->redirect('/expenses' . $this->redirectFilters());
-        }
+        try {
+            $payload = $this->validatedPayload();
+            $receipt = $this->uploadReceipt();
 
-        $receipt = null;
-        if (!empty($_FILES['receipt']['name'])) {
-            $receipt = Upload::store($_FILES['receipt'], 'expenses', ['jpg', 'jpeg', 'png', 'pdf']);
-        }
-
-        if ($receipt) {
-            $old = $this->db()->prepare('SELECT receipt_url FROM expenses WHERE id = ?');
-            $old->execute([$expenseId]);
-            $oldReceipt = $old->fetchColumn();
-            if ($oldReceipt) {
-                Upload::delete((string)$oldReceipt);
+            $exists = $this->db()->prepare('SELECT id, receipt_url FROM expenses WHERE id = ?');
+            $exists->execute([$expenseId]);
+            $row = $exists->fetch();
+            if (!$row) {
+                throw new RuntimeException('Expense record not found.');
             }
-            $this->db()->prepare(
-                'UPDATE expenses SET category_id=?, record_type=?, name=?, amount=?, description=?, expense_date=?, payment_mode=?, receipt_url=? WHERE id=?'
-            )->execute([
-                (int)$this->input('category_id'),
-                $this->validRecordType($this->input('record_type')),
-                $name,
-                (float)$this->input('amount'),
-                $this->input('description'),
-                $this->input('expense_date'),
-                $this->input('payment_mode'),
-                $receipt,
-                $expenseId,
-            ]);
-        } else {
-            $this->db()->prepare(
-                'UPDATE expenses SET category_id=?, record_type=?, name=?, amount=?, description=?, expense_date=?, payment_mode=? WHERE id=?'
-            )->execute([
-                (int)$this->input('category_id'),
-                $this->validRecordType($this->input('record_type')),
-                $name,
-                (float)$this->input('amount'),
-                $this->input('description'),
-                $this->input('expense_date'),
-                $this->input('payment_mode'),
-                $expenseId,
-            ]);
+
+            if ($receipt) {
+                if (!empty($row['receipt_url'])) {
+                    Upload::delete((string)$row['receipt_url']);
+                }
+                $this->db()->prepare(
+                    'UPDATE expenses SET
+                        category_id=?, record_type=?, name=?, amount=?, gst_applicable=?,
+                        cgst_amount=?, sgst_amount=?, total_amount=?,
+                        description=?, expense_date=?, payment_mode=?, receipt_url=?
+                     WHERE id=?'
+                )->execute([
+                    $payload['category_id'],
+                    $payload['record_type'],
+                    $payload['name'],
+                    $payload['amount'],
+                    $payload['gst_applicable'],
+                    $payload['cgst_amount'],
+                    $payload['sgst_amount'],
+                    $payload['total_amount'],
+                    $payload['description'],
+                    $payload['expense_date'],
+                    $payload['payment_mode'],
+                    $receipt,
+                    $expenseId,
+                ]);
+            } else {
+                $this->db()->prepare(
+                    'UPDATE expenses SET
+                        category_id=?, record_type=?, name=?, amount=?, gst_applicable=?,
+                        cgst_amount=?, sgst_amount=?, total_amount=?,
+                        description=?, expense_date=?, payment_mode=?
+                     WHERE id=?'
+                )->execute([
+                    $payload['category_id'],
+                    $payload['record_type'],
+                    $payload['name'],
+                    $payload['amount'],
+                    $payload['gst_applicable'],
+                    $payload['cgst_amount'],
+                    $payload['sgst_amount'],
+                    $payload['total_amount'],
+                    $payload['description'],
+                    $payload['expense_date'],
+                    $payload['payment_mode'],
+                    $expenseId,
+                ]);
+            }
+
+            Audit::log('update', 'expenses', 'expenses', $expenseId);
+            flash('success', 'Record updated.');
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+        } catch (PDOException $e) {
+            flash('error', 'Could not update expense. Run /install.php?migrate_expenses=1 once, then try again.');
         }
 
-        Audit::log('update', 'expenses', 'expenses', $expenseId);
-        flash('success', 'Record updated.');
         $this->redirect('/expenses' . $this->redirectFilters());
     }
 
@@ -198,9 +234,30 @@ class ExpenseController extends Controller
     {
         require_role('super_admin');
         $this->validateCsrf();
+        $name = trim((string)$this->input('name'));
+        if ($name === '') {
+            flash('error', 'Category name is required.');
+            $this->redirect('/expenses');
+        }
         $this->db()->prepare('INSERT INTO expense_categories (name, description, is_active) VALUES (?,?,1)')
-            ->execute([$this->input('name'), $this->input('description')]);
+            ->execute([$name, $this->input('description')]);
         flash('success', 'Category created.');
+        $this->redirect('/expenses');
+    }
+
+    public function updateCategory(string $id): void
+    {
+        require_role('super_admin');
+        $this->validateCsrf();
+        $catId = (int)$id;
+        $name = trim((string)$this->input('name'));
+        if ($name === '') {
+            flash('error', 'Category name is required.');
+            $this->redirect('/expenses');
+        }
+        $this->db()->prepare('UPDATE expense_categories SET name=?, description=? WHERE id=?')
+            ->execute([$name, $this->input('description'), $catId]);
+        flash('success', 'Category updated.');
         $this->redirect('/expenses');
     }
 
@@ -213,9 +270,78 @@ class ExpenseController extends Controller
         $this->redirect('/expenses');
     }
 
+    /** @return array<string, mixed> */
+    private function validatedPayload(): array
+    {
+        $name = trim((string)$this->input('name'));
+        if ($name === '') {
+            throw new RuntimeException('Name is required — enter what was purchased or spent on.');
+        }
+
+        $categoryId = (int)$this->input('category_id');
+        if ($categoryId <= 0) {
+            throw new RuntimeException('Please select a category. Add one first if the list is empty.');
+        }
+
+        $amount = (float)$this->input('amount');
+        if ($amount <= 0) {
+            throw new RuntimeException('Amount must be greater than zero.');
+        }
+
+        $gstApplicable = isset($_POST['gst_applicable']) && $_POST['gst_applicable'] === '1';
+        [$cgst, $sgst, $total] = self::computeGst($amount, $gstApplicable);
+
+        return [
+            'category_id' => $categoryId,
+            'record_type' => $this->validRecordType($this->input('record_type')),
+            'name' => $name,
+            'amount' => $amount,
+            'gst_applicable' => $gstApplicable ? 1 : 0,
+            'cgst_amount' => $cgst,
+            'sgst_amount' => $sgst,
+            'total_amount' => $total,
+            'description' => trim((string)$this->input('description')),
+            'expense_date' => $this->input('expense_date') ?: date('Y-m-d'),
+            'payment_mode' => $this->validPaymentMode($this->input('payment_mode')),
+        ];
+    }
+
+    /** @return array{0: float, 1: float, 2: float} */
+    public static function computeGst(float $amount, bool $gstApplicable): array
+    {
+        if (!$gstApplicable || $amount <= 0) {
+            return [0.0, 0.0, round($amount, 2)];
+        }
+
+        $cgst = round($amount * (self::CGST_RATE / 100), 2);
+        $sgst = round($amount * (self::SGST_RATE / 100), 2);
+
+        return [$cgst, $sgst, round($amount + $cgst + $sgst, 2)];
+    }
+
+    private function uploadReceipt(): ?string
+    {
+        if (empty($_FILES['receipt']['name'])) {
+            return null;
+        }
+
+        $receipt = Upload::store($_FILES['receipt'], 'expenses', ['jpg', 'jpeg', 'png', 'pdf']);
+        if (!$receipt) {
+            throw new RuntimeException('Receipt upload failed. Use JPG, PNG, or PDF.');
+        }
+
+        return $receipt;
+    }
+
     private function validRecordType(?string $type): string
     {
         return in_array($type, self::recordTypes(), true) ? $type : 'expenditure';
+    }
+
+    private function validPaymentMode(?string $mode): string
+    {
+        $allowed = ['cash', 'bank', 'upi', 'card', 'cheque'];
+        return in_array($mode, $allowed, true) ? $mode : 'cash';
     }
 
     /** @return array{0: string, 1: list<mixed>} */

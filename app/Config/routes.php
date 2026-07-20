@@ -140,6 +140,7 @@ $router->post('/partner-transactions/{id}/delete', [PartnerController::class, 'd
 $router->get('/expenses', [ExpenseController::class, 'index'], ['require_auth']);
 $router->post('/expenses', [ExpenseController::class, 'store'], ['require_auth']);
 $router->post('/expenses/categories', [ExpenseController::class, 'storeCategory'], ['require_auth']);
+$router->post('/expenses/categories/{id}', [ExpenseController::class, 'updateCategory'], ['require_auth']);
 $router->post('/expenses/categories/{id}/delete', [ExpenseController::class, 'deleteCategory'], ['require_auth']);
 $router->post('/expenses/{id}', [ExpenseController::class, 'update'], ['require_auth']);
 $router->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy'], ['require_auth']);

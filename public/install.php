@@ -158,6 +158,11 @@ try {
         };
         $addCol($db, 'expenses', 'record_type', "ENUM('asset','expenditure') NOT NULL DEFAULT 'expenditure' AFTER category_id");
         $addCol($db, 'expenses', 'name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER record_type");
+        $addCol($db, 'expenses', 'gst_applicable', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER amount');
+        $addCol($db, 'expenses', 'cgst_amount', 'DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER gst_applicable');
+        $addCol($db, 'expenses', 'sgst_amount', 'DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cgst_amount');
+        $addCol($db, 'expenses', 'total_amount', 'DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER sgst_amount');
+        $db->exec('UPDATE expenses SET total_amount = amount WHERE total_amount = 0');
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

@@ -93,10 +93,11 @@ class DashboardController extends Controller
 
         $bank = (float)$db->query("SELECT COALESCE(SUM(current_balance),0) FROM bank_accounts WHERE is_active=1")->fetchColumn();
         $expenses = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM expenses WHERE YEAR(expense_date)=YEAR(CURDATE()) AND MONTH(expense_date)=MONTH(CURDATE())"
+            "SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), amount)),0) FROM expenses
+             WHERE YEAR(expense_date)=YEAR(CURDATE()) AND MONTH(expense_date)=MONTH(CURDATE())"
         )->fetchColumn();
         $expensesPrev = (float)$db->query(
-            "SELECT COALESCE(SUM(amount),0) FROM expenses
+            "SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), amount)),0) FROM expenses
              WHERE expense_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
              AND expense_date < DATE_FORMAT(CURDATE(), '%Y-%m-01')"
         )->fetchColumn();
