@@ -37,6 +37,7 @@ class PurchaseOrderService
             $items[] = [
                 'variant_id' => $variantId,
                 'vehicle_id' => (int)($row['vehicle_id'] ?? 0),
+                'new_variant_name' => trim((string)($row['new_variant_name'] ?? '')),
                 'color' => trim((string)($row['color'] ?? '')),
                 'hsn_code' => trim((string)($row['hsn_code'] ?? '87116020')) ?: '87116020',
                 'description' => trim((string)($row['description'] ?? '')),
@@ -215,7 +216,8 @@ class PurchaseOrderService
             $resolved = $this->resolveVariant(
                 (int)$item['variant_id'],
                 (string)($item['color'] ?? ''),
-                (float)$item['unit_rate']
+                (float)$item['unit_rate'],
+                (string)($item['new_variant_name'] ?? '')
             );
             $item['variant_id'] = $resolved['variant_id'];
             $item['vehicle_id'] = $resolved['vehicle_id'];
@@ -240,11 +242,11 @@ class PurchaseOrderService
     }
 
     /**
-     * Tie PO line to the correct vehicle variant (by color). Creates a new variant when needed.
+     * Tie PO line to the correct vehicle variant. Creates a new variant when needed.
      *
      * @return array{variant_id: int, vehicle_id: int, color: string}
      */
-    public function resolveVariant(int $variantId, string $color, float $unitRate): array
+    public function resolveVariant(int $variantId, string $color, float $unitRate, string $newVariantName = ''): array
     {
         $stmt = $this->db->prepare('SELECT * FROM vehicle_variants WHERE id = ?');
         $stmt->execute([$variantId]);
@@ -254,12 +256,22 @@ class PurchaseOrderService
         }
 
         $color = trim($color);
+        $newVariantName = trim($newVariantName);
         $baseColor = trim((string)($base['color'] ?? ''));
-        if ($color === '' || strcasecmp($color, $baseColor) === 0) {
+        $targetName = $newVariantName !== '' ? $newVariantName : (string)$base['name'];
+        $targetColor = $color !== '' ? $color : $baseColor;
+
+        if (
+            strcasecmp($targetName, (string)$base['name']) === 0
+            && (
+                $targetColor === ''
+                || strcasecmp($targetColor, $baseColor) === 0
+            )
+        ) {
             return [
                 'variant_id' => $variantId,
                 'vehicle_id' => (int)$base['vehicle_id'],
-                'color' => $baseColor ?: $color,
+                'color' => $baseColor ?: $targetColor,
             ];
         }
 
@@ -269,17 +281,17 @@ class PurchaseOrderService
                AND LOWER(TRIM(COALESCE(color, \'\'))) = LOWER(?)
              LIMIT 1'
         );
-        $find->execute([$base['vehicle_id'], $base['name'], $base['battery_type'], $color]);
+        $find->execute([$base['vehicle_id'], $targetName, $base['battery_type'], $targetColor]);
         $existing = $find->fetch(PDO::FETCH_ASSOC);
         if ($existing) {
             return [
                 'variant_id' => (int)$existing['id'],
                 'vehicle_id' => (int)$existing['vehicle_id'],
-                'color' => (string)($existing['color'] ?? $color),
+                'color' => (string)($existing['color'] ?? $targetColor),
             ];
         }
 
-        $skuBase = strtoupper(substr(slugify($base['name'] . '-' . $color), 0, 12));
+        $skuBase = strtoupper(substr(slugify($targetName . '-' . $targetColor), 0, 12));
         $sku = $skuBase . '-' . random_int(100, 999);
         $skuCheck = $this->db->prepare('SELECT COUNT(*) FROM vehicle_variants WHERE sku = ?');
         for ($i = 0; $i < 5; $i++) {
@@ -296,9 +308,9 @@ class PurchaseOrderService
              VALUES (?,?,?,?,?,?,?,?,1)'
         )->execute([
             $base['vehicle_id'],
-            $base['name'],
+            $targetName,
             $sku,
-            $color,
+            $targetColor,
             $sellPrice,
             $base['battery_type'],
             $base['battery_spec'],
@@ -308,7 +320,7 @@ class PurchaseOrderService
         return [
             'variant_id' => (int)$this->db->lastInsertId(),
             'vehicle_id' => (int)$base['vehicle_id'],
-            'color' => $color,
+            'color' => $targetColor,
         ];
     }
 

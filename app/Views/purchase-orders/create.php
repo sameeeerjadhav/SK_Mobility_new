@@ -5,7 +5,7 @@ $variantsJson = json_encode($variants, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
 document.addEventListener('alpine:init', () => {
   Alpine.data('poCreatePage', () => ({
     variants: <?= $variantsJson ?>,
-    items: [{ variant_id: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }],
+    items: [{ variant_id: '', new_variant_name: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }],
     gstRate: 5,
     variantLabel(v) {
       const parts = [v.vehicle_name, v.name];
@@ -49,7 +49,7 @@ document.addEventListener('alpine:init', () => {
       return '\u20B9' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
     addItem() {
-      this.items = [...this.items, { variant_id: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }];
+      this.items = [...this.items, { variant_id: '', new_variant_name: '', color: '', quantity: 1, unit_rate: '', hsn_code: '87116020', description: '' }];
     },
     removeItem(idx) {
       if (this.items.length <= 1) return;
@@ -121,6 +121,13 @@ document.addEventListener('alpine:init', () => {
                   <option :value="v.id" x-text="variantLabel(v)"></option>
                 </template>
               </select>
+              <div class="muted" style="font-size:0.75rem;margin-top:0.2rem;">
+                Select the closest base variant; use "New variant name" below to auto-create one in Vehicles.
+              </div>
+            </div>
+            <div class="form-group" style="grid-column:1 / -1;">
+              <label>New variant name (optional)</label>
+              <input class="form-control" type="text" :name="'items['+idx+'][new_variant_name]'" x-model="it.new_variant_name" placeholder="e.g. NX3 Pro 1210">
             </div>
             <div class="form-group">
               <label>Color</label>
