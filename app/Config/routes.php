@@ -96,6 +96,7 @@ $router->get('/billing/{id}', [BillingController::class, 'show'], ['require_auth
 $router->get('/inventory', [InventoryController::class, 'index'], ['require_auth']);
 $router->post('/inventory/adjust', [InventoryController::class, 'adjust'], ['require_auth']);
 $router->post('/inventory/transfer', [InventoryController::class, 'transfer'], ['require_auth']);
+$router->post('/inventory/split-variant', [InventoryController::class, 'splitVariant'], ['require_auth']);
 $router->post('/inventory/warehouses', [InventoryController::class, 'storeWarehouse'], ['require_auth']);
 $router->post('/inventory/warehouses/{id}', [InventoryController::class, 'updateWarehouse'], ['require_auth']);
 $router->post('/inventory/warehouses/{id}/delete', [InventoryController::class, 'deleteWarehouse'], ['require_auth']);

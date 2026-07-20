@@ -5,6 +5,8 @@ namespace App\Controllers;
 use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Controller;
+use App\Services\InventoryService;
+use RuntimeException;
 
 class InventoryController extends Controller
 {
@@ -180,6 +182,49 @@ class InventoryController extends Controller
         Audit::log('update', 'inventory', 'inventory', $variantId, null, ['from' => $fromId, 'to' => $toId, 'qty' => $qty]);
         flash('success', 'Stock transferred.');
         $this->redirect('/inventory?warehouse_id=' . $toId);
+    }
+
+    public function splitVariant(): void
+    {
+        require_permission('manage_inventory');
+        $this->validateCsrf();
+
+        $variantId = (int)$this->input('variant_id');
+        $warehouseId = (int)$this->input('warehouse_id');
+        $notes = trim((string)$this->input('notes')) ?: null;
+
+        $splits = [];
+        $raw = $this->input('splits');
+        if (is_array($raw)) {
+            foreach ($raw as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $splits[] = [
+                    'color' => (string)($row['color'] ?? ''),
+                    'quantity' => (int)($row['quantity'] ?? 0),
+                ];
+            }
+        }
+
+        try {
+            (new InventoryService($this->db()))->splitVariantByColor($variantId, $warehouseId, $splits, $notes);
+            Audit::log('update', 'inventory', 'inventory', $variantId, null, [
+                'action' => 'split_by_color',
+                'warehouse_id' => $warehouseId,
+                'splits' => $splits,
+            ]);
+            flash('success', 'Stock split by color. New color variants appear under Vehicles and in this warehouse.');
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+        }
+
+        $vehicleId = (int)$this->input('vehicle_id');
+        $redirect = '/inventory?warehouse_id=' . $warehouseId;
+        if ($vehicleId > 0) {
+            $redirect .= '&vehicle_id=' . $vehicleId;
+        }
+        $this->redirect($redirect);
     }
 
     public function storeWarehouse(): void

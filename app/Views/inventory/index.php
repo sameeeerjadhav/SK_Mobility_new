@@ -1,8 +1,31 @@
-<div x-data="{ adjustOpen: false, transferOpen: false, whOpen: false, editWh: null }">
+<div x-data="{
+  adjustOpen: false,
+  transferOpen: false,
+  whOpen: false,
+  editWh: null,
+  splitOpen: false,
+  splitRow: null,
+  splitLines: [{ color: '', quantity: '' }],
+  openSplit(row) {
+    this.splitRow = row;
+    this.splitLines = [{ color: '', quantity: '' }, { color: '', quantity: '' }];
+    this.splitOpen = true;
+  },
+  addSplitLine() {
+    this.splitLines = [...this.splitLines, { color: '', quantity: '' }];
+  },
+  removeSplitLine(idx) {
+    if (this.splitLines.length <= 1) return;
+    this.splitLines = this.splitLines.filter((_, i) => i !== idx);
+  },
+  splitAllocated() {
+    return this.splitLines.reduce((s, r) => s + (parseInt(r.quantity, 10) || 0), 0);
+  }
+}">
   <div class="toolbar">
     <div>
       <h1 class="page-title">Inventory</h1>
-      <p class="page-sub">Stock levels by warehouse</p>
+      <p class="page-sub">Stock levels by warehouse · split combined stock into color-wise variants</p>
     </div>
     <?php if ($canManage): ?>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
@@ -59,7 +82,7 @@
   <div class="card">
     <div class="table-wrap">
       <table class="data">
-        <thead><tr><th>Vehicle</th><th>Variant</th><th>SKU</th><th>Color</th><th>Available</th><th>Reserved</th><th>Min Level</th></tr></thead>
+        <thead><tr><th>Vehicle</th><th>Variant</th><th>SKU</th><th>Color</th><th>Available</th><th>Reserved</th><th>Min Level</th><?php if ($canManage): ?><th></th><?php endif; ?></tr></thead>
         <tbody>
         <?php foreach ($stock as $s): ?>
           <tr>
@@ -74,15 +97,86 @@
             </td>
             <td><?= (int)$s['quantity_reserved'] ?></td>
             <td><?= (int)$s['min_stock_level'] ?></td>
+            <?php if ($canManage): ?>
+            <td style="white-space:nowrap;">
+              <?php if ((int)$s['quantity_available'] > 0): ?>
+                <button class="btn btn-sm btn-outline" type="button"
+                  @click='openSplit(<?= json_encode([
+                    'variant_id' => (int)$s['variant_id'],
+                    'vehicle_id' => (int)$s['vehicle_id'],
+                    'vehicle_name' => $s['vehicle_name'],
+                    'variant_name' => $s['variant_name'],
+                    'color' => $s['color'] ?? '',
+                    'quantity_available' => (int)$s['quantity_available'],
+                    'warehouse_id' => (int)$warehouseId,
+                  ], JSON_HEX_APOS | JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) ?>)'>
+                  Split by color
+                </button>
+              <?php endif; ?>
+            </td>
+            <?php endif; ?>
           </tr>
         <?php endforeach; ?>
-        <?php if (!$stock): ?><tr><td colspan="7" class="muted">No stock records for this warehouse. Receive a purchase order or use Adjust Stock to add inventory.</td></tr><?php endif; ?>
+        <?php if (!$stock): ?><tr><td colspan="<?= $canManage ? 8 : 7 ?>" class="muted">No stock records for this warehouse. Receive a purchase order or use Adjust Stock to add inventory.</td></tr><?php endif; ?>
         </tbody>
       </table>
     </div>
   </div>
 
   <?php if ($canManage): ?>
+  <div class="modal-backdrop" :class="{ open: splitOpen }" @click.self="splitOpen=false">
+    <div class="modal modal-lg">
+      <form method="post" action="<?= url('inventory/split-variant') ?>">
+        <?= csrf_field() ?>
+        <div class="modal-header">
+          <h3 class="modal-title">Split stock by color</h3>
+          <button type="button" class="btn btn-sm btn-outline" @click="splitOpen=false">Close</button>
+        </div>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+          <template x-if="splitRow">
+            <div>
+              <p class="muted" style="margin-top:0;">
+                Move units from <strong x-text="splitRow.vehicle_name + ' — ' + splitRow.variant_name"></strong>
+                <span x-show="splitRow.color"> (<span x-text="splitRow.color"></span>)</span>
+                into separate color variants under the same vehicle. New colors appear on <strong>Vehicles → Variants</strong>.
+              </p>
+              <p style="margin:0.5rem 0 1rem;">Available in this warehouse: <strong x-text="splitRow.quantity_available"></strong>
+                · Allocating: <strong x-text="splitAllocated()"></strong></p>
+              <input type="hidden" name="variant_id" :value="splitRow?.variant_id">
+              <input type="hidden" name="warehouse_id" :value="splitRow?.warehouse_id">
+              <input type="hidden" name="vehicle_id" value="<?= (int)$vehicleId ?>">
+
+              <template x-for="(line, idx) in splitLines" :key="idx">
+                <div style="display:flex;gap:0.5rem;align-items:end;margin-bottom:0.5rem;flex-wrap:wrap;">
+                  <div class="form-group" style="margin:0;flex:1;min-width:140px;">
+                    <label x-show="idx===0">Color *</label>
+                    <input class="form-control" type="text" :name="'splits['+idx+'][color]'" x-model="line.color"
+                           placeholder="e.g. Red" required>
+                  </div>
+                  <div class="form-group" style="margin:0;width:100px;">
+                    <label x-show="idx===0">Qty *</label>
+                    <input class="form-control" type="number" min="1" :name="'splits['+idx+'][quantity]'" x-model="line.quantity" required>
+                  </div>
+                  <button class="btn btn-sm btn-danger" type="button" @click="removeSplitLine(idx)" x-show="splitLines.length > 1" style="margin-bottom:0.35rem;">×</button>
+                </div>
+              </template>
+              <button class="btn btn-sm btn-outline" type="button" @click="addSplitLine()">+ Add color</button>
+
+              <div class="form-group" style="margin-top:1rem;">
+                <label>Notes</label>
+                <textarea class="form-control" name="notes" rows="2" placeholder="Optional reason for split"></textarea>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" @click="splitOpen=false">Cancel</button>
+          <button class="btn btn-primary" type="submit">Split stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-backdrop" :class="{ open: adjustOpen }" @click.self="adjustOpen=false">
     <div class="modal">
       <form method="post" action="<?= url('inventory/adjust') ?>">
