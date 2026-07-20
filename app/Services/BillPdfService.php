@@ -19,6 +19,14 @@ class BillPdfService
         $payment = strtolower((string)($bill['payment_mode'] ?? ''));
         $paidCash = str_contains($payment, 'cash');
         $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check');
+        $paymentStatus = strtolower((string)($bill['payment_status'] ?? 'full'));
+        $amountPaid = (float)($bill['amount_paid'] ?? 0);
+        $amountDue = (float)($bill['amount_due'] ?? 0);
+        if ($paymentStatus === 'full' && $amountPaid <= 0) {
+            $amountPaid = $total;
+            $amountDue = 0.0;
+        }
+        $isPartialPayment = $paymentStatus === 'partial' && $amountDue > 0;
 
         $companyState = $bill['company_state'] ?? setting('company_state', 'Maharashtra');
         $location = strtolower((string)($bill['billing_location'] ?? 'kokamthan'));
@@ -235,7 +243,18 @@ class BillPdfService
       <tr>
         <td colspan="5" class="r foot-amt">Loan Amount</td>
         <td colspan="4" class="r foot-amt">' . self::num($loan) . '</td>
+      </tr>' .
+        ($isPartialPayment
+            ? '
+      <tr>
+        <td colspan="5" class="r foot-amt">Amount Paid</td>
+        <td colspan="4" class="r foot-amt">' . self::num($amountPaid) . '</td>
       </tr>
+      <tr>
+        <td colspan="5" class="r foot-amt">Balance Due</td>
+        <td colspan="4" class="r foot-amt">' . self::num($amountDue) . '</td>
+      </tr>'
+            : '') . '
       <tr>
         <td colspan="5" class="r foot-amt">Total Amount</td>
         <td colspan="4" class="r foot-amt">' . self::num($total) . '</td>
@@ -248,6 +267,9 @@ class BillPdfService
 
   <div class="footer">
     <div class="pay">
+      ' . ($isPartialPayment
+            ? '<div style="margin-bottom:8px;font-weight:700;">Partial payment · Paid ' . self::num($amountPaid) . ' · Due ' . self::num($amountDue) . '</div>'
+            : '<div style="margin-bottom:8px;font-weight:700;">Paid in full</div>') . '
       <div style="margin-bottom:8px;"><span class="chk ' . ($paidCash ? 'on' : '') . '"></span> Paid in Cash</div>
       <div><span class="chk ' . ($paidCheque ? 'on' : '') . '"></span> Paid in Cheque</div>
     </div>

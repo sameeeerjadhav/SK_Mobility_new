@@ -2,6 +2,12 @@
 $payment = strtolower((string)($bill['payment_mode'] ?? ''));
 $paidCash = str_contains($payment, 'cash');
 $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check');
+$paymentStatus = strtolower((string)($bill['payment_status'] ?? 'full'));
+$amountPaid = (float)($bill['amount_paid'] ?? 0);
+$amountDue = (float)($bill['amount_due'] ?? 0);
+if ($paymentStatus === 'full' && $amountPaid <= 0) {
+    $amountPaid = (float)($bill['total_amount'] ?? 0);
+}
 $locationLabels = ['kokamthan' => 'Kokamthan', 'kopargaon' => 'Kopargaon'];
 $billingLoc = $bill['billing_location'] ?? 'kokamthan';
 $companyAddress = $billingLoc === 'kopargaon'
@@ -63,6 +69,12 @@ $companyAddress = $billingLoc === 'kopargaon'
   </div>
   <p style="margin-top:1rem;"><strong>Loan:</strong> <?= money($bill['loan_amount'] ?? 0) ?> ·
     <strong>Total:</strong> <?= money($bill['total_amount']) ?> ·
+    <?php if (($bill['payment_status'] ?? 'full') === 'partial'): ?>
+      <strong>Paid:</strong> <?= money($bill['amount_paid'] ?? 0) ?> ·
+      <strong>Due:</strong> <?= money($bill['amount_due'] ?? 0) ?> ·
+    <?php else: ?>
+      <strong>Payment:</strong> Full paid ·
+    <?php endif; ?>
     <strong>In words:</strong> <?= e(amount_in_words($bill['total_amount'])) ?></p>
 </div>
 
@@ -155,15 +167,54 @@ $companyAddress = $billingLoc === 'kopargaon'
     </div>
 
     <div class="form-grid">
-      <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" name="loan_amount" value="<?= e((string)($bill['loan_amount'] ?? '0')) ?>"></div>
-      <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" name="discount_amount" value="<?= e((string)($bill['discount_amount'] ?? '0')) ?>"></div>
-      <div class="form-group"><label>PM E-DRIVE (₹)</label><input class="form-control" type="number" step="0.01" name="pm_drive_incentive" value="<?= e((string)($bill['pm_drive_incentive'] ?? '0')) ?>"></div>
-      <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" name="state_subsidy" value="<?= e((string)($bill['state_subsidy'] ?? '0')) ?>"></div>
-      <div class="form-group full" style="display:flex;gap:1.25rem;align-items:center;">
-        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1" <?= $paidCash ? 'checked' : '' ?>> Paid in Cash</label>
-        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1" <?= $paidCheque ? 'checked' : '' ?>> Paid in Cheque</label>
+      <div class="form-group"><label>PM E-DRIVE (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="pm_drive_incentive" value="<?= e((string)($bill['pm_drive_incentive'] ?? '0')) ?>"></div>
+      <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="state_subsidy" value="<?= e((string)($bill['state_subsidy'] ?? '0')) ?>"></div>
+      <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="discount_amount" value="<?= e((string)($bill['discount_amount'] ?? '0')) ?>"></div>
+      <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="loan_amount" value="<?= e((string)($bill['loan_amount'] ?? '0')) ?>"></div>
+
+      <div class="form-group full" style="grid-column:1 / -1;padding-top:0.35rem;border-top:1px solid var(--border);">
+        <label>Payment status</label>
+        <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.35rem;">
+          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;">
+            <input type="radio" name="payment_status" value="full" <?= $paymentStatus !== 'partial' ? 'checked' : '' ?>> Full paid
+          </label>
+          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;">
+            <input type="radio" name="payment_status" value="partial" <?= $paymentStatus === 'partial' ? 'checked' : '' ?>> Partial payment
+          </label>
+        </div>
+      </div>
+      <div class="form-group partial-paid-field" style="<?= $paymentStatus === 'partial' ? '' : 'display:none;' ?>">
+        <label>Amount paid (₹)</label>
+        <input class="form-control" type="number" step="0.01" min="0.01" name="amount_paid" value="<?= e((string)($amountPaid > 0 ? $amountPaid : '')) ?>" placeholder="Received so far">
+      </div>
+      <div class="form-group partial-due-field" style="<?= $paymentStatus === 'partial' ? '' : 'display:none;' ?>">
+        <label>Balance due (₹)</label>
+        <input class="form-control" type="text" value="<?= e(money($amountDue)) ?>" readonly tabindex="-1" style="background:#f8fafc;">
+        <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Recalculated when you save.</p>
+      </div>
+      <div class="form-group full" style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap;">
+        <span style="font-weight:700;font-size:0.82rem;color:#64748b;">Payment mode</span>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1" <?= $paidCash ? 'checked' : '' ?>> Cash</label>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1" <?= $paidCheque ? 'checked' : '' ?>> Cheque</label>
       </div>
     </div>
+    <script>
+      document.querySelectorAll('input[name="payment_status"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+          var partial = this.value === 'partial';
+          document.querySelectorAll('.partial-paid-field, .partial-due-field').forEach(function (el) {
+            el.style.display = partial ? '' : 'none';
+          });
+          var paidInput = document.querySelector('input[name="amount_paid"]');
+          if (paidInput) paidInput.required = partial;
+        });
+      });
+      (function () {
+        var partial = document.querySelector('input[name="payment_status"][value="partial"]');
+        var paidInput = document.querySelector('input[name="amount_paid"]');
+        if (paidInput && partial && partial.checked) paidInput.required = true;
+      })();
+    </script>
     <div style="margin-top:1rem;"><button class="btn btn-primary" type="submit">Save invoice fields</button></div>
   </form>
 </div>

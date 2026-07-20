@@ -184,6 +184,8 @@ class OrderController extends Controller
             'state_subsidy' => $this->input('state_subsidy'),
             'loan_amount' => $this->input('loan_amount'),
             'discount_amount' => $this->input('discount_amount'),
+            'payment_status' => $this->input('payment_status'),
+            'amount_paid' => $this->input('amount_paid'),
             'sale_date' => $this->input('sale_date'),
             'paid_cash' => isset($_POST['paid_cash']) ? 1 : 0,
             'paid_cheque' => isset($_POST['paid_cheque']) ? 1 : 0,

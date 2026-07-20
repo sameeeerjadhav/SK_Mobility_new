@@ -140,6 +140,31 @@ $gstLabel = $isSpareOrder ? 'GST 18%' : 'GST 28%';
           <div><span class="k"><?= e($gstLabel) ?></span><span class="v"><?= money($order['tax_amount']) ?></span></div>
           <div class="total"><span class="k">Total</span><span class="v"><?= money($order['total_amount']) ?></span></div>
         </div>
+
+        <?php
+          $payStatus = $order['payment_status'] ?? 'full';
+          $amountPaid = (float)($order['amount_paid'] ?? 0);
+          $amountDue = (float)($order['amount_due'] ?? 0);
+          if ($payStatus === 'full' && $amountPaid <= 0) {
+              $amountPaid = (float)$order['total_amount'];
+          }
+          if ($payStatus === 'full' && $amountDue <= 0) {
+              $amountDue = 0;
+          } elseif ($amountDue <= 0 && $amountPaid > 0) {
+              $amountDue = max(0, (float)$order['total_amount'] - $amountPaid);
+          }
+          $paymentLabel = $payStatus === 'partial' ? 'Partial payment' : 'Full paid';
+        ?>
+        <div class="od-rows" style="margin-top:0.75rem;padding-top:0.7rem;border-top:1px solid #e2e8f0;">
+          <div class="od-row"><span class="k">Payment</span><span class="v"><?= e($paymentLabel) ?></span></div>
+          <?php if ($payStatus === 'partial'): ?>
+            <div class="od-row"><span class="k">Paid</span><span class="v"><?= money($amountPaid) ?></span></div>
+            <div class="od-row"><span class="k">Due</span><span class="v" style="color:#b45309;"><?= money($amountDue) ?></span></div>
+          <?php endif; ?>
+          <?php if (!empty($order['payment_mode'])): ?>
+            <div class="od-row"><span class="k">Mode</span><span class="v"><?= e(str_replace('_', ' + ', ucfirst($order['payment_mode']))) ?></span></div>
+          <?php endif; ?>
+        </div>
       </div>
 
       <div class="card">

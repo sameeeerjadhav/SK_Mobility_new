@@ -6,6 +6,7 @@ use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Services\BillPdfService;
+use App\Services\OrderService;
 
 class BillingController extends Controller
 {
@@ -143,6 +144,16 @@ class BillingController extends Controller
         $sgst = round($taxable * ((float)$bill['sgst_rate'] / 100), 2);
         $total = round($taxable + $cgst + $sgst, 2);
 
+        try {
+            [$paymentStatus, $amountPaid, $amountDue] = OrderService::resolvePaymentAmounts([
+                'payment_status' => $this->input('payment_status'),
+                'amount_paid' => $this->input('amount_paid'),
+            ], $total);
+        } catch (\RuntimeException $e) {
+            flash('error', $e->getMessage());
+            $this->redirect('/billing/' . $billId);
+        }
+
         $this->db()->prepare(
             'UPDATE bills SET
                 booking_no=?, customer_name=?, customer_phone=?, customer_email=?, customer_address=?,
@@ -152,7 +163,7 @@ class BillingController extends Controller
                 motor_warranty=?, battery_warranty=?, controller_warranty=?, charger_warranty=?,
                 hp_name=?, vehicle_sale_date=?,
                 pm_drive_incentive=?, state_subsidy=?, loan_amount=?, discount_amount=?,
-                payment_mode=?, total_amount=?
+                payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?
              WHERE id=?'
         )->execute([
             $this->input('booking_no') ?: null,
@@ -177,8 +188,21 @@ class BillingController extends Controller
             $this->input('hp_name'),
             $this->input('vehicle_sale_date') ?: null,
             $pm, $state, $loan, $discount,
-            $paymentMode, $total, $billId,
+            $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total, $billId,
         ]);
+
+        if (!empty($bill['order_id'])) {
+            $this->db()->prepare(
+                'UPDATE orders SET
+                    pm_drive_incentive=?, state_subsidy=?, loan_amount=?, discount_amount=?,
+                    payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?
+                 WHERE id=?'
+            )->execute([
+                $pm, $state, $loan, $discount,
+                $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total,
+                (int)$bill['order_id'],
+            ]);
+        }
 
         // Refresh first bill line tax breakdown when amounts change
         $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ? ORDER BY id ASC');

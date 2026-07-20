@@ -103,6 +103,8 @@ class OrderService
         $taxAmount = round($cgst + $sgst, 2);
         $totalAmount = round($taxable + $taxAmount, 2);
 
+        [$paymentStatus, $amountPaid, $amountDue] = self::resolvePaymentAmounts($data, $totalAmount);
+
         $prefix = $orderType === 'dealer' ? 'ORD' : 'CORD';
         if ($productType === 'spare_part') {
             $prefix = $orderType === 'dealer' ? 'SORD' : 'SCORD';
@@ -128,9 +130,10 @@ class OrderService
                     motor_warranty, battery_warranty, controller_warranty, charger_warranty,
                     hp_name, color, vehicle_model_type,
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
-                    payment_mode, sale_date, subtotal, tax_amount, total_amount,
+                    payment_mode, payment_status, amount_paid, amount_due,
+                    sale_date, subtotal, tax_amount, total_amount,
                     status, delivery_address, notes, expected_delivery_date, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $orderNumber, $bookingNo, $orderType, $productType, $billingLocation, $dealerId,
                 $data['customer_name'] ?? null,
@@ -153,7 +156,8 @@ class OrderService
                 $color,
                 $vehicleModelType,
                 $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
-                $paymentMode, $saleDate, $subtotal, $taxAmount, $totalAmount,
+                $paymentMode, $paymentStatus, $amountPaid, $amountDue,
+                $saleDate, $subtotal, $taxAmount, $totalAmount,
                 'pending',
                 $data['delivery_address'] ?? null,
                 $data['notes'] ?? null,
@@ -224,8 +228,9 @@ class OrderService
                     hp_name, vehicle_sale_date,
                     subtotal, tax_rate, cgst_rate, sgst_rate,
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
-                    payment_mode, total_amount, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                    payment_mode, payment_status, amount_paid, amount_due,
+                    total_amount, created_by
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $billNumber, $billType, $billingLocation, $orderId, $bookingNo,
                 setting('company_name'), setting('company_address'), setting('company_branch_address'),
@@ -254,7 +259,8 @@ class OrderService
                 $saleDate,
                 $subtotal, $cgstRate + $sgstRate, $cgstRate, $sgstRate,
                 $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
-                $paymentMode, $totalAmount, $userId,
+                $paymentMode, $paymentStatus, $amountPaid, $amountDue,
+                $totalAmount, $userId,
             ]);
             $billId = (int)$db->lastInsertId();
 
@@ -426,6 +432,26 @@ class OrderService
             $parts[] = 'cheque';
         }
         return $parts ? implode('_', $parts) : null;
+    }
+
+    /** @return array{0:string,1:float,2:float} status, paid, due */
+    public static function resolvePaymentAmounts(array $data, float $totalAmount): array
+    {
+        $status = strtolower(trim((string)($data['payment_status'] ?? 'full')));
+        if (!in_array($status, ['full', 'partial'], true)) {
+            $status = 'full';
+        }
+        if ($status === 'full') {
+            return ['full', round($totalAmount, 2), 0.0];
+        }
+        $paid = max(0, (float)($data['amount_paid'] ?? 0));
+        if ($paid <= 0) {
+            throw new RuntimeException('Enter how much was paid for a partial payment.');
+        }
+        if ($paid >= $totalAmount) {
+            throw new RuntimeException('Partial payment must be less than the order total. Choose Full paid if the full amount was received.');
+        }
+        return ['partial', round($paid, 2), round($totalAmount - $paid, 2)];
     }
 
     private static function dealerName(PDO $db, int $dealerId): ?string

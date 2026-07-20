@@ -13,6 +13,7 @@
  *  /install.php?migrate_po_spare_items=1  ← spare parts / batteries on PO line items
  *  /install.php?migrate_billing_location=1  ← Kokamthan / Kopargaon billing location on orders & invoices
  *  /install.php?migrate_sell_order_spare_parts=1  ← spare parts on sell orders + order line types
+ *  /install.php?migrate_order_payment_partial=1  ← full vs partial payment on sell orders & invoices
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -429,6 +430,58 @@ try {
         }
         $db->exec("ALTER TABLE bills MODIFY bill_type ENUM('vehicle','warranty','spare') NOT NULL DEFAULT 'vehicle'");
         echo "bills.bill_type includes spare\n";
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_order_payment_partial']) && $_GET['migrate_order_payment_partial'] === '1') {
+        echo "\n--- Order partial payment migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        $addPaymentCols = static function (PDO $db, string $table) use ($colExists): void {
+            if (!$colExists($db, $table, 'payment_status')) {
+                $db->exec(
+                    "ALTER TABLE {$table}
+                     ADD COLUMN payment_status ENUM('full','partial') NOT NULL DEFAULT 'full' AFTER payment_mode"
+                );
+                echo "added {$table}.payment_status\n";
+            } else {
+                echo "skip {$table}.payment_status\n";
+            }
+            if (!$colExists($db, $table, 'amount_paid')) {
+                $db->exec(
+                    "ALTER TABLE {$table}
+                     ADD COLUMN amount_paid DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER payment_status"
+                );
+                echo "added {$table}.amount_paid\n";
+            } else {
+                echo "skip {$table}.amount_paid\n";
+            }
+            if (!$colExists($db, $table, 'amount_due')) {
+                $db->exec(
+                    "ALTER TABLE {$table}
+                     ADD COLUMN amount_due DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER amount_paid"
+                );
+                echo "added {$table}.amount_due\n";
+            } else {
+                echo "skip {$table}.amount_due\n";
+            }
+            $db->exec(
+                "UPDATE {$table}
+                 SET payment_status = 'full',
+                     amount_paid = total_amount,
+                     amount_due = 0
+                 WHERE payment_status = 'full' AND amount_paid = 0 AND total_amount > 0"
+            );
+            echo "backfilled {$table} full-payment amounts\n";
+        };
+        $addPaymentCols($db, 'orders');
+        $addPaymentCols($db, 'bills');
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

@@ -42,6 +42,8 @@ foreach ($spareParts ?? [] as $sp) {
   modelType: '',
   modelName: '',
   batteryType: '',
+  paymentStatus: 'full',
+  amountPaid: '',
   get primary() {
     const id = String(this.items[0]?.variant_id || '');
     return this.variantMap[id] || null;
@@ -337,15 +339,39 @@ foreach ($spareParts ?? [] as $sp) {
 
     <div class="card" style="margin-bottom:0.85rem;">
       <h3 class="card-title">4. Payment &amp; incentives</h3>
+      <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">Incentives affect invoice tax. Choose full or partial payment — balance due is calculated when the order is saved.</p>
       <div class="form-grid">
-        <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" name="loan_amount" value="0"></div>
-        <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" name="discount_amount" value="0"></div>
-        <div class="form-group"><label>PM E-DRIVE Incentive (₹)</label><input class="form-control" type="number" step="0.01" name="pm_drive_incentive" value="0"></div>
-        <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" name="state_subsidy" value="0"></div>
-        <div class="form-group full" style="display:flex;gap:1.25rem;align-items:center;padding-top:0.25rem;">
-          <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1"> Paid in Cash</label>
-          <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1"> Paid in Cheque</label>
+        <div class="form-group"><label>PM E-DRIVE Incentive (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="pm_drive_incentive" value="0"></div>
+        <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="state_subsidy" value="0"></div>
+        <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="discount_amount" value="0"></div>
+        <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="loan_amount" value="0"></div>
+
+        <div class="form-group full" style="grid-column:1 / -1;padding-top:0.35rem;border-top:1px solid var(--border);">
+          <label>Payment status *</label>
+          <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.35rem;">
+            <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
+              <input type="radio" name="payment_status" value="full" x-model="paymentStatus"> Full paid
+            </label>
+            <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
+              <input type="radio" name="payment_status" value="partial" x-model="paymentStatus"> Partial payment
+            </label>
+          </div>
         </div>
+
+        <template x-if="paymentStatus === 'partial'">
+          <div class="form-group" style="grid-column:1 / -1;">
+            <label>Amount paid now (₹) *</label>
+            <input class="form-control" type="number" step="0.01" min="0.01" name="amount_paid" x-model="amountPaid" placeholder="How much received today" required>
+            <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Balance due = order total − amount paid (calculated automatically).</p>
+          </div>
+        </template>
+
+        <div class="form-group full" style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap;">
+          <span style="font-weight:700;font-size:0.82rem;color:#64748b;">Payment mode</span>
+          <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1"> Cash</label>
+          <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1"> Cheque</label>
+        </div>
+
         <div class="form-group full">
           <label>Notes</label>
           <textarea class="form-control" name="notes" rows="2"></textarea>
