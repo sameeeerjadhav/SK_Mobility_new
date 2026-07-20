@@ -21,6 +21,10 @@ $locationLabels = [
 
 <div class="stat-grid" style="margin-bottom:1rem;">
   <div class="stat-card">
+    <div class="stat-label">Total invoices</div>
+    <div class="stat-value"><?= (int)$totalInvoices ?></div>
+  </div>
+  <div class="stat-card">
     <div class="stat-label">Matching invoices</div>
     <div class="stat-value"><?= (int)$invoiceCount ?></div>
   </div>
@@ -45,8 +49,16 @@ $locationLabels = [
         <option value="kopargaon" <?= ($billingLocation ?? '') === 'kopargaon' ? 'selected' : '' ?>>Kopargaon</option>
       </select>
     </div>
+    <div class="form-group" style="margin:0;min-width:140px;">
+      <label>Sale date from</label>
+      <input class="form-control" type="date" name="from" value="<?= e($from ?? '') ?>">
+    </div>
+    <div class="form-group" style="margin:0;min-width:140px;">
+      <label>Sale date to</label>
+      <input class="form-control" type="date" name="to" value="<?= e($to ?? '') ?>">
+    </div>
     <button class="btn btn-primary" type="submit">Filter</button>
-    <?php if (($orderType ?? '') !== '' || ($billingLocation ?? '') !== ''): ?>
+    <?php if (($orderType ?? '') !== '' || ($billingLocation ?? '') !== '' || ($from ?? '') !== '' || ($to ?? '') !== ''): ?>
       <a class="btn btn-outline" href="<?= url('billing') ?>">Clear</a>
     <?php endif; ?>
   </div>

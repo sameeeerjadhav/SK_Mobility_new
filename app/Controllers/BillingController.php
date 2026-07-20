@@ -15,6 +15,8 @@ class BillingController extends Controller
 
         $orderType = trim((string)$this->input('order_type'));
         $billingLocation = trim((string)$this->input('billing_location'));
+        $from = trim((string)$this->input('from'));
+        $to = trim((string)$this->input('to'));
         $locationFilterAvailable = $this->billingLocationColumnExists();
 
         $where = ["b.bill_type = 'vehicle'"];
@@ -30,7 +32,19 @@ class BillingController extends Controller
             flash('warning', 'Billing location filter needs a database update. Run /install.php?migrate_billing_location=1 once, then try again.');
             $billingLocation = '';
         }
+        if ($from !== '') {
+            $where[] = 'COALESCE(b.vehicle_sale_date, DATE(b.created_at)) >= ?';
+            $params[] = $from;
+        }
+        if ($to !== '') {
+            $where[] = 'COALESCE(b.vehicle_sale_date, DATE(b.created_at)) <= ?';
+            $params[] = $to;
+        }
         $sqlWhere = implode(' AND ', $where);
+
+        $totalInvoices = (int)$this->db()->query(
+            "SELECT COUNT(*) FROM bills WHERE bill_type = 'vehicle'"
+        )->fetchColumn();
 
         $stmt = $this->db()->prepare(
             "SELECT b.*, o.order_type
@@ -50,9 +64,12 @@ class BillingController extends Controller
         $this->view('billing/index', [
             'title' => 'Tax Invoices',
             'bills' => $stmt->fetchAll(),
+            'totalInvoices' => $totalInvoices,
             'invoiceCount' => (int)$countStmt->fetchColumn(),
             'orderType' => $orderType,
             'billingLocation' => $billingLocation,
+            'from' => $from,
+            'to' => $to,
             'locationFilterAvailable' => $locationFilterAvailable,
             'canManage' => can('manage_billing'),
         ]);
