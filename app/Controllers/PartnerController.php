@@ -35,11 +35,14 @@ class PartnerController extends Controller
         require_role('super_admin');
         $this->validateCsrf();
         $this->db()->prepare(
-            'INSERT INTO partners (name, type, contact_person, phone, email, address, gst_number, is_active) VALUES (?,?,?,?,?,?,?,1)'
+            'INSERT INTO partners (name, phone, email, address, aadhar_number, pan_number, is_active) VALUES (?,?,?,?,?,?,1)'
         )->execute([
-            $this->input('name'), $this->input('type') ?: 'vendor',
-            $this->input('contact_person'), $this->input('phone'), $this->input('email'),
-            $this->input('address'), $this->input('gst_number'),
+            trim((string)$this->input('name')),
+            trim((string)$this->input('phone')),
+            trim((string)$this->input('email')),
+            trim((string)$this->input('address')),
+            trim((string)$this->input('aadhar_number')),
+            trim((string)$this->input('pan_number')),
         ]);
         Audit::log('create', 'partners', 'partners', (int)$this->db()->lastInsertId());
         flash('success', 'Partner created.');
@@ -51,12 +54,16 @@ class PartnerController extends Controller
         require_role('super_admin');
         $this->validateCsrf();
         $this->db()->prepare(
-            'UPDATE partners SET name=?, type=?, contact_person=?, phone=?, email=?, address=?, gst_number=?, is_active=? WHERE id=?'
+            'UPDATE partners SET name=?, phone=?, email=?, address=?, aadhar_number=?, pan_number=?, is_active=? WHERE id=?'
         )->execute([
-            $this->input('name'), $this->input('type'),
-            $this->input('contact_person'), $this->input('phone'), $this->input('email'),
-            $this->input('address'), $this->input('gst_number'),
-            (int)$this->input('is_active'), (int)$id,
+            trim((string)$this->input('name')),
+            trim((string)$this->input('phone')),
+            trim((string)$this->input('email')),
+            trim((string)$this->input('address')),
+            trim((string)$this->input('aadhar_number')),
+            trim((string)$this->input('pan_number')),
+            (int)$this->input('is_active'),
+            (int)$id,
         ]);
         Audit::log('update', 'partners', 'partners', (int)$id);
         flash('success', 'Partner updated.');

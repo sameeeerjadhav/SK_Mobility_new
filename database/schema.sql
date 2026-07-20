@@ -602,6 +602,8 @@ CREATE TABLE partners (
   phone VARCHAR(20) NULL,
   email VARCHAR(191) NULL,
   address TEXT NULL,
+  aadhar_number VARCHAR(20) NULL,
+  pan_number VARCHAR(20) NULL,
   gst_number VARCHAR(30) NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -651,6 +653,16 @@ CREATE TABLE expenses (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES expense_categories(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE expense_items (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  expense_id INT UNSIGNED NOT NULL,
+  name VARCHAR(150) NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+  INDEX idx_expense_items_expense (expense_id)
 ) ENGINE=InnoDB;
 
 -- ============================================================

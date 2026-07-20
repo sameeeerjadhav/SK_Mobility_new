@@ -6,7 +6,8 @@
  *  /install.php
  *  /install.php?reset_admin=1
  *  /install.php?migrate_invoice=1   ← SAI KUBER tax invoice columns + company settings
- *  /install.php?migrate_expenses=1  ← expense asset / expenditure record type
+ *  /install.php?migrate_expenses=1  ← expense types, GST, multi-item line items
+ *  /install.php?migrate_partners=1  ← partner Aadhar & PAN fields
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -163,6 +164,59 @@ try {
         $addCol($db, 'expenses', 'sgst_amount', 'DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cgst_amount');
         $addCol($db, 'expenses', 'total_amount', 'DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER sgst_amount');
         $db->exec('UPDATE expenses SET total_amount = amount WHERE total_amount = 0');
+
+        $tableExists = $db->query(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'expense_items'"
+        )->fetchColumn();
+        if ((int)$tableExists === 0) {
+            $db->exec(
+                "CREATE TABLE expense_items (
+                  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                  expense_id INT UNSIGNED NOT NULL,
+                  name VARCHAR(150) NOT NULL,
+                  amount DECIMAL(10,2) NOT NULL,
+                  sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                  FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+                  INDEX idx_expense_items_expense (expense_id)
+                ) ENGINE=InnoDB"
+            );
+            echo "created expense_items\n";
+        } else {
+            echo "skip expense_items\n";
+        }
+
+        $db->exec(
+            "INSERT INTO expense_items (expense_id, name, amount, sort_order)
+             SELECT e.id,
+                    CASE WHEN e.name IS NOT NULL AND e.name <> '' THEN e.name ELSE CONCAT('Item #', e.id) END,
+                    e.amount,
+                    0
+             FROM expenses e
+             LEFT JOIN expense_items ei ON ei.expense_id = e.id
+             WHERE ei.id IS NULL"
+        );
+        echo "backfilled expense_items\n";
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_partners']) && $_GET['migrate_partners'] === '1') {
+        echo "\n--- Partner Aadhar / PAN migration ---\n";
+        $addCol = static function (PDO $db, string $table, string $column, string $definition): void {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                echo "skip {$table}.{$column}\n";
+                return;
+            }
+            $db->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+            echo "added {$table}.{$column}\n";
+        };
+        $addCol($db, 'partners', 'aadhar_number', 'VARCHAR(20) NULL AFTER address');
+        $addCol($db, 'partners', 'pan_number', 'VARCHAR(20) NULL AFTER aadhar_number');
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

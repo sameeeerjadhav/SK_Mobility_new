@@ -14,13 +14,13 @@
   <div class="grid-2">
     <div class="card"><h3 class="card-title">Partners</h3>
       <div class="table-wrap"><table class="data">
-        <thead><tr><th>Name</th><th>Type</th><th>Contact</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Contact No.</th><th>Email</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($partners as $p): ?>
           <tr>
             <td><?= e($p['name']) ?></td>
-            <td><span class="chip chip-info"><?= e(ucfirst($p['type'])) ?></span></td>
-            <td><?= e($p['contact_person'] ?? '—') ?><div class="muted" style="font-size:0.75rem;"><?= e($p['phone'] ?? '') ?></div></td>
+            <td><?= e($p['phone'] ?: '—') ?></td>
+            <td><?= e($p['email'] ?: '—') ?></td>
             <td style="white-space:nowrap;">
               <button class="btn btn-sm btn-outline" type="button" @click='editPartner = <?= json_encode($p, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
               <form method="post" action="<?= url('partners/'.$p['id'].'/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete?')">
@@ -60,15 +60,12 @@
       <?= csrf_field() ?>
       <div class="modal-header"><h3 class="modal-title">Add Partner</h3></div>
       <div class="modal-body form-grid">
-        <div class="form-group"><label>Name</label><input class="form-control" name="name" required></div>
-        <div class="form-group"><label>Type</label>
-          <select class="form-control" name="type"><?php foreach (['vendor','distributor','supplier','other'] as $t): ?><option value="<?= $t ?>"><?= ucfirst($t) ?></option><?php endforeach; ?></select>
-        </div>
-        <div class="form-group"><label>Contact</label><input class="form-control" name="contact_person"></div>
-        <div class="form-group"><label>Phone</label><input class="form-control" name="phone"></div>
-        <div class="form-group"><label>Email</label><input class="form-control" name="email"></div>
-        <div class="form-group"><label>GST</label><input class="form-control" name="gst_number"></div>
+        <div class="form-group full"><label>Name *</label><input class="form-control" name="name" required></div>
+        <div class="form-group"><label>Contact No.</label><input class="form-control" name="phone" type="tel"></div>
+        <div class="form-group"><label>Email ID</label><input class="form-control" name="email" type="email"></div>
         <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" rows="2"></textarea></div>
+        <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="aadhar_number" maxlength="12" inputmode="numeric"></div>
+        <div class="form-group"><label>PAN Number</label><input class="form-control" name="pan_number" maxlength="10" style="text-transform:uppercase;"></div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-outline" @click="partnerOpen=false">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
     </form></div>
@@ -80,19 +77,14 @@
         <?= csrf_field() ?>
         <div class="modal-header"><h3 class="modal-title">Edit Partner</h3></div>
         <div class="modal-body form-grid">
-          <div class="form-group"><label>Name</label><input class="form-control" name="name" :value="editPartner?.name" required></div>
-          <div class="form-group"><label>Type</label>
-            <select class="form-control" name="type" :value="editPartner?.type">
-              <?php foreach (['vendor','distributor','supplier','other'] as $t): ?><option value="<?= $t ?>"><?= ucfirst($t) ?></option><?php endforeach; ?>
-            </select>
-          </div>
-          <div class="form-group"><label>Contact</label><input class="form-control" name="contact_person" :value="editPartner?.contact_person"></div>
-          <div class="form-group"><label>Phone</label><input class="form-control" name="phone" :value="editPartner?.phone"></div>
-          <div class="form-group"><label>Email</label><input class="form-control" name="email" :value="editPartner?.email"></div>
-          <div class="form-group"><label>GST</label><input class="form-control" name="gst_number" :value="editPartner?.gst_number"></div>
-          <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" :value="editPartner?.address" rows="2"></textarea></div>
+          <div class="form-group full"><label>Name *</label><input class="form-control" name="name" x-model="editPartner.name" required></div>
+          <div class="form-group"><label>Contact No.</label><input class="form-control" name="phone" type="tel" x-model="editPartner.phone"></div>
+          <div class="form-group"><label>Email ID</label><input class="form-control" name="email" type="email" x-model="editPartner.email"></div>
+          <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" x-model="editPartner.address" rows="2"></textarea></div>
+          <div class="form-group"><label>Aadhar No.</label><input class="form-control" name="aadhar_number" maxlength="12" inputmode="numeric" x-model="editPartner.aadhar_number"></div>
+          <div class="form-group"><label>PAN Number</label><input class="form-control" name="pan_number" maxlength="10" style="text-transform:uppercase;" x-model="editPartner.pan_number"></div>
           <div class="form-group"><label>Active</label>
-            <select class="form-control" name="is_active" :value="String(editPartner?.is_active)">
+            <select class="form-control" name="is_active" x-model="editPartner.is_active">
               <option value="1">Active</option>
               <option value="0">Inactive</option>
             </select>

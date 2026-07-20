@@ -74,11 +74,16 @@ class ExpenseController extends Controller
              LIMIT 500"
         );
         $expenses->execute($params);
+        $rows = $expenses->fetchAll();
+        $this->attachItems($rows);
+
+        $editId = (int)($this->input('edit') ?? 0);
+        $editExpense = $editId > 0 ? $this->findExpense($editId) : null;
 
         $this->view('expenses/index', [
             'title' => 'Assets & Expenditure',
             'stats' => $stats,
-            'expenses' => $expenses->fetchAll(),
+            'expenses' => $rows,
             'categories' => $this->db()->query('SELECT * FROM expense_categories WHERE is_active=1 ORDER BY name')->fetchAll(),
             'allCategories' => $this->db()->query('SELECT * FROM expense_categories ORDER BY name')->fetchAll(),
             'recordTypes' => self::recordTypes(),
@@ -90,6 +95,23 @@ class ExpenseController extends Controller
             'to' => $to,
             'filteredSum' => (float)$filteredSum,
             'filteredCount' => (int)$filteredCount,
+            'editExpense' => $editExpense,
+        ]);
+    }
+
+    public function show(string $id): void
+    {
+        require_role('super_admin');
+        $expense = $this->findExpense((int)$id);
+        $total = (float)($expense['total_amount'] ?? 0) > 0
+            ? (float)$expense['total_amount']
+            : (float)$expense['amount'];
+
+        $this->view('expenses/show', [
+            'title' => $expense['name'] ?: 'Expense #' . $expense['id'],
+            'expense' => $expense,
+            'items' => $expense['items'] ?? [],
+            'total' => $total,
         ]);
     }
 
@@ -102,29 +124,40 @@ class ExpenseController extends Controller
             $payload = $this->validatedPayload();
             $receipt = $this->uploadReceipt();
 
-            $this->db()->prepare(
-                'INSERT INTO expenses (
-                    category_id, record_type, name, amount, gst_applicable,
-                    cgst_amount, sgst_amount, total_amount,
-                    description, expense_date, payment_mode, receipt_url, created_by
-                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
-            )->execute([
-                $payload['category_id'],
-                $payload['record_type'],
-                $payload['name'],
-                $payload['amount'],
-                $payload['gst_applicable'],
-                $payload['cgst_amount'],
-                $payload['sgst_amount'],
-                $payload['total_amount'],
-                $payload['description'],
-                $payload['expense_date'],
-                $payload['payment_mode'],
-                $receipt,
-                Auth::id(),
-            ]);
+            $db = $this->db();
+            $db->beginTransaction();
+            try {
+                $db->prepare(
+                    'INSERT INTO expenses (
+                        category_id, record_type, name, amount, gst_applicable,
+                        cgst_amount, sgst_amount, total_amount,
+                        description, expense_date, payment_mode, receipt_url, created_by
+                     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                )->execute([
+                    $payload['category_id'],
+                    $payload['record_type'],
+                    $payload['name'],
+                    $payload['amount'],
+                    $payload['gst_applicable'],
+                    $payload['cgst_amount'],
+                    $payload['sgst_amount'],
+                    $payload['total_amount'],
+                    $payload['description'],
+                    $payload['expense_date'],
+                    $payload['payment_mode'],
+                    $receipt,
+                    Auth::id(),
+                ]);
 
-            Audit::log('create', 'expenses', 'expenses', (int)$this->db()->lastInsertId());
+                $expenseId = (int)$db->lastInsertId();
+                $this->saveItems($expenseId, $payload['items']);
+                $db->commit();
+            } catch (\Throwable $e) {
+                $db->rollBack();
+                throw $e;
+            }
+
+            Audit::log('create', 'expenses', 'expenses', $expenseId);
             flash('success', 'Record saved.');
         } catch (RuntimeException $e) {
             flash('error', $e->getMessage());
@@ -152,52 +185,62 @@ class ExpenseController extends Controller
                 throw new RuntimeException('Expense record not found.');
             }
 
-            if ($receipt) {
-                if (!empty($row['receipt_url'])) {
-                    Upload::delete((string)$row['receipt_url']);
+            $db = $this->db();
+            $db->beginTransaction();
+            try {
+                if ($receipt) {
+                    if (!empty($row['receipt_url'])) {
+                        Upload::delete((string)$row['receipt_url']);
+                    }
+                    $db->prepare(
+                        'UPDATE expenses SET
+                            category_id=?, record_type=?, name=?, amount=?, gst_applicable=?,
+                            cgst_amount=?, sgst_amount=?, total_amount=?,
+                            description=?, expense_date=?, payment_mode=?, receipt_url=?
+                         WHERE id=?'
+                    )->execute([
+                        $payload['category_id'],
+                        $payload['record_type'],
+                        $payload['name'],
+                        $payload['amount'],
+                        $payload['gst_applicable'],
+                        $payload['cgst_amount'],
+                        $payload['sgst_amount'],
+                        $payload['total_amount'],
+                        $payload['description'],
+                        $payload['expense_date'],
+                        $payload['payment_mode'],
+                        $receipt,
+                        $expenseId,
+                    ]);
+                } else {
+                    $db->prepare(
+                        'UPDATE expenses SET
+                            category_id=?, record_type=?, name=?, amount=?, gst_applicable=?,
+                            cgst_amount=?, sgst_amount=?, total_amount=?,
+                            description=?, expense_date=?, payment_mode=?
+                         WHERE id=?'
+                    )->execute([
+                        $payload['category_id'],
+                        $payload['record_type'],
+                        $payload['name'],
+                        $payload['amount'],
+                        $payload['gst_applicable'],
+                        $payload['cgst_amount'],
+                        $payload['sgst_amount'],
+                        $payload['total_amount'],
+                        $payload['description'],
+                        $payload['expense_date'],
+                        $payload['payment_mode'],
+                        $expenseId,
+                    ]);
                 }
-                $this->db()->prepare(
-                    'UPDATE expenses SET
-                        category_id=?, record_type=?, name=?, amount=?, gst_applicable=?,
-                        cgst_amount=?, sgst_amount=?, total_amount=?,
-                        description=?, expense_date=?, payment_mode=?, receipt_url=?
-                     WHERE id=?'
-                )->execute([
-                    $payload['category_id'],
-                    $payload['record_type'],
-                    $payload['name'],
-                    $payload['amount'],
-                    $payload['gst_applicable'],
-                    $payload['cgst_amount'],
-                    $payload['sgst_amount'],
-                    $payload['total_amount'],
-                    $payload['description'],
-                    $payload['expense_date'],
-                    $payload['payment_mode'],
-                    $receipt,
-                    $expenseId,
-                ]);
-            } else {
-                $this->db()->prepare(
-                    'UPDATE expenses SET
-                        category_id=?, record_type=?, name=?, amount=?, gst_applicable=?,
-                        cgst_amount=?, sgst_amount=?, total_amount=?,
-                        description=?, expense_date=?, payment_mode=?
-                     WHERE id=?'
-                )->execute([
-                    $payload['category_id'],
-                    $payload['record_type'],
-                    $payload['name'],
-                    $payload['amount'],
-                    $payload['gst_applicable'],
-                    $payload['cgst_amount'],
-                    $payload['sgst_amount'],
-                    $payload['total_amount'],
-                    $payload['description'],
-                    $payload['expense_date'],
-                    $payload['payment_mode'],
-                    $expenseId,
-                ]);
+
+                $this->saveItems($expenseId, $payload['items']);
+                $db->commit();
+            } catch (\Throwable $e) {
+                $db->rollBack();
+                throw $e;
             }
 
             Audit::log('update', 'expenses', 'expenses', $expenseId);
@@ -273,9 +316,9 @@ class ExpenseController extends Controller
     /** @return array<string, mixed> */
     private function validatedPayload(): array
     {
-        $name = trim((string)$this->input('name'));
-        if ($name === '') {
-            throw new RuntimeException('Name is required — enter what was purchased or spent on.');
+        $items = $this->parseItems();
+        if ($items === []) {
+            throw new RuntimeException('Add at least one item with a name and base amount.');
         }
 
         $categoryId = (int)$this->input('category_id');
@@ -283,13 +326,24 @@ class ExpenseController extends Controller
             throw new RuntimeException('Please select a category. Add one first if the list is empty.');
         }
 
-        $amount = (float)$this->input('amount');
+        $amount = 0.0;
+        $names = [];
+        foreach ($items as $item) {
+            $amount += $item['amount'];
+            $names[] = $item['name'];
+        }
+        $amount = round($amount, 2);
         if ($amount <= 0) {
-            throw new RuntimeException('Amount must be greater than zero.');
+            throw new RuntimeException('Total base amount must be greater than zero.');
         }
 
         $gstApplicable = isset($_POST['gst_applicable']) && $_POST['gst_applicable'] === '1';
         [$cgst, $sgst, $total] = self::computeGst($amount, $gstApplicable);
+
+        $name = implode(', ', $names);
+        if (strlen($name) > 150) {
+            $name = substr($name, 0, 147) . '...';
+        }
 
         return [
             'category_id' => $categoryId,
@@ -303,7 +357,91 @@ class ExpenseController extends Controller
             'description' => trim((string)$this->input('description')),
             'expense_date' => $this->input('expense_date') ?: date('Y-m-d'),
             'payment_mode' => $this->validPaymentMode($this->input('payment_mode')),
+            'items' => $items,
         ];
+    }
+
+    /** @return list<array{name: string, amount: float}> */
+    private function parseItems(): array
+    {
+        $names = $_POST['item_name'] ?? null;
+        $amounts = $_POST['item_amount'] ?? null;
+
+        // Legacy single-field fallback
+        if (!is_array($names) || !is_array($amounts)) {
+            $legacyName = trim((string)$this->input('name'));
+            $legacyAmount = (float)$this->input('amount');
+            if ($legacyName !== '' && $legacyAmount > 0) {
+                return [['name' => $legacyName, 'amount' => round($legacyAmount, 2)]];
+            }
+            return [];
+        }
+
+        $items = [];
+        $count = max(count($names), count($amounts));
+        for ($i = 0; $i < $count; $i++) {
+            $name = trim((string)($names[$i] ?? ''));
+            $amount = round((float)($amounts[$i] ?? 0), 2);
+            if ($name === '' && $amount <= 0) {
+                continue;
+            }
+            if ($name === '') {
+                throw new RuntimeException('Each item needs a name (e.g. Laptop, Printer).');
+            }
+            if ($amount <= 0) {
+                throw new RuntimeException('Each item needs a base amount greater than zero.');
+            }
+            $items[] = ['name' => $name, 'amount' => $amount];
+        }
+
+        return $items;
+    }
+
+    /** @param list<array{name: string, amount: float}> $items */
+    private function saveItems(int $expenseId, array $items): void
+    {
+        $this->db()->prepare('DELETE FROM expense_items WHERE expense_id = ?')->execute([$expenseId]);
+        $ins = $this->db()->prepare(
+            'INSERT INTO expense_items (expense_id, name, amount, sort_order) VALUES (?,?,?,?)'
+        );
+        foreach ($items as $i => $item) {
+            $ins->execute([$expenseId, $item['name'], $item['amount'], $i]);
+        }
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private function attachItems(array &$rows): void
+    {
+        if ($rows === []) {
+            return;
+        }
+
+        try {
+            $ids = array_map(static fn($r) => (int)$r['id'], $rows);
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $this->db()->prepare(
+                "SELECT id, expense_id, name, amount, sort_order
+                 FROM expense_items
+                 WHERE expense_id IN ({$placeholders})
+                 ORDER BY sort_order ASC, id ASC"
+            );
+            $stmt->execute($ids);
+            $byExpense = [];
+            foreach ($stmt->fetchAll() as $item) {
+                $byExpense[(int)$item['expense_id']][] = $item;
+            }
+        } catch (PDOException) {
+            $byExpense = [];
+        }
+
+        foreach ($rows as &$row) {
+            $row['items'] = $byExpense[(int)$row['id']] ?? [[
+                'name' => $row['name'] ?? '',
+                'amount' => (float)$row['amount'],
+            ]];
+            $row['item_count'] = count($row['items']);
+        }
+        unset($row);
     }
 
     /** @return array{0: float, 1: float, 2: float} */
@@ -369,9 +507,10 @@ class ExpenseController extends Controller
             $params[] = $paymentMode;
         }
         if ($search !== '') {
-            $where[] = '(e.name LIKE ? OR e.description LIKE ? OR ec.name LIKE ?)';
+            $where[] = '(e.name LIKE ? OR e.description LIKE ? OR ec.name LIKE ?
+                        OR EXISTS (SELECT 1 FROM expense_items ei WHERE ei.expense_id = e.id AND ei.name LIKE ?))';
             $q = '%' . $search . '%';
-            array_push($params, $q, $q, $q);
+            array_push($params, $q, $q, $q, $q);
         }
         if ($from !== '') {
             $where[] = 'e.expense_date >= ?';
@@ -389,5 +528,39 @@ class ExpenseController extends Controller
     {
         $qs = trim((string)$this->input('return_filters'));
         return $qs !== '' ? '?' . $qs : '';
+    }
+
+    /** @return array<string, mixed> */
+    private function findExpense(int $id): array
+    {
+        $stmt = $this->db()->prepare(
+            "SELECT e.*, ec.name AS category_name, u.first_name, u.last_name
+             FROM expenses e
+             JOIN expense_categories ec ON ec.id = e.category_id
+             JOIN users u ON u.id = e.created_by
+             WHERE e.id = ? LIMIT 1"
+        );
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            flash('error', 'Expense record not found.');
+            $this->redirect('/expenses');
+        }
+
+        $items = $this->db()->prepare(
+            'SELECT id, expense_id, name, amount, sort_order
+             FROM expense_items WHERE expense_id = ? ORDER BY sort_order ASC, id ASC'
+        );
+        $items->execute([$id]);
+        $row['items'] = $items->fetchAll();
+        if ($row['items'] === []) {
+            $row['items'] = [[
+                'name' => $row['name'] ?? '',
+                'amount' => (float)$row['amount'],
+            ]];
+        }
+        $row['item_count'] = count($row['items']);
+
+        return $row;
     }
 }

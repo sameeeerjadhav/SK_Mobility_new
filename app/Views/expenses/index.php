@@ -17,9 +17,9 @@ $expenseTotal = static function (array $e): float {
   expOpen: false,
   catOpen: false,
   editCat: null,
-  editExp: null,
+  editExp: <?= $editExpense ? json_encode($editExpense, JSON_HEX_APOS | JSON_HEX_TAG) : 'null' ?>,
   gstApplicable: false,
-  baseAmount: '',
+  items: [{ name: '', amount: '' }],
   gstCalc(amount, on) {
     const base = parseFloat(amount) || 0;
     if (!on || base <= 0) return { cgst: 0, sgst: 0, total: base };
@@ -27,13 +27,36 @@ $expenseTotal = static function (array $e): float {
     const sgst = Math.round(base * 0.09 * 100) / 100;
     return { cgst, sgst, total: Math.round((base + cgst + sgst) * 100) / 100 };
   },
+  itemsBase(list) {
+    return (list || []).reduce((sum, it) => sum + (parseFloat(it.amount) || 0), 0);
+  },
+  itemsTotal(list, on) {
+    return this.gstCalc(this.itemsBase(list), on);
+  },
   fmt(n) { return '₹' + (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
   openAdd() {
     this.expOpen = true;
     this.gstApplicable = false;
-    this.baseAmount = '';
+    this.items = [{ name: '', amount: '' }];
+  },
+  addItem(listKey) {
+    this[listKey].push({ name: '', amount: '' });
+  },
+  removeItem(listKey, idx) {
+    if (this[listKey].length <= 1) return;
+    this[listKey].splice(idx, 1);
+  },
+  openEdit(row) {
+    const copy = JSON.parse(JSON.stringify(row));
+    if (!copy.items || !copy.items.length) {
+      copy.items = [{ name: copy.name || '', amount: copy.amount || '' }];
+    } else {
+      copy.items = copy.items.map(it => ({ name: it.name || '', amount: it.amount || '' }));
+    }
+    this.editExp = copy;
   }
-}">
+}"
+  x-init="if (editExp) openEdit(editExp)">
   <div class="toolbar">
     <div>
       <h1 class="page-title">Assets &amp; Expenditure</h1>
@@ -169,8 +192,14 @@ $expenseTotal = static function (array $e): float {
           <tr>
             <td><?= india_date($e['expense_date']) ?></td>
             <td>
-              <strong><?= e($e['name'] ?: '—') ?></strong>
-              <?php if (!empty($e['description'])): ?><div class="muted" style="font-size:0.78rem;"><?= e($e['description']) ?></div><?php endif; ?>
+              <strong><a href="<?= url('expenses/' . $e['id']) ?>"><?= e($e['name'] ?: '—') ?></a></strong>
+              <?php if (!empty($e['items']) && count($e['items']) > 1): ?>
+                <?php foreach ($e['items'] as $item): ?>
+                  <div class="muted" style="font-size:0.78rem;"><?= e($item['name']) ?> · <?= money($item['amount']) ?></div>
+                <?php endforeach; ?>
+              <?php elseif (!empty($e['description'])): ?>
+                <div class="muted" style="font-size:0.78rem;"><?= e($e['description']) ?></div>
+              <?php endif; ?>
             </td>
             <td>
               <?php if (($e['record_type'] ?? 'expenditure') === 'asset'): ?>
@@ -192,13 +221,14 @@ $expenseTotal = static function (array $e): float {
             <td><?= e(ucfirst($e['payment_mode'])) ?></td>
             <td>
               <?php if (!empty($e['receipt_url'])): ?>
-                <a href="<?= asset($e['receipt_url']) ?>" target="_blank" rel="noopener">View</a>
+                <a href="<?= asset($e['receipt_url']) ?>" target="_blank" rel="noopener">File</a>
               <?php else: ?>
                 <span class="muted">—</span>
               <?php endif; ?>
             </td>
             <td style="white-space:nowrap;">
-              <button class="btn btn-sm btn-outline" type="button" @click='editExp = <?= json_encode($e, JSON_HEX_APOS | JSON_HEX_TAG) ?>'>Edit</button>
+              <a class="btn btn-sm btn-outline" href="<?= url('expenses/' . $e['id']) ?>">View</a>
+              <button class="btn btn-sm btn-outline" type="button" @click='openEdit(<?= json_encode($e, JSON_HEX_APOS | JSON_HEX_TAG) ?>)'>Edit</button>
               <form method="post" action="<?= url('expenses/' . $e['id'] . '/delete') ?>" style="display:inline;" onsubmit="return confirm('Delete this record?')">
                 <?= csrf_field() ?>
                 <?php if ($filterQuery !== ''): ?><input type="hidden" name="return_filters" value="<?= e($filterQuery) ?>"><?php endif; ?>
@@ -216,11 +246,14 @@ $expenseTotal = static function (array $e): float {
   </div>
 
   <div class="modal-backdrop" :class="{open:expOpen}" @click.self="expOpen=false">
-    <div class="modal">
+    <div class="modal" style="max-width:640px;">
       <form method="post" action="<?= url('expenses') ?>" enctype="multipart/form-data">
         <?= csrf_field() ?>
         <?php if ($filterQuery !== ''): ?><input type="hidden" name="return_filters" value="<?= e($filterQuery) ?>"><?php endif; ?>
-        <div class="modal-header"><h3 class="modal-title">Add record</h3></div>
+        <div class="modal-header">
+          <h3 class="modal-title">Add record</h3>
+          <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">One receipt = one record. Use <strong>+ Add item</strong> for multiple products on the same bill.</p>
+        </div>
         <div class="modal-body form-grid">
           <div class="form-group">
             <label>Type *</label>
@@ -237,28 +270,45 @@ $expenseTotal = static function (array $e): float {
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="form-group full">
-            <label>Name *</label>
-            <input class="form-control" name="name" required placeholder="e.g. Office laptop, March electricity bill">
+
+          <div class="form-group full" style="padding:0.75rem;border:1px solid var(--border);border-radius:10px;background:#fafafa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.55rem;">
+              <div>
+                <label style="margin:0;font-weight:700;">Items in this record *</label>
+                <p class="muted" style="margin:0.2rem 0 0;font-size:0.78rem;">e.g. Laptop and Printer on one receipt</p>
+              </div>
+              <button type="button" class="btn btn-sm btn-primary" @click="addItem('items')">+ Add item</button>
+            </div>
+            <div x-for="(item, idx) in items" :key="'add-item-' + idx" style="display:grid;grid-template-columns:1fr 140px auto;gap:0.45rem;margin-bottom:0.45rem;align-items:end;">
+              <div class="form-group" style="margin:0;">
+                <label x-text="'Item ' + (idx + 1)" style="font-size:0.75rem;"></label>
+                <input class="form-control" name="item_name[]" x-model="item.name" required placeholder="e.g. Laptop">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label style="font-size:0.75rem;">Base amount</label>
+                <input class="form-control" type="number" step="0.01" min="0.01" name="item_amount[]" x-model="item.amount" required>
+              </div>
+              <button type="button" class="btn btn-sm btn-danger" style="margin-bottom:0;" @click="removeItem('items', idx)" :disabled="items.length <= 1" title="Remove item">×</button>
+            </div>
           </div>
+
           <div class="form-group full">
             <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;cursor:pointer;">
               <input type="checkbox" name="gst_applicable" value="1" x-model="gstApplicable">
-              Include GST (9% CGST + 9% SGST)
+              Include GST (9% CGST + 9% SGST) on total base
             </label>
           </div>
-          <div class="form-group">
-            <label>Base amount *</label>
-            <input class="form-control" type="number" step="0.01" min="0.01" name="amount" x-model="baseAmount" required>
-          </div>
-          <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" value="<?= date('Y-m-d') ?>"></div>
-          <div class="form-group full" x-show="gstApplicable" x-cloak style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:10px;background:#f8fffd;">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;font-size:0.88rem;">
-              <div><span class="muted">CGST 9%</span><br><strong x-text="fmt(gstCalc(baseAmount, gstApplicable).cgst)"></strong></div>
-              <div><span class="muted">SGST 9%</span><br><strong x-text="fmt(gstCalc(baseAmount, gstApplicable).sgst)"></strong></div>
-              <div><span class="muted">Total payable</span><br><strong style="color:#0f766e;" x-text="fmt(gstCalc(baseAmount, gstApplicable).total)"></strong></div>
+
+          <div class="form-group full" style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:10px;background:#f8fffd;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;font-size:0.88rem;">
+              <div><span class="muted">Base total</span><br><strong x-text="fmt(itemsBase(items))"></strong></div>
+              <div x-show="gstApplicable"><span class="muted">CGST 9%</span><br><strong x-text="fmt(itemsTotal(items, gstApplicable).cgst)"></strong></div>
+              <div x-show="gstApplicable"><span class="muted">SGST 9%</span><br><strong x-text="fmt(itemsTotal(items, gstApplicable).sgst)"></strong></div>
+              <div><span class="muted">Total payable</span><br><strong style="color:#0f766e;" x-text="fmt(itemsTotal(items, gstApplicable).total)"></strong></div>
             </div>
           </div>
+
+          <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" value="<?= date('Y-m-d') ?>"></div>
           <div class="form-group">
             <label>Payment mode</label>
             <select class="form-control" name="payment_mode">
@@ -279,12 +329,15 @@ $expenseTotal = static function (array $e): float {
   </div>
 
   <div class="modal-backdrop" :class="{open:!!editExp}" @click.self="editExp=null" x-show="editExp" x-cloak>
-    <div class="modal" x-show="editExp">
+    <div class="modal" style="max-width:640px;" x-show="editExp">
       <form method="post" :action="'<?= url('expenses') ?>/' + editExp?.id" enctype="multipart/form-data">
         <?= csrf_field() ?>
         <?php if ($filterQuery !== ''): ?><input type="hidden" name="return_filters" value="<?= e($filterQuery) ?>"><?php endif; ?>
-        <div class="modal-header"><h3 class="modal-title">Edit record</h3></div>
-        <div class="modal-body form-grid">
+        <div class="modal-header">
+          <h3 class="modal-title">Edit record</h3>
+          <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">Update items in this single record. Use <strong>+ Add item</strong> for more lines on the same receipt.</p>
+        </div>
+        <div class="modal-body form-grid" x-show="editExp">
           <div class="form-group">
             <label>Type *</label>
             <select class="form-control" name="record_type" x-model="editExp.record_type">
@@ -300,28 +353,42 @@ $expenseTotal = static function (array $e): float {
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="form-group full">
-            <label>Name *</label>
-            <input class="form-control" name="name" x-model="editExp.name" required>
+
+          <div class="form-group full" x-show="editExp?.items" style="padding:0.75rem;border:1px solid var(--border);border-radius:10px;background:#fafafa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.55rem;">
+              <label style="margin:0;font-weight:700;">Items in this record *</label>
+              <button type="button" class="btn btn-sm btn-primary" @click="editExp.items.push({ name: '', amount: '' })">+ Add item</button>
+            </div>
+            <div x-for="(item, idx) in editExp.items" :key="'edit-item-' + idx" style="display:grid;grid-template-columns:1fr 140px auto;gap:0.45rem;margin-bottom:0.45rem;align-items:end;">
+              <div class="form-group" style="margin:0;">
+                <label x-text="'Item ' + (idx + 1)" style="font-size:0.75rem;"></label>
+                <input class="form-control" name="item_name[]" x-model="item.name" required placeholder="e.g. Laptop">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label style="font-size:0.75rem;">Base amount</label>
+                <input class="form-control" type="number" step="0.01" min="0.01" name="item_amount[]" x-model="item.amount" required>
+              </div>
+              <button type="button" class="btn btn-sm btn-danger" style="margin-bottom:0;" @click="editExp.items.length > 1 && editExp.items.splice(idx, 1)" :disabled="editExp.items.length <= 1" title="Remove item">×</button>
+            </div>
           </div>
+
           <div class="form-group full">
             <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;cursor:pointer;">
               <input type="checkbox" name="gst_applicable" value="1" :checked="editExp.gst_applicable == 1" @change="editExp.gst_applicable = $event.target.checked ? 1 : 0">
-              Include GST (9% CGST + 9% SGST)
+              Include GST (9% CGST + 9% SGST) on total base
             </label>
           </div>
-          <div class="form-group">
-            <label>Base amount *</label>
-            <input class="form-control" type="number" step="0.01" min="0.01" name="amount" x-model="editExp.amount" required>
-          </div>
-          <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" x-model="editExp.expense_date"></div>
-          <div class="form-group full" x-show="editExp.gst_applicable == 1" x-cloak style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:10px;background:#f8fffd;">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;font-size:0.88rem;">
-              <div><span class="muted">CGST 9%</span><br><strong x-text="fmt(gstCalc(editExp.amount, editExp.gst_applicable == 1).cgst)"></strong></div>
-              <div><span class="muted">SGST 9%</span><br><strong x-text="fmt(gstCalc(editExp.amount, editExp.gst_applicable == 1).sgst)"></strong></div>
-              <div><span class="muted">Total payable</span><br><strong style="color:#0f766e;" x-text="fmt(gstCalc(editExp.amount, editExp.gst_applicable == 1).total)"></strong></div>
+
+          <div class="form-group full" style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:10px;background:#f8fffd;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;font-size:0.88rem;">
+              <div><span class="muted">Base total</span><br><strong x-text="fmt(itemsBase(editExp.items))"></strong></div>
+              <div x-show="editExp.gst_applicable == 1"><span class="muted">CGST 9%</span><br><strong x-text="fmt(itemsTotal(editExp.items, editExp.gst_applicable == 1).cgst)"></strong></div>
+              <div x-show="editExp.gst_applicable == 1"><span class="muted">SGST 9%</span><br><strong x-text="fmt(itemsTotal(editExp.items, editExp.gst_applicable == 1).sgst)"></strong></div>
+              <div><span class="muted">Total payable</span><br><strong style="color:#0f766e;" x-text="fmt(itemsTotal(editExp.items, editExp.gst_applicable == 1).total)"></strong></div>
             </div>
           </div>
+
+          <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" x-model="editExp.expense_date"></div>
           <div class="form-group">
             <label>Payment mode</label>
             <select class="form-control" name="payment_mode" x-model="editExp.payment_mode">
