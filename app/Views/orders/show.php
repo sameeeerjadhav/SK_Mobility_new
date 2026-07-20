@@ -1,6 +1,9 @@
 <?php
 $isSpareOrder = ($order['product_type'] ?? 'vehicle') === 'spare_part';
-$gstLabel = $isSpareOrder ? 'GST 18%' : 'GST 28%';
+$cgstRate = (float)($order['cgst_rate'] ?? ($isSpareOrder ? 9 : 14));
+$sgstRate = (float)($order['sgst_rate'] ?? ($isSpareOrder ? 9 : 14));
+$taxRate = (float)($order['tax_rate'] ?? ($cgstRate + $sgstRate));
+$gstLabel = 'GST ' . rtrim(rtrim(number_format($taxRate, 2, '.', ''), '0'), '.') . '%';
 ?>
 <style>
 .od{max-width:1080px}
@@ -140,6 +143,7 @@ $gstLabel = $isSpareOrder ? 'GST 18%' : 'GST 28%';
           <div><span class="k"><?= e($gstLabel) ?></span><span class="v"><?= money($order['tax_amount']) ?></span></div>
           <div class="total"><span class="k">Total</span><span class="v"><?= money($order['total_amount']) ?></span></div>
         </div>
+        <p class="muted" style="margin:0.35rem 0 0;font-size:0.78rem;">CGST <?= e(rtrim(rtrim(number_format($cgstRate, 2), '0'), '.')) ?>% + SGST <?= e(rtrim(rtrim(number_format($sgstRate, 2), '0'), '.')) ?>%</p>
 
         <?php
           $payStatus = $order['payment_status'] ?? 'full';

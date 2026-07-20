@@ -140,9 +140,21 @@ class BillingController extends Controller
         $state = (float)$this->input('state_subsidy');
         $subtotal = (float)$bill['subtotal'];
         $taxable = max(0, $subtotal - $pm - $state - $discount);
-        $cgst = round($taxable * ((float)$bill['cgst_rate'] / 100), 2);
-        $sgst = round($taxable * ((float)$bill['sgst_rate'] / 100), 2);
-        $total = round($taxable + $cgst + $sgst, 2);
+        $billProductType = ($bill['bill_type'] ?? '') === 'spare' ? 'spare_part' : 'vehicle';
+        try {
+            [$cgstRate, $sgstRate] = OrderService::resolveGstRates([
+                'cgst_rate' => $this->input('cgst_rate'),
+                'sgst_rate' => $this->input('sgst_rate'),
+            ], $billProductType);
+        } catch (\RuntimeException $e) {
+            flash('error', $e->getMessage());
+            $this->redirect('/billing/' . $billId);
+        }
+        $taxRate = round($cgstRate + $sgstRate, 2);
+        $cgst = round($taxable * ($cgstRate / 100), 2);
+        $sgst = round($taxable * ($sgstRate / 100), 2);
+        $taxAmount = round($cgst + $sgst, 2);
+        $total = round($taxable + $taxAmount, 2);
 
         try {
             [$paymentStatus, $amountPaid, $amountDue] = OrderService::resolvePaymentAmounts([
@@ -163,6 +175,7 @@ class BillingController extends Controller
                 motor_warranty=?, battery_warranty=?, controller_warranty=?, charger_warranty=?,
                 hp_name=?, vehicle_sale_date=?,
                 pm_drive_incentive=?, state_subsidy=?, loan_amount=?, discount_amount=?,
+                cgst_rate=?, sgst_rate=?, tax_rate=?,
                 payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?
              WHERE id=?'
         )->execute([
@@ -188,6 +201,7 @@ class BillingController extends Controller
             $this->input('hp_name'),
             $this->input('vehicle_sale_date') ?: null,
             $pm, $state, $loan, $discount,
+            $cgstRate, $sgstRate, $taxRate,
             $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total, $billId,
         ]);
 
@@ -195,10 +209,12 @@ class BillingController extends Controller
             $this->db()->prepare(
                 'UPDATE orders SET
                     pm_drive_incentive=?, state_subsidy=?, loan_amount=?, discount_amount=?,
+                    cgst_rate=?, sgst_rate=?, tax_rate=?, tax_amount=?,
                     payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?
                  WHERE id=?'
             )->execute([
                 $pm, $state, $loan, $discount,
+                $cgstRate, $sgstRate, $taxRate, $taxAmount,
                 $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total,
                 (int)$bill['order_id'],
             ]);
@@ -216,8 +232,8 @@ class BillingController extends Controller
             foreach ($rows as $idx => $row) {
                 $lineDisc = $idx === 0 ? $totalDisc : 0.0;
                 $lineTaxable = max(0, (float)$row['unit_price'] * (int)$row['quantity'] - $lineDisc);
-                $lineCgst = round($lineTaxable * ((float)$bill['cgst_rate'] / 100), 2);
-                $lineSgst = round($lineTaxable * ((float)$bill['sgst_rate'] / 100), 2);
+                $lineCgst = round($lineTaxable * ($cgstRate / 100), 2);
+                $lineSgst = round($lineTaxable * ($sgstRate / 100), 2);
                 $lineTotal = round($lineTaxable + $lineCgst + $lineSgst, 2);
                 $upd->execute([$lineDisc, $lineTaxable, $lineCgst, $lineSgst, $lineTotal, $row['id']]);
             }

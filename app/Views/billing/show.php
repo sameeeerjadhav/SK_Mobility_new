@@ -13,6 +13,9 @@ $billingLoc = $bill['billing_location'] ?? 'kokamthan';
 $companyAddress = $billingLoc === 'kopargaon'
     ? ($bill['company_branch_address'] ?? '')
     : ($bill['company_address'] ?? '');
+$billCgst = (float)($bill['cgst_rate'] ?? 14);
+$billSgst = (float)($bill['sgst_rate'] ?? 14);
+$billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
 ?>
 <div style="margin-bottom:1rem;"><a href="<?= url('billing') ?>">&larr; Tax Invoices</a></div>
 
@@ -67,7 +70,8 @@ $companyAddress = $billingLoc === 'kopargaon'
       </tbody>
     </table>
   </div>
-  <p style="margin-top:1rem;"><strong>Loan:</strong> <?= money($bill['loan_amount'] ?? 0) ?> ·
+  <p style="margin-top:1rem;"><strong>GST:</strong> <?= e(rtrim(rtrim(number_format($billTaxRate, 2), '0'), '.')) ?>% (CGST <?= e(rtrim(rtrim(number_format($billCgst, 2), '0'), '.')) ?>% + SGST <?= e(rtrim(rtrim(number_format($billSgst, 2), '0'), '.')) ?>%) ·
+    <strong>Loan:</strong> <?= money($bill['loan_amount'] ?? 0) ?> ·
     <strong>Total:</strong> <?= money($bill['total_amount']) ?> ·
     <?php if (($bill['payment_status'] ?? 'full') === 'partial'): ?>
       <strong>Paid:</strong> <?= money($bill['amount_paid'] ?? 0) ?> ·
@@ -167,6 +171,26 @@ $companyAddress = $billingLoc === 'kopargaon'
     </div>
 
     <div class="form-grid">
+      <div class="form-group">
+        <label>GST preset</label>
+        <select class="form-control" id="bill-gst-preset">
+          <option value="">— Select preset —</option>
+          <option value="28">28% (14 + 14)</option>
+          <option value="18">18% (9 + 9)</option>
+          <option value="12">12% (6 + 6)</option>
+          <option value="5">5% (2.5 + 2.5)</option>
+          <option value="0">0%</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>CGST % *</label>
+        <input class="form-control" type="number" step="0.01" min="0" max="100" name="cgst_rate" id="bill-cgst-rate" value="<?= e((string)$billCgst) ?>" required>
+      </div>
+      <div class="form-group">
+        <label>SGST % *</label>
+        <input class="form-control" type="number" step="0.01" min="0" max="100" name="sgst_rate" id="bill-sgst-rate" value="<?= e((string)$billSgst) ?>" required>
+      </div>
+
       <div class="form-group"><label>PM E-DRIVE (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="pm_drive_incentive" value="<?= e((string)($bill['pm_drive_incentive'] ?? '0')) ?>"></div>
       <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="state_subsidy" value="<?= e((string)($bill['state_subsidy'] ?? '0')) ?>"></div>
       <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="discount_amount" value="<?= e((string)($bill['discount_amount'] ?? '0')) ?>"></div>
@@ -199,6 +223,20 @@ $companyAddress = $billingLoc === 'kopargaon'
       </div>
     </div>
     <script>
+      (function () {
+        var presets = { '28': [14, 14], '18': [9, 9], '12': [6, 6], '5': [2.5, 2.5], '0': [0, 0] };
+        var presetEl = document.getElementById('bill-gst-preset');
+        var cgstEl = document.getElementById('bill-cgst-rate');
+        var sgstEl = document.getElementById('bill-sgst-rate');
+        if (presetEl && cgstEl && sgstEl) {
+          presetEl.addEventListener('change', function () {
+            var p = presets[this.value];
+            if (!p) return;
+            cgstEl.value = p[0];
+            sgstEl.value = p[1];
+          });
+        }
+      })();
       document.querySelectorAll('input[name="payment_status"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
           var partial = this.value === 'partial';

@@ -44,6 +44,28 @@ foreach ($spareParts ?? [] as $sp) {
   batteryType: '',
   paymentStatus: 'full',
   amountPaid: '',
+  gstPreset: 'default',
+  defaultCgst: <?= $productType === 'spare_part' ? '9' : '14' ?>,
+  defaultSgst: <?= $productType === 'spare_part' ? '9' : '14' ?>,
+  cgstRate: <?= $productType === 'spare_part' ? '9' : '14' ?>,
+  sgstRate: <?= $productType === 'spare_part' ? '9' : '14' ?>,
+  applyGstPreset() {
+    const presets = {
+      default: [this.defaultCgst, this.defaultSgst],
+      '28': [14, 14],
+      '18': [9, 9],
+      '12': [6, 6],
+      '5': [2.5, 2.5],
+      '0': [0, 0],
+    };
+    if (this.gstPreset === 'custom') return;
+    const p = presets[this.gstPreset] || presets.default;
+    this.cgstRate = p[0];
+    this.sgstRate = p[1];
+  },
+  get totalGstPercent() {
+    return Math.round(((parseFloat(this.cgstRate) || 0) + (parseFloat(this.sgstRate) || 0)) * 100) / 100;
+  },
   get primary() {
     const id = String(this.items[0]?.variant_id || '');
     return this.variantMap[id] || null;
@@ -236,7 +258,7 @@ foreach ($spareParts ?? [] as $sp) {
     </div>
 
     <div class="card" style="margin-bottom:0.85rem;">
-      <h3 class="card-title">Billing</h3>
+      <h3 class="card-title">Billing &amp; GST</h3>
       <div class="form-grid">
         <div class="form-group" style="max-width:280px;">
           <label>Billing location *</label>
@@ -245,6 +267,39 @@ foreach ($spareParts ?? [] as $sp) {
             <option value="kopargaon">Kopargaon</option>
           </select>
           <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Branch address printed on the tax invoice</p>
+        </div>
+        <div class="form-group">
+          <label>GST option *</label>
+          <select class="form-control" x-model="gstPreset" @change="applyGstPreset()">
+            <option value="default">Default — <?= $productType === 'spare_part' ? '18% (9+9) spare parts' : '28% (14+14) vehicles' ?></option>
+            <option value="28">28% — CGST 14% + SGST 14%</option>
+            <option value="18">18% — CGST 9% + SGST 9%</option>
+            <option value="12">12% — CGST 6% + SGST 6%</option>
+            <option value="5">5% — CGST 2.5% + SGST 2.5%</option>
+            <option value="0">0% — No GST</option>
+            <option value="custom">Custom rates</option>
+          </select>
+        </div>
+        <template x-if="gstPreset === 'custom'">
+          <div class="form-group">
+            <label>CGST % *</label>
+            <input class="form-control" type="number" step="0.01" min="0" max="100" name="cgst_rate" x-model="cgstRate" required>
+          </div>
+        </template>
+        <template x-if="gstPreset === 'custom'">
+          <div class="form-group">
+            <label>SGST % *</label>
+            <input class="form-control" type="number" step="0.01" min="0" max="100" name="sgst_rate" x-model="sgstRate" required>
+          </div>
+        </template>
+        <template x-if="gstPreset !== 'custom'">
+          <input type="hidden" name="cgst_rate" :value="cgstRate">
+          <input type="hidden" name="sgst_rate" :value="sgstRate">
+        </template>
+        <div class="form-group">
+          <label>Total GST</label>
+          <input class="form-control" type="text" readonly tabindex="-1" style="background:#f8fafc;"
+                 :value="totalGstPercent + '% · CGST ' + cgstRate + '% + SGST ' + sgstRate + '%'">
         </div>
       </div>
     </div>

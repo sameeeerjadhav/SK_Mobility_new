@@ -73,8 +73,6 @@ class OrderService
             if ($color === null || $color === '') {
                 throw new RuntimeException('Model Color is required (select a variant with a color, or enter color).');
             }
-            $cgstRate = 14.0;
-            $sgstRate = 14.0;
             $defaultHsn = '87116020';
         } else {
             if (trim((string)($data['sale_date'] ?? '')) === '') {
@@ -84,10 +82,11 @@ class OrderService
             $primary = $lineItems[0];
             $vehicleModelType = 'Spare Parts';
             $color = null;
-            $cgstRate = 9.0;
-            $sgstRate = 9.0;
             $defaultHsn = '85076000';
         }
+
+        [$cgstRate, $sgstRate] = self::resolveGstRates($data, $productType);
+        $taxRate = round($cgstRate + $sgstRate, 2);
 
         $subtotal = array_sum(array_column($lineItems, 'total_price'));
 
@@ -131,9 +130,9 @@ class OrderService
                     hp_name, color, vehicle_model_type,
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
                     payment_mode, payment_status, amount_paid, amount_due,
-                    sale_date, subtotal, tax_amount, total_amount,
+                    sale_date, subtotal, tax_amount, cgst_rate, sgst_rate, tax_rate, total_amount,
                     status, delivery_address, notes, expected_delivery_date, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $orderNumber, $bookingNo, $orderType, $productType, $billingLocation, $dealerId,
                 $data['customer_name'] ?? null,
@@ -157,7 +156,7 @@ class OrderService
                 $vehicleModelType,
                 $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
                 $paymentMode, $paymentStatus, $amountPaid, $amountDue,
-                $saleDate, $subtotal, $taxAmount, $totalAmount,
+                $saleDate, $subtotal, $taxAmount, $cgstRate, $sgstRate, $taxRate, $totalAmount,
                 'pending',
                 $data['delivery_address'] ?? null,
                 $data['notes'] ?? null,
@@ -257,7 +256,7 @@ class OrderService
                 $productType === 'vehicle' ? ($data['charger_warranty'] ?? null) : null,
                 $productType === 'vehicle' ? ($data['hp_name'] ?? null) : null,
                 $saleDate,
-                $subtotal, $cgstRate + $sgstRate, $cgstRate, $sgstRate,
+                $subtotal, $taxRate, $cgstRate, $sgstRate,
                 $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
                 $paymentMode, $paymentStatus, $amountPaid, $amountDue,
                 $totalAmount, $userId,
@@ -432,6 +431,18 @@ class OrderService
             $parts[] = 'cheque';
         }
         return $parts ? implode('_', $parts) : null;
+    }
+
+    /** @return array{0:float,1:float} cgst, sgst */
+    public static function resolveGstRates(array $data, string $productType): array
+    {
+        $default = $productType === 'spare_part' ? 9.0 : 14.0;
+        $cgst = round((float)($data['cgst_rate'] ?? $default), 2);
+        $sgst = round((float)($data['sgst_rate'] ?? $default), 2);
+        if ($cgst < 0 || $sgst < 0 || $cgst > 100 || $sgst > 100) {
+            throw new RuntimeException('CGST and SGST rates must be between 0 and 100.');
+        }
+        return [$cgst, $sgst];
     }
 
     /** @return array{0:string,1:float,2:float} status, paid, due */

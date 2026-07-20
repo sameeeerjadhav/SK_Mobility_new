@@ -14,6 +14,7 @@
  *  /install.php?migrate_billing_location=1  ← Kokamthan / Kopargaon billing location on orders & invoices
  *  /install.php?migrate_sell_order_spare_parts=1  ← spare parts on sell orders + order line types
  *  /install.php?migrate_order_payment_partial=1  ← full vs partial payment on sell orders & invoices
+ *  /install.php?migrate_sell_order_gst=1  ← custom GST rates stored on sell orders
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -482,6 +483,39 @@ try {
         };
         $addPaymentCols($db, 'orders');
         $addPaymentCols($db, 'bills');
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_sell_order_gst']) && $_GET['migrate_sell_order_gst'] === '1') {
+        echo "\n--- Sell order GST rates migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        if (!$colExists($db, 'orders', 'cgst_rate')) {
+            $db->exec(
+                'ALTER TABLE orders
+                 ADD COLUMN cgst_rate DECIMAL(5,2) NOT NULL DEFAULT 14 AFTER tax_amount,
+                 ADD COLUMN sgst_rate DECIMAL(5,2) NOT NULL DEFAULT 14 AFTER cgst_rate,
+                 ADD COLUMN tax_rate DECIMAL(5,2) NOT NULL DEFAULT 28 AFTER sgst_rate'
+            );
+            echo "added orders.cgst_rate, sgst_rate, tax_rate\n";
+            $db->exec(
+                "UPDATE orders o
+                 LEFT JOIN bills b ON b.order_id = o.id
+                 SET o.cgst_rate = COALESCE(b.cgst_rate, IF(o.product_type = 'spare_part', 9, 14)),
+                     o.sgst_rate = COALESCE(b.sgst_rate, IF(o.product_type = 'spare_part', 9, 14)),
+                     o.tax_rate = COALESCE(b.tax_rate, IF(o.product_type = 'spare_part', 18, 28))
+                 WHERE o.cgst_rate = 14 OR o.tax_rate = 28"
+            );
+            echo "backfilled GST rates from bills / product type\n";
+        } else {
+            echo "skip orders GST rate columns\n";
+        }
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

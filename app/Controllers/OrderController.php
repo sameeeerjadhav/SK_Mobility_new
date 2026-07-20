@@ -186,6 +186,8 @@ class OrderController extends Controller
             'discount_amount' => $this->input('discount_amount'),
             'payment_status' => $this->input('payment_status'),
             'amount_paid' => $this->input('amount_paid'),
+            'cgst_rate' => $this->input('cgst_rate'),
+            'sgst_rate' => $this->input('sgst_rate'),
             'sale_date' => $this->input('sale_date'),
             'paid_cash' => isset($_POST['paid_cash']) ? 1 : 0,
             'paid_cheque' => isset($_POST['paid_cheque']) ? 1 : 0,
