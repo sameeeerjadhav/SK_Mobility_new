@@ -7,7 +7,7 @@ $locationLabels = [
 <div class="toolbar">
   <div>
     <h1 class="page-title">Tax Invoices</h1>
-    <p class="page-sub">SAI KUBER MOBILITY invoices from dealer &amp; customer orders</p>
+    <p class="page-sub">SAI KUBER MOBILITY invoices from dealer &amp; customer sell orders</p>
   </div>
 </div>
 

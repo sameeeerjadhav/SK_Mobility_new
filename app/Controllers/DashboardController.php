@@ -233,7 +233,7 @@ class DashboardController extends Controller
         $this->view('dashboard/dealer', [
             'title' => 'Dashboard',
             'stats' => [
-                ['label' => 'My Orders', 'value' => $orders, 'fmt' => 'int'],
+                ['label' => 'My Sell Orders', 'value' => $orders, 'fmt' => 'int'],
                 ['label' => 'Revenue', 'value' => $revenue, 'fmt' => 'money'],
                 ['label' => 'Leads', 'value' => $leadCount, 'fmt' => 'int'],
             ],

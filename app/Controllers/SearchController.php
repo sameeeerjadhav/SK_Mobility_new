@@ -23,7 +23,7 @@ class SearchController extends Controller
         );
         $orders->execute([$like, $like]);
         foreach ($orders->fetchAll() as $r) {
-            $results[] = ['type' => 'Order', 'title' => $r['title'], 'meta' => $r['meta'], 'url' => url('orders/' . $r['id'])];
+            $results[] = ['type' => 'Sell Order', 'title' => $r['title'], 'meta' => $r['meta'], 'url' => url('orders/' . $r['id'])];
         }
 
         if (can('manage_dealers') || Auth::role() === 'super_admin') {

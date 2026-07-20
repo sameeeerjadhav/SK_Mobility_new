@@ -26,7 +26,7 @@ $companyAddress = $billingLoc === 'kopargaon'
       <a class="btn btn-outline" href="<?= url('billing/' . $bill['id'] . '/preview') ?>" target="_blank">Preview / Print</a>
       <a class="btn btn-primary" href="<?= url('billing/' . $bill['id'] . '/pdf') ?>" target="_blank">Download PDF</a>
       <?php if (!empty($bill['order_id'])): ?>
-        <a class="btn btn-outline" href="<?= url('orders/' . (int)$bill['order_id']) ?>">View order</a>
+        <a class="btn btn-outline" href="<?= url('orders/' . (int)$bill['order_id']) ?>">View sell order</a>
       <?php endif; ?>
     </div>
   </div>

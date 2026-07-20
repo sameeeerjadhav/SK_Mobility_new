@@ -40,14 +40,14 @@
 </style>
 
 <div class="od">
-  <a class="od-back" href="<?= url('orders') ?>">&larr; Orders</a>
+  <a class="od-back" href="<?= url('orders') ?>">&larr; Sell Orders</a>
 
   <div class="od-bar">
     <div>
       <h1><?= e($order['order_number']) ?></h1>
       <div class="meta">
         <?= status_chip($order['status']) ?>
-        <span><?= e(ucfirst($order['order_type'])) ?> order</span>
+        <span><?= e(ucfirst($order['order_type'])) ?> sell order</span>
         <span>·</span>
         <span><?= india_datetime($order['created_at'] ?? null) ?></span>
       </div>

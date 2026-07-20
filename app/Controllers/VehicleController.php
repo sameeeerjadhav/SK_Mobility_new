@@ -341,7 +341,7 @@ class VehicleController extends Controller
         $used = $this->db()->prepare('SELECT COUNT(*) FROM order_items WHERE variant_id = ?');
         $used->execute([$variantId]);
         if ((int)$used->fetchColumn() > 0) {
-            flash('error', 'Cannot delete: this variant is used in existing orders.');
+            flash('error', 'Cannot delete: this variant is used in existing sell orders.');
             $this->redirect('/vehicles/' . $vehicleId);
         }
 

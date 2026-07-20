@@ -36,7 +36,7 @@ try {
       </button>
       <div class="search-box" @click.outside="searchOpen=false">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="search" placeholder="Search orders, dealers, vehicles, leads…"
+        <input type="search" placeholder="Search sell orders, dealers, vehicles, leads…"
                x-model="searchQ"
                @input.debounce.350ms="
                  if (searchQ.length < 2) { searchResults=[]; searchOpen=false; return; }

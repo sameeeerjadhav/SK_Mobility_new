@@ -13,7 +13,7 @@
 </div>
 
 <div class="card">
-  <h3 class="card-title">Recent orders</h3>
+  <h3 class="card-title">Recent sell orders</h3>
   <div class="table-wrap">
     <table class="data">
       <thead><tr><th>Order #</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
@@ -26,7 +26,7 @@
           <td><?= india_date($o['created_at']) ?></td>
         </tr>
       <?php endforeach; ?>
-      <?php if (!$recentOrders): ?><tr><td colspan="4" class="muted">No orders yet.</td></tr><?php endif; ?>
+      <?php if (!$recentOrders): ?><tr><td colspan="4" class="muted">No sell orders yet.</td></tr><?php endif; ?>
       </tbody>
     </table>
   </div>

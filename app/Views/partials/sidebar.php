@@ -7,7 +7,7 @@ $icons = [
     'Dashboard' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
     'Dealers' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     'Vehicles' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14v-5l-2-5H7L5 12v5z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>',
-    'Orders' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
+    'Sell Orders' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>',
     'Payments' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
     'Inventory' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
     'Purchase Orders' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
@@ -35,7 +35,7 @@ if ($role === 'super_admin') {
     $nav[] = ['section' => 'Operations', 'items' => [
         ['label' => 'Dealers', 'href' => '/dealers', 'perm' => 'manage_dealers'],
         ['label' => 'Vehicles', 'href' => '/vehicles', 'perm' => 'view_vehicles'],
-        ['label' => 'Orders', 'href' => '/orders', 'perm' => 'view_orders'],
+        ['label' => 'Sell Orders', 'href' => '/orders', 'perm' => 'view_orders'],
         ['label' => 'Payments', 'href' => '/payments', 'perm' => 'view_payments'],
         ['label' => 'Inventory', 'href' => '/inventory', 'perm' => 'view_inventory'],
         ['label' => 'Purchase Orders', 'href' => '/purchase-orders'],
@@ -59,7 +59,7 @@ if ($role === 'super_admin') {
 } elseif ($role === 'dealer') {
     $nav[] = ['section' => 'Operations', 'items' => [
         ['label' => 'Vehicles', 'href' => '/vehicles', 'perm' => 'view_vehicles'],
-        ['label' => 'Orders', 'href' => '/orders', 'perm' => 'view_orders'],
+        ['label' => 'Sell Orders', 'href' => '/orders', 'perm' => 'view_orders'],
         ['label' => 'Payments', 'href' => '/payments', 'perm' => 'view_payments'],
         ['label' => 'Leads', 'href' => '/leads', 'perm' => 'view_leads'],
         ['label' => 'Services', 'href' => '/services', 'perm' => 'view_services'],

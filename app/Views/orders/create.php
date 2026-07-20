@@ -65,11 +65,11 @@ foreach ($variants as $vv) {
     this.syncFromVariant(0);
   }
 }">
-  <div style="margin-bottom:0.75rem;"><a href="<?= url('orders') ?>">&larr; Orders</a></div>
+  <div style="margin-bottom:0.75rem;"><a href="<?= url('orders') ?>">&larr; Sell Orders</a></div>
 
   <div class="toolbar" style="margin-bottom:1rem;">
     <div>
-      <h1 class="page-title" style="margin:0;">Create Order</h1>
+      <h1 class="page-title" style="margin:0;">Create Sell Order</h1>
       <p class="page-sub" style="margin:0.25rem 0 0;">Same tax-invoice fields for dealer &amp; customer · model type follows the variant</p>
     </div>
   </div>
@@ -78,15 +78,15 @@ foreach ($variants as $vv) {
     <?= csrf_field() ?>
 
     <div class="card" style="margin-bottom:0.85rem;">
-      <h3 class="card-title">1. Order &amp; vehicle</h3>
+      <h3 class="card-title">1. Sell order &amp; vehicle</h3>
       <div class="form-grid">
         <div class="form-group">
-          <label>Order type</label>
+          <label>Sell order type</label>
           <select class="form-control" name="order_type" x-model="orderType" @change="onOrderTypeChange()" required>
             <?php if (!empty($isAdmin)): ?>
-              <option value="dealer">Dealer Order</option>
+              <option value="dealer">Dealer Sell Order</option>
             <?php endif; ?>
-            <option value="customer">Customer Order</option>
+            <option value="customer">Customer Sell Order</option>
           </select>
         </div>
         <div class="form-group" x-show="orderType==='dealer'" x-cloak>
@@ -290,7 +290,7 @@ foreach ($variants as $vv) {
 
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
       <a class="btn btn-outline" href="<?= url('orders') ?>">Cancel</a>
-      <button class="btn btn-primary" type="submit">Create order &amp; tax invoice</button>
+      <button class="btn btn-primary" type="submit">Create sell order &amp; tax invoice</button>
     </div>
   </form>
 </div>

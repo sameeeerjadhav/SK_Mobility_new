@@ -28,7 +28,7 @@
     <div class="table-wrap">
       <table class="data">
         <thead>
-          <tr><th>Business</th><th>Code</th><th>Contact</th><th>Status</th><th>Orders</th><th>Revenue</th><th></th></tr>
+          <tr><th>Business</th><th>Code</th><th>Contact</th><th>Status</th><th>Sell Orders</th><th>Revenue</th><th></th></tr>
         </thead>
         <tbody>
         <?php foreach ($dealers as $d): ?>

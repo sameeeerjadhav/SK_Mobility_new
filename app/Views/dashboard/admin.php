@@ -35,7 +35,7 @@
     <h3 class="card-title">Top dealers by revenue</h3>
     <div class="table-wrap">
       <table class="data">
-        <thead><tr><th>Dealer</th><th>Code</th><th>Orders</th><th>Revenue</th></tr></thead>
+        <thead><tr><th>Dealer</th><th>Code</th><th>Sell Orders</th><th>Revenue</th></tr></thead>
         <tbody>
         <?php if (!$topDealers): ?>
           <tr><td colspan="4" class="muted">No dealers yet.</td></tr>
@@ -75,7 +75,7 @@
 </div>
 
 <div class="card" style="margin-top:1rem;">
-  <h3 class="card-title">Recent orders</h3>
+  <h3 class="card-title">Recent sell orders</h3>
   <div class="table-wrap">
     <table class="data">
       <thead><tr><th>Order #</th><th>Type</th><th>Party</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
@@ -90,7 +90,7 @@
           <td><?= india_date($o['created_at']) ?></td>
         </tr>
       <?php endforeach; ?>
-      <?php if (!$recentOrders): ?><tr><td colspan="6" class="muted">No orders yet.</td></tr><?php endif; ?>
+      <?php if (!$recentOrders): ?><tr><td colspan="6" class="muted">No sell orders yet.</td></tr><?php endif; ?>
       </tbody>
     </table>
   </div>

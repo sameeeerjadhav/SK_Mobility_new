@@ -58,7 +58,7 @@ class OrderController extends Controller
         }
 
         $this->view('orders/index', [
-            'title' => 'Orders',
+            'title' => 'Sell Orders',
             'orders' => $stmt->fetchAll(),
             'orderType' => $orderType,
             'status' => $status,
@@ -89,7 +89,7 @@ class OrderController extends Controller
         )->fetchAll();
 
         $this->view('orders/create', [
-            'title' => 'Create Order',
+            'title' => 'Create Sell Order',
             'dealers' => $dealers,
             'variants' => $variants,
             'isAdmin' => Auth::role() === 'super_admin',
@@ -158,13 +158,13 @@ class OrderController extends Controller
 
         try {
             $result = OrderService::create($payload, (int)Auth::id());
-            flash('success', 'Order ' . $result['order_number'] . ' created with bill ' . $result['bill_number']);
+            flash('success', 'Sell order ' . $result['order_number'] . ' created with bill ' . $result['bill_number']);
             $this->redirect('/orders/' . $result['order_id']);
         } catch (RuntimeException $e) {
             flash('error', $e->getMessage());
             $this->redirect('/orders/create');
         } catch (\Throwable $e) {
-            flash('error', env('APP_DEBUG') === 'true' ? $e->getMessage() : 'Failed to create order.');
+            flash('error', env('APP_DEBUG') === 'true' ? $e->getMessage() : 'Failed to create sell order.');
             $this->redirect('/orders/create');
         }
     }
@@ -180,7 +180,7 @@ class OrderController extends Controller
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
         if (!$order) {
-            flash('error', 'Order not found.');
+            flash('error', 'Sell order not found.');
             $this->redirect('/orders');
         }
         if (Auth::role() === 'dealer' && (int)$order['dealer_id'] !== Auth::dealerId()) {
@@ -223,7 +223,7 @@ class OrderController extends Controller
         $this->validateCsrf();
         try {
             OrderService::updateStatus((int)$id, $this->input('status'), (int)Auth::id(), $this->input('notes'));
-            flash('success', 'Order status updated.');
+            flash('success', 'Sell order status updated.');
         } catch (RuntimeException $e) {
             flash('error', $e->getMessage());
         }
@@ -248,7 +248,7 @@ class OrderController extends Controller
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
         if (!$order) {
-            flash('error', 'Order not found.');
+            flash('error', 'Sell order not found.');
             $this->redirect('/orders');
         }
         if (Auth::role() === 'dealer' && (int)$order['dealer_id'] !== Auth::dealerId()) {
@@ -262,7 +262,7 @@ class OrderController extends Controller
         $billStmt->execute([$orderId]);
         $bill = $billStmt->fetch();
         if (!$bill) {
-            flash('error', 'Tax invoice not found for this order.');
+            flash('error', 'Tax invoice not found for this sell order.');
             $this->redirect('/orders/' . $orderId);
         }
 

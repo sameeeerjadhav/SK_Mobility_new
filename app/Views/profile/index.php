@@ -36,7 +36,7 @@
       <p><strong><?= e($dealer['business_name']) ?></strong></p>
       <p>Code: <?= e($dealer['dealer_code'] ?? '—') ?></p>
       <p>Status: <?= status_chip($dealer['status']) ?></p>
-      <p>Orders: <?= (int)$dealer['total_orders'] ?> · Revenue: <?= money($dealer['total_revenue']) ?></p>
+      <p>Sell orders: <?= (int)$dealer['total_orders'] ?> · Revenue: <?= money($dealer['total_revenue']) ?></p>
     </div>
     <?php endif; ?>
   </div>

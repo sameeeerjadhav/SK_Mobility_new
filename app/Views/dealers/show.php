@@ -70,7 +70,7 @@
 </div>
 <?php endif; ?>
 <div class="stat-grid">
-  <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value"><?= (int)$dealer['total_orders'] ?></div></div>
+  <div class="stat-card"><div class="stat-label">Total Sell Orders</div><div class="stat-value"><?= (int)$dealer['total_orders'] ?></div></div>
   <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-value"><?= money($dealer['total_revenue']) ?></div></div>
   <div class="stat-card"><div class="stat-label">Total Leads</div><div class="stat-value"><?= (int)$totalLeads ?></div></div>
   <div class="stat-card"><div class="stat-label">Performance</div><div class="stat-value"><?= (int)$dealer['performance_score'] ?></div></div>
@@ -80,7 +80,7 @@
   <div class="card">
     <div class="tabs">
       <button type="button" class="tab" :class="{ active: tab==='profile' }" @click="tab='profile'">Profile</button>
-      <button type="button" class="tab" :class="{ active: tab==='orders' }" @click="tab='orders'">Recent Orders</button>
+      <button type="button" class="tab" :class="{ active: tab==='orders' }" @click="tab='orders'">Recent Sell Orders</button>
       <button type="button" class="tab" :class="{ active: tab==='status' }" @click="tab='status'">Status Breakdown</button>
     </div>
 
@@ -108,7 +108,7 @@
               <td><?= india_date($o['created_at']) ?></td>
             </tr>
           <?php endforeach; ?>
-          <?php if (!$recentOrders): ?><tr><td colspan="4" class="muted">No orders.</td></tr><?php endif; ?>
+          <?php if (!$recentOrders): ?><tr><td colspan="4" class="muted">No sell orders.</td></tr><?php endif; ?>
           </tbody>
         </table>
       </div>

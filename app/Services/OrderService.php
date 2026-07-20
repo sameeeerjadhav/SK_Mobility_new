@@ -289,7 +289,7 @@ class OrderService
 
         NotificationService::notifyRole(
             'super_admin',
-            'New Order',
+            'New Sell Order',
             "Order {$orderNumber} created for " . money($totalAmount),
             'order',
             'orders',

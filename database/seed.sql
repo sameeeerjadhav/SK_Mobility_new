@@ -15,9 +15,9 @@ INSERT INTO roles (id, name, slug, description) VALUES
 INSERT INTO permissions (id, name, slug, module, description) VALUES
 (1,  'View Dashboard', 'view_dashboard', 'dashboard', NULL),
 (2,  'Manage Dealers', 'manage_dealers', 'dealers', NULL),
-(3,  'View Orders', 'view_orders', 'orders', NULL),
-(4,  'Manage Orders', 'manage_orders', 'orders', NULL),
-(5,  'Approve Orders', 'approve_orders', 'orders', NULL),
+(3,  'View Sell Orders', 'view_orders', 'orders', NULL),
+(4,  'Manage Sell Orders', 'manage_orders', 'orders', NULL),
+(5,  'Approve Sell Orders', 'approve_orders', 'orders', NULL),
 (6,  'View Payments', 'view_payments', 'payments', NULL),
 (7,  'Manage Payments', 'manage_payments', 'payments', NULL),
 (8,  'View Billing', 'view_billing', 'billing', NULL),
