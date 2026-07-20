@@ -215,7 +215,7 @@ class BillingController extends Controller
             flash('error', 'Tax invoice not found.');
             $this->redirect('/billing');
         }
-        $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ?');
+        $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ? ORDER BY id ASC');
         $items->execute([$id]);
         return [$bill, $items->fetchAll()];
     }

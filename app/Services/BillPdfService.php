@@ -43,8 +43,12 @@ class BillPdfService
 
         $rows = '';
         $itemCount = count($items);
+        // Dealer & customer invoices: at least 5 line slots; grow automatically for 6+ vehicles/lines.
         $rowCount = $itemCount > 0 ? max(5, $itemCount) : 5;
-        $compactRows = $itemCount > 5 ? ' compact-items' : '';
+        $compactRows = '';
+        if ($itemCount > 5) {
+            $compactRows = $itemCount > 8 ? ' compact-items ultra-compact' : ' compact-items';
+        }
         for ($i = 0; $i < $rowCount; $i++) {
             $item = $items[$i] ?? null;
             if ($item) {
@@ -144,6 +148,9 @@ class BillPdfService
   table.items td { height: 22px; }
   table.items.compact-items td { height: 18px; font-size: 10px; padding: 3px 4px; }
   table.items.compact-items th { font-size: 9px; padding: 3px 4px; }
+  table.items.ultra-compact td { height: 15px; font-size: 9px; padding: 2px 3px; }
+  table.items.ultra-compact th { font-size: 8.5px; padding: 2px 3px; }
+  table.items.ultra-compact .empty-row td { height: 15px; }
   .c { text-align: center; }
   .r { text-align: right; }
   .empty-row td { height: 24px; }

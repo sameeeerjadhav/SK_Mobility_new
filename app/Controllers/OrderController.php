@@ -267,7 +267,7 @@ class OrderController extends Controller
         }
         $bill['order_type'] = $order['order_type'] ?? null;
 
-        $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ?');
+        $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ? ORDER BY id ASC');
         $items->execute([(int)$bill['id']]);
         $lineItems = $items->fetchAll();
 
