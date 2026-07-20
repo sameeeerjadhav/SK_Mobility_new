@@ -86,7 +86,7 @@ $statusClass = [
             <th>Supplier company</th>
             <th>Lines</th>
             <th>Qty</th>
-            <th>Total (incl. 5% GST)</th>
+            <th>Total (incl. GST)</th>
             <th>Status</th>
             <th></th>
           </tr>

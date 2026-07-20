@@ -99,7 +99,7 @@ document.addEventListener('alpine:init', () => {
       <div class="stat-value"><?= money($po['subtotal']) ?></div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">GST (5%)</div>
+      <div class="stat-label">Total GST</div>
       <div class="stat-value"><?= money($po['gst_amount']) ?></div>
     </div>
     <div class="stat-card">

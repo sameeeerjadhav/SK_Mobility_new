@@ -22,7 +22,7 @@ document.addEventListener('alpine:init', () => {
     defaultVehicleMode: '<?= $defaultVehicleMode ?>',
     defaultSpareMode: '<?= $defaultSpareMode ?>',
     items: [],
-    gstRate: 5,
+    defaultGstPercent: 5,
     init() {
       this.items = [this.blankItem()];
     },
@@ -45,6 +45,7 @@ document.addEventListener('alpine:init', () => {
         quantity: 1,
         unit_rate: '',
         hsn_code: '87116020',
+        gst_percent: this.defaultGstPercent,
         description: '',
       };
     },
@@ -66,6 +67,7 @@ document.addEventListener('alpine:init', () => {
         it.spare_category_id = '';
         it.spare_mode = this.defaultSpareMode;
         it.hsn_code = '87116020';
+        it.gst_percent = this.defaultGstForType('vehicle_variant');
       } else {
         it.variant_id = '';
         it.vehicle_id = '';
@@ -77,7 +79,16 @@ document.addEventListener('alpine:init', () => {
         it.variant_mode = this.defaultVariantMode;
         it.color = '';
         it.hsn_code = '85076000';
+        it.gst_percent = this.defaultGstForType('spare_part');
       }
+    },
+    defaultGstForType(type) {
+      return type === 'spare_part' ? 18 : 5;
+    },
+    applyDefaultGstToAll() {
+      const rate = parseFloat(this.defaultGstPercent);
+      if (Number.isNaN(rate) || rate < 0 || rate > 100) return;
+      this.items.forEach(it => { it.gst_percent = rate; });
     },
     setMode(idx, mode) {
       const it = this.items[idx];
@@ -158,9 +169,10 @@ document.addEventListener('alpine:init', () => {
     lineCalc(it) {
       const qty = parseInt(it.quantity, 10) || 0;
       const rate = parseFloat(it.unit_rate) || 0;
+      const gstRate = parseFloat(it.gst_percent) || 0;
       const taxable = Math.round(rate * qty * 100) / 100;
-      const gst = Math.round(taxable * this.gstRate / 100 * 100) / 100;
-      return { taxable, gst, total: Math.round((taxable + gst) * 100) / 100 };
+      const gst = Math.round(taxable * gstRate / 100 * 100) / 100;
+      return { taxable, gst, total: Math.round((taxable + gst) * 100) / 100, gstRate };
     },
     totals() {
       let taxable = 0, gst = 0;
@@ -432,6 +444,11 @@ document.addEventListener('alpine:init', () => {
               <input class="form-control" type="number" step="0.01" min="0.01" :name="'items['+idx+'][unit_rate]'" x-model="it.unit_rate" required>
             </div>
             <div class="form-group">
+              <label>GST % *</label>
+              <input class="form-control" type="number" step="0.01" min="0" max="100"
+                     :name="'items['+idx+'][gst_percent]'" x-model="it.gst_percent" required>
+            </div>
+            <div class="form-group">
               <label>HSN code</label>
               <input class="form-control" type="text" :name="'items['+idx+'][hsn_code]'" x-model="it.hsn_code">
             </div>
@@ -443,7 +460,7 @@ document.addEventListener('alpine:init', () => {
 
           <div class="muted" style="font-size:0.82rem;margin-top:0.35rem;">
             Taxable: <span x-text="fmt(lineCalc(it).taxable)"></span>
-            · GST 5%: <span x-text="fmt(lineCalc(it).gst)"></span>
+            · GST <span x-text="lineCalc(it).gstRate + '%'"></span>: <span x-text="fmt(lineCalc(it).gst)"></span>
             · Line total: <strong x-text="fmt(lineCalc(it).total)"></strong>
           </div>
         </div>
@@ -453,16 +470,26 @@ document.addEventListener('alpine:init', () => {
     <div class="card" style="margin-bottom:0.85rem;">
       <h3 class="card-title">3. Totals &amp; notes</h3>
       <div style="display:grid;grid-template-columns:1fr 280px;gap:1.25rem;align-items:start;">
-        <div class="form-group" style="margin:0;">
-          <label>Notes</label>
-          <textarea class="form-control" name="notes" rows="4" placeholder="Payment terms, delivery instructions…"></textarea>
+        <div>
+          <div class="form-group" style="margin:0 0 0.75rem;">
+            <label>Notes</label>
+            <textarea class="form-control" name="notes" rows="4" placeholder="Payment terms, delivery instructions…"></textarea>
+          </div>
+          <div class="form-group" style="margin:0;max-width:220px;">
+            <label>Default GST %</label>
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+              <input class="form-control" type="number" step="0.01" min="0" max="100" x-model="defaultGstPercent">
+              <button class="btn btn-sm btn-outline" type="button" @click="applyDefaultGstToAll()">Apply to all</button>
+            </div>
+            <div class="muted" style="font-size:0.75rem;margin-top:0.25rem;">Each line can use a different rate — vehicles default to 5%, spare parts to 18%.</div>
+          </div>
         </div>
         <div style="padding:0.85rem 1rem;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);">
           <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
             <span>Taxable subtotal</span><span x-text="fmt(totals().taxable)"></span>
           </div>
           <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
-            <span>GST (5%)</span><span x-text="fmt(totals().gst)"></span>
+            <span>Total GST</span><span x-text="fmt(totals().gst)"></span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:1.05rem;font-weight:800;padding-top:0.5rem;border-top:1px solid var(--border);">
             <span>Grand total</span><span x-text="fmt(totals().total)"></span>

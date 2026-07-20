@@ -31,7 +31,10 @@ class PurchaseOrderService
                 continue;
             }
 
-            $gstPercent = (float)($row['gst_percent'] ?? self::GST_RATE);
+            $gstPercent = round((float)($row['gst_percent'] ?? self::GST_RATE), 2);
+            if ($gstPercent < 0 || $gstPercent > 100) {
+                throw new RuntimeException("Line {$lineNo}: GST percent must be between 0 and 100.");
+            }
             $taxable = round($unitRate * $qty, 2);
             $gst = round($taxable * ($gstPercent / 100), 2);
             $lineTotal = round($taxable + $gst, 2);
