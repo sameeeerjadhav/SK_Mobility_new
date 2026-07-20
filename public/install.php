@@ -228,7 +228,8 @@ try {
             throw new RuntimeException('Migration file 009_purchase_orders.sql not found.');
         }
         foreach (array_filter(array_map('trim', explode(';', $migration))) as $stmt) {
-            if ($stmt === '' || str_starts_with($stmt, '--')) {
+            $stmt = trim(preg_replace('/^--.*$/m', '', $stmt) ?? '');
+            if ($stmt === '') {
                 continue;
             }
             $db->exec($stmt);

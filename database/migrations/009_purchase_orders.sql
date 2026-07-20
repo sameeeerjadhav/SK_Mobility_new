@@ -1,5 +1,3 @@
--- Purchase orders + goods receipt with warehouse split
-
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   po_number VARCHAR(40) NOT NULL UNIQUE,
