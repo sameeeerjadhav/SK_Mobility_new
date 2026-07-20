@@ -15,6 +15,7 @@
  *  /install.php?migrate_sell_order_spare_parts=1  ← spare parts on sell orders + order line types
  *  /install.php?migrate_order_payment_partial=1  ← full vs partial payment on sell orders & invoices
  *  /install.php?migrate_sell_order_gst=1  ← custom GST rates stored on sell orders
+ *  /install.php?migrate_po_product_type=1  ← vehicle vs spare parts on purchase orders
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -515,6 +516,41 @@ try {
             echo "backfilled GST rates from bills / product type\n";
         } else {
             echo "skip orders GST rate columns\n";
+        }
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_po_product_type']) && $_GET['migrate_po_product_type'] === '1') {
+        echo "\n--- Purchase order product type migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        if (!$colExists($db, 'purchase_orders', 'product_type')) {
+            $db->exec(
+                "ALTER TABLE purchase_orders
+                 ADD COLUMN product_type ENUM('vehicle','spare_part') NOT NULL DEFAULT 'vehicle' AFTER po_number"
+            );
+            echo "added purchase_orders.product_type\n";
+            $db->exec(
+                "UPDATE purchase_orders po
+                 SET product_type = 'spare_part'
+                 WHERE EXISTS (
+                     SELECT 1 FROM purchase_order_items poi
+                     WHERE poi.purchase_order_id = po.id AND poi.item_type = 'spare_part'
+                 )
+                 AND NOT EXISTS (
+                     SELECT 1 FROM purchase_order_items poi
+                     WHERE poi.purchase_order_id = po.id AND poi.item_type = 'vehicle_variant'
+                 )"
+            );
+            echo "backfilled product_type from line items\n";
+        } else {
+            echo "skip purchase_orders.product_type\n";
         }
         echo "Migration complete.\n";
     }

@@ -14,6 +14,7 @@ $statusClass = [
     'cancelled' => 'chip-danger',
 ];
 $canReceive = !in_array($po['status'], ['received', 'cancelled'], true);
+$isSparePo = ($po['product_type'] ?? 'vehicle') === 'spare_part';
 $pendingItems = array_filter($items, static fn($it) => (int)$it['quantity_ordered'] > (int)$it['quantity_received']);
 $itemsJson = json_encode(array_values(array_map(static function ($it) {
     $itemType = $it['item_type'] ?? 'vehicle_variant';
@@ -75,6 +76,7 @@ document.addEventListener('alpine:init', () => {
       <p class="page-sub">
         <?= e($po['supplier_name'] ?? 'No supplier') ?>
         · <?= e(date('d M Y', strtotime($po['po_date']))) ?>
+        · <span class="chip chip-muted"><?= $isSparePo ? 'Spare Parts' : 'Vehicle' ?></span>
         · <span class="chip <?= $statusClass[$po['status']] ?? 'chip-muted' ?>"><?= e($statusLabels[$po['status']] ?? $po['status']) ?></span>
       </p>
     </div>

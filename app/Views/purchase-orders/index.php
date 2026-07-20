@@ -19,9 +19,18 @@ $statusClass = [
   <div class="toolbar">
     <div>
       <h1 class="page-title">Purchase Orders</h1>
-      <p class="page-sub">Procure vehicle variants from suppliers — receipt updates inventory by warehouse &amp; color. Linked to <a href="<?= url('vehicles') ?>">Vehicles</a> and <a href="<?= url('inventory') ?>">Inventory</a>.</p>
+      <p class="page-sub">Procure vehicles or spare parts from suppliers — receipt updates inventory. Linked to <a href="<?= url('vehicles') ?>">Vehicles</a>, <a href="<?= url('spare-parts') ?>">Spare Parts</a>, and <a href="<?= url('inventory') ?>">Inventory</a>.</p>
     </div>
-    <a class="btn btn-primary" href="<?= url('purchase-orders/create') ?>">+ New Purchase Order</a>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a class="btn btn-primary" href="<?= url('purchase-orders/create?product=vehicle') ?>">+ Vehicle PO</a>
+      <a class="btn btn-outline" href="<?= url('purchase-orders/create?product=spare_part') ?>">+ Spare Parts PO</a>
+    </div>
+  </div>
+
+  <div class="tabs" style="margin-bottom:1rem;">
+    <a class="tab <?= ($productType ?? '') === '' ? 'active' : '' ?>" href="<?= url('purchase-orders') ?>">All</a>
+    <a class="tab <?= ($productType ?? '') === 'vehicle' ? 'active' : '' ?>" href="<?= url('purchase-orders?product_type=vehicle') ?>">Vehicles</a>
+    <a class="tab <?= ($productType ?? '') === 'spare_part' ? 'active' : '' ?>" href="<?= url('purchase-orders?product_type=spare_part') ?>">Spare Parts</a>
   </div>
 
   <div class="stat-grid">
@@ -46,6 +55,9 @@ $statusClass = [
   <form method="get" class="card" style="margin-bottom:1rem;">
     <h3 class="card-title" style="margin-bottom:0.65rem;">Filters</h3>
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:end;">
+      <?php if (($productType ?? '') !== ''): ?>
+        <input type="hidden" name="product_type" value="<?= e($productType) ?>">
+      <?php endif; ?>
       <div class="form-group" style="margin:0;min-width:130px;">
         <label>Status</label>
         <select class="form-control" name="status">
@@ -82,6 +94,7 @@ $statusClass = [
         <thead>
           <tr>
             <th>PO Number</th>
+            <th>Type</th>
             <th>Date</th>
             <th>Supplier company</th>
             <th>Lines</th>
@@ -93,8 +106,13 @@ $statusClass = [
         </thead>
         <tbody>
         <?php foreach ($orders as $o): ?>
+          <?php
+            $isSpare = ($o['product_type'] ?? 'vehicle') === 'spare_part';
+            $typeLabel = $isSpare ? 'Spare Parts' : 'Vehicle';
+          ?>
           <tr>
             <td><strong><?= e($o['po_number']) ?></strong></td>
+            <td><span class="chip chip-muted"><?= e($typeLabel) ?></span></td>
             <td><?= e(date('d M Y', strtotime($o['po_date']))) ?></td>
             <td><?= e($o['supplier_name'] ?? '—') ?></td>
             <td><?= (int)$o['line_count'] ?></td>
@@ -106,9 +124,10 @@ $statusClass = [
         <?php endforeach; ?>
         <?php if (!$orders): ?>
           <tr>
-            <td colspan="8" class="muted">
+            <td colspan="9" class="muted">
               No purchase orders yet.
-              <a href="<?= url('purchase-orders/create') ?>">Create your first PO</a>
+              <a href="<?= url('purchase-orders/create?product=vehicle') ?>">Create a vehicle PO</a>
+              or <a href="<?= url('purchase-orders/create?product=spare_part') ?>">spare parts PO</a>
             </td>
           </tr>
         <?php endif; ?>

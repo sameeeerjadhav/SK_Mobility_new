@@ -20,6 +20,7 @@ class PurchaseOrderController extends Controller
         require_role('super_admin');
 
         $status = trim((string)$this->input('status'));
+        $productType = trim((string)$this->input('product_type'));
         $supplier = trim((string)$this->input('supplier'));
         $search = trim((string)$this->input('search'));
         $from = $this->input('from');
@@ -30,6 +31,10 @@ class PurchaseOrderController extends Controller
         if ($status !== '') {
             $where[] = 'po.status = ?';
             $params[] = $status;
+        }
+        if ($productType !== '' && in_array($productType, ['vehicle', 'spare_part'], true)) {
+            $where[] = 'po.product_type = ?';
+            $params[] = $productType;
         }
         if ($supplier !== '') {
             $where[] = 'po.supplier_name LIKE ?';
@@ -91,6 +96,7 @@ class PurchaseOrderController extends Controller
             'orders' => $orders,
             'stats' => $stats,
             'status' => $status,
+            'productType' => $productType,
             'supplier' => $supplier,
             'search' => $search,
             'from' => $from,
@@ -102,13 +108,29 @@ class PurchaseOrderController extends Controller
     {
         require_role('super_admin');
 
+        $productType = $this->input('product');
+        if (!in_array($productType, ['vehicle', 'spare_part'], true)) {
+            $productType = 'vehicle';
+        }
+
+        $variants = $this->loadVariants();
+        $vehicles = $this->loadVehicles();
+        $vehicleCategories = $this->loadVehicleCategories();
+        $spareParts = $this->loadSpareParts();
+        $spareCategories = $this->loadSpareCategories();
+
+        $canCreateVehicle = !empty($variants) || !empty($vehicles) || !empty($vehicleCategories);
+        $canCreateSpare = !empty($spareParts) || !empty($spareCategories);
+
         $this->view('purchase-orders/create', [
-            'title' => 'New Purchase Order',
-            'variants' => $this->loadVariants(),
-            'vehicles' => $this->loadVehicles(),
-            'vehicleCategories' => $this->loadVehicleCategories(),
-            'spareParts' => $this->loadSpareParts(),
-            'spareCategories' => $this->loadSpareCategories(),
+            'title' => $productType === 'spare_part' ? 'New Spare Parts Purchase Order' : 'New Vehicle Purchase Order',
+            'productType' => $productType,
+            'variants' => $variants,
+            'vehicles' => $vehicles,
+            'vehicleCategories' => $vehicleCategories,
+            'spareParts' => $spareParts,
+            'spareCategories' => $spareCategories,
+            'canCreate' => $productType === 'spare_part' ? $canCreateSpare : $canCreateVehicle,
         ]);
     }
 
@@ -223,18 +245,29 @@ class PurchaseOrderController extends Controller
 
         try {
             $payload = $this->validatedHeader();
+            $productType = $this->input('product_type') ?: 'vehicle';
+            if (!in_array($productType, ['vehicle', 'spare_part'], true)) {
+                $productType = 'vehicle';
+            }
+            $expectedItemType = $productType === 'spare_part' ? 'spare_part' : 'vehicle_variant';
             $lines = $this->service()->calcLines($this->input('items') ?? []);
+            foreach ($lines['items'] as $item) {
+                if (($item['item_type'] ?? '') !== $expectedItemType) {
+                    throw new RuntimeException('All line items must match the purchase order type (vehicle or spare parts).');
+                }
+            }
             $db = $this->db();
             $db->beginTransaction();
 
             $poNumber = next_code('PO', 'purchase_orders', 'po_number');
             $db->prepare(
                 'INSERT INTO purchase_orders (
-                    po_number, supplier_name, po_date, supplier_invoice_no, supplier_invoice_date,
+                    po_number, product_type, supplier_name, po_date, supplier_invoice_no, supplier_invoice_date,
                     status, subtotal, gst_amount, total_amount, notes, created_by
-                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
                 $poNumber,
+                $productType,
                 $payload['supplier_name'],
                 $payload['po_date'],
                 $payload['supplier_invoice_no'],
@@ -258,7 +291,8 @@ class PurchaseOrderController extends Controller
                 $this->db()->rollBack();
             }
             flash('error', $e->getMessage());
-            $this->redirect('/purchase-orders/create');
+            $product = urlencode(($this->input('product_type') ?: 'vehicle') === 'spare_part' ? 'spare_part' : 'vehicle');
+            $this->redirect('/purchase-orders/create?product=' . $product);
         }
     }
 

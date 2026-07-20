@@ -439,6 +439,7 @@ CREATE TABLE inventory_movements (
 CREATE TABLE purchase_orders (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   po_number VARCHAR(40) NOT NULL UNIQUE,
+  product_type ENUM('vehicle','spare_part') NOT NULL DEFAULT 'vehicle',
   supplier_name VARCHAR(200) NULL,
   po_date DATE NOT NULL,
   supplier_invoice_no VARCHAR(80) NULL,

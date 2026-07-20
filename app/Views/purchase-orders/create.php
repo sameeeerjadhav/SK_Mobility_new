@@ -1,18 +1,21 @@
 <?php
+$productType = $productType ?? 'vehicle';
+$isSparePo = $productType === 'spare_part';
 $variantsJson = json_encode($variants, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 $vehiclesJson = json_encode($vehicles, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 $vehicleCategoriesJson = json_encode($vehicleCategories, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 $sparePartsJson = json_encode($spareParts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 $spareCategoriesJson = json_encode($spareCategories, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 $batteryTypes = ['Lithium Ion', 'Lead Acid'];
-$canCreate = !empty($vehicles) || !empty($vehicleCategories) || !empty($spareParts) || !empty($spareCategories);
 $defaultVariantMode = !empty($variants) ? 'existing' : 'new';
 $defaultVehicleMode = !empty($vehicles) ? 'existing' : 'new';
 $defaultSpareMode = !empty($spareParts) ? 'existing' : 'new';
+$defaultGstPercent = $isSparePo ? 18 : 5;
 ?>
 <script>
 document.addEventListener('alpine:init', () => {
   Alpine.data('poCreatePage', () => ({
+    productType: '<?= e($productType) ?>',
     variants: <?= $variantsJson ?>,
     vehicles: <?= $vehiclesJson ?>,
     vehicleCategories: <?= $vehicleCategoriesJson ?>,
@@ -22,13 +25,14 @@ document.addEventListener('alpine:init', () => {
     defaultVehicleMode: '<?= $defaultVehicleMode ?>',
     defaultSpareMode: '<?= $defaultSpareMode ?>',
     items: [],
-    defaultGstPercent: 5,
+    defaultGstPercent: <?= (int)$defaultGstPercent ?>,
     init() {
       this.items = [this.blankItem()];
     },
     blankItem() {
+      const isSpare = this.productType === 'spare_part';
       return {
-        item_type: 'vehicle_variant',
+        item_type: isSpare ? 'spare_part' : 'vehicle_variant',
         variant_mode: this.defaultVariantMode,
         vehicle_mode: this.defaultVehicleMode,
         variant_id: '',
@@ -44,8 +48,8 @@ document.addEventListener('alpine:init', () => {
         color: '',
         quantity: 1,
         unit_rate: '',
-        hsn_code: '87116020',
-        gst_percent: this.defaultGstPercent,
+        hsn_code: isSpare ? '85076000' : '87116020',
+        gst_percent: isSpare ? 18 : 5,
         description: '',
       };
     },
@@ -217,6 +221,10 @@ document.addEventListener('alpine:init', () => {
       this.items = [...this.items.slice(0, idx + 1), line, ...this.items.slice(idx + 1)];
     },
     addItem() {
+      if (this.productType === 'spare_part') {
+        this.items = [...this.items, this.blankItem()];
+        return;
+      }
       const last = this.lastVehicleLine();
       if (last) {
         this.items = [...this.items, {
@@ -280,17 +288,28 @@ document.addEventListener('alpine:init', () => {
 
   <div class="toolbar" style="margin-bottom:1rem;">
     <div>
-      <h1 class="page-title" style="margin:0;">New Purchase Order</h1>
-      <p class="page-sub" style="margin:0.25rem 0 0;">Purchase vehicles or spare parts/batteries — stock is added on PO receive</p>
+      <h1 class="page-title" style="margin:0;" x-text="productType === 'spare_part' ? 'New Spare Parts Purchase Order' : 'New Vehicle Purchase Order'"></h1>
+      <p class="page-sub" style="margin:0.25rem 0 0;">Separate flow for vehicles and spare parts — stock is added on PO receive</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a class="btn btn-sm" :class="productType === 'vehicle' ? 'btn-primary' : 'btn-outline'" href="<?= url('purchase-orders/create?product=vehicle') ?>">Vehicle</a>
+      <a class="btn btn-sm" :class="productType === 'spare_part' ? 'btn-primary' : 'btn-outline'" href="<?= url('purchase-orders/create?product=spare_part') ?>">Spare Parts</a>
     </div>
   </div>
 
   <?php if (!$canCreate): ?>
-    <div class="alert alert-warning">Add vehicle categories under <a href="<?= url('vehicles') ?>">Vehicles</a> or spare categories under <a href="<?= url('spare-parts') ?>">Spare Parts</a> before creating a purchase order.</div>
+    <div class="alert alert-warning">
+      <?php if ($isSparePo): ?>
+        Add spare categories under <a href="<?= url('spare-parts') ?>">Spare Parts</a> before creating a spare parts purchase order.
+      <?php else: ?>
+        Add vehicle categories under <a href="<?= url('vehicles') ?>">Vehicles</a> before creating a vehicle purchase order.
+      <?php endif; ?>
+    </div>
   <?php endif; ?>
 
   <form method="post" action="<?= url('purchase-orders') ?>">
     <?= csrf_field() ?>
+    <input type="hidden" name="product_type" :value="productType">
 
     <div class="card" style="margin-bottom:0.85rem;">
       <h3 class="card-title">1. Supplier &amp; invoice</h3>
@@ -317,8 +336,9 @@ document.addEventListener('alpine:init', () => {
     <div class="card" style="margin-bottom:0.85rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
         <div>
-          <h3 class="card-title" style="margin:0;">2. Line items</h3>
-          <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;">Each line is either a vehicle variant or a spare part/battery — use color to split variants under one vehicle</p>
+          <h3 class="card-title" style="margin:0;" x-text="productType === 'spare_part' ? '2. Spare parts / batteries' : '2. Vehicle variants'"></h3>
+          <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;" x-show="productType === 'vehicle'">Use color to split variants under one vehicle — each color is a separate catalog variant on receive.</p>
+          <p class="muted" style="margin:0.25rem 0 0;font-size:0.82rem;" x-show="productType === 'spare_part'">Procure spare parts or batteries — stock updates on receive (no warehouse split).</p>
         </div>
         <button class="btn btn-sm btn-outline" type="button" @click="addItem()">+ Add line</button>
       </div>
@@ -330,21 +350,12 @@ document.addEventListener('alpine:init', () => {
             <button class="btn btn-sm btn-danger" type="button" @click="removeItem(idx)" x-show="items.length > 1">Remove</button>
           </div>
 
-          <input type="hidden" :name="'items['+idx+'][item_type]'" :value="it.item_type">
-          <input type="hidden" :name="'items['+idx+'][variant_mode]'" :value="it.variant_mode" x-show="it.item_type === 'vehicle_variant'">
-          <input type="hidden" :name="'items['+idx+'][vehicle_mode]'" :value="it.vehicle_mode" x-show="it.item_type === 'vehicle_variant' && it.variant_mode === 'new'">
-          <input type="hidden" :name="'items['+idx+'][spare_mode]'" :value="it.spare_mode" x-show="it.item_type === 'spare_part'">
+          <input type="hidden" :name="'items['+idx+'][item_type]'" :value="productType === 'spare_part' ? 'spare_part' : 'vehicle_variant'">
+          <input type="hidden" :name="'items['+idx+'][variant_mode]'" :value="it.variant_mode" x-show="productType === 'vehicle'">
+          <input type="hidden" :name="'items['+idx+'][vehicle_mode]'" :value="it.vehicle_mode" x-show="productType === 'vehicle' && it.variant_mode === 'new'">
+          <input type="hidden" :name="'items['+idx+'][spare_mode]'" :value="it.spare_mode" x-show="productType === 'spare_part'">
 
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
-            <button class="btn btn-sm" type="button"
-              :class="it.item_type === 'vehicle_variant' ? 'btn-primary' : 'btn-outline'"
-              @click="setItemType(idx, 'vehicle_variant')">Vehicle variant</button>
-            <button class="btn btn-sm" type="button"
-              :class="it.item_type === 'spare_part' ? 'btn-primary' : 'btn-outline'"
-              @click="setItemType(idx, 'spare_part')">Spare part / Battery</button>
-          </div>
-
-          <template x-if="it.item_type === 'vehicle_variant'">
+          <template x-if="productType === 'vehicle'">
             <div>
               <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
                 <button class="btn btn-sm" type="button"
@@ -461,7 +472,7 @@ document.addEventListener('alpine:init', () => {
             </div>
           </template>
 
-          <template x-if="it.item_type === 'spare_part'">
+          <template x-if="productType === 'spare_part'">
             <div>
               <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
                 <button class="btn btn-sm" type="button"
@@ -563,7 +574,7 @@ document.addEventListener('alpine:init', () => {
               <input class="form-control" type="number" step="0.01" min="0" max="100" x-model="defaultGstPercent">
               <button class="btn btn-sm btn-outline" type="button" @click="applyDefaultGstToAll()">Apply to all</button>
             </div>
-            <div class="muted" style="font-size:0.75rem;margin-top:0.25rem;">Each line can use a different rate — vehicles default to 5%, spare parts to 18%.</div>
+            <div class="muted" style="font-size:0.75rem;margin-top:0.25rem;">Each line can use a different rate — <?= $isSparePo ? 'spare parts default to 18%' : 'vehicles default to 5%' ?>.</div>
           </div>
         </div>
         <div style="padding:0.85rem 1rem;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);">
