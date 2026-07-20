@@ -11,6 +11,14 @@ $locationLabels = [
   </div>
 </div>
 
+<?php if (empty($locationFilterAvailable)): ?>
+  <div class="alert alert-warning" style="margin-bottom:1rem;">
+    Billing location is not set up on this database yet. Run
+    <a href="<?= url('install.php?migrate_billing_location=1') ?>" target="_blank">/install.php?migrate_billing_location=1</a>
+    once after deploy to enable Kokamthan / Kopargaon filters and order billing location.
+  </div>
+<?php endif; ?>
+
 <div class="stat-grid" style="margin-bottom:1rem;">
   <div class="stat-card">
     <div class="stat-label">Matching invoices</div>

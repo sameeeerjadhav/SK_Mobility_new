@@ -15,6 +15,7 @@ class BillingController extends Controller
 
         $orderType = trim((string)$this->input('order_type'));
         $billingLocation = trim((string)$this->input('billing_location'));
+        $locationFilterAvailable = $this->billingLocationColumnExists();
 
         $where = ["b.bill_type = 'vehicle'"];
         $params = [];
@@ -22,9 +23,12 @@ class BillingController extends Controller
             $where[] = 'o.order_type = ?';
             $params[] = $orderType;
         }
-        if ($billingLocation !== '' && in_array($billingLocation, ['kokamthan', 'kopargaon'], true)) {
+        if ($locationFilterAvailable && $billingLocation !== '' && in_array($billingLocation, ['kokamthan', 'kopargaon'], true)) {
             $where[] = 'b.billing_location = ?';
             $params[] = $billingLocation;
+        } elseif ($billingLocation !== '' && !$locationFilterAvailable) {
+            flash('warning', 'Billing location filter needs a database update. Run /install.php?migrate_billing_location=1 once, then try again.');
+            $billingLocation = '';
         }
         $sqlWhere = implode(' AND ', $where);
 
@@ -49,6 +53,7 @@ class BillingController extends Controller
             'invoiceCount' => (int)$countStmt->fetchColumn(),
             'orderType' => $orderType,
             'billingLocation' => $billingLocation,
+            'locationFilterAvailable' => $locationFilterAvailable,
             'canManage' => can('manage_billing'),
         ]);
     }
@@ -194,5 +199,20 @@ class BillingController extends Controller
         $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ?');
         $items->execute([$id]);
         return [$bill, $items->fetchAll()];
+    }
+
+    private function billingLocationColumnExists(): bool
+    {
+        static $exists = null;
+        if ($exists !== null) {
+            return $exists;
+        }
+        $stmt = $this->db()->prepare(
+            'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $stmt->execute(['bills', 'billing_location']);
+        $exists = (int)$stmt->fetchColumn() > 0;
+        return $exists;
     }
 }
