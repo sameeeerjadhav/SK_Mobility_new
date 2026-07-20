@@ -35,9 +35,11 @@ if ($role === 'super_admin') {
     $nav[] = ['section' => 'Operations', 'items' => [
         ['label' => 'Dealers', 'href' => '/dealers', 'perm' => 'manage_dealers'],
         ['label' => 'Vehicles', 'href' => '/vehicles', 'perm' => 'view_vehicles'],
-        ['label' => 'Sell Orders', 'href' => '/orders', 'perm' => 'view_orders'],
         ['label' => 'Payments', 'href' => '/payments', 'perm' => 'view_payments'],
         ['label' => 'Inventory', 'href' => '/inventory', 'perm' => 'view_inventory'],
+    ]];
+    $nav[] = ['section' => 'Orders', 'items' => [
+        ['label' => 'Sell Orders', 'href' => '/orders', 'perm' => 'view_orders'],
         ['label' => 'Purchase Orders', 'href' => '/purchase-orders'],
     ]];
     $nav[] = ['section' => 'Field Ops', 'items' => [
@@ -59,10 +61,12 @@ if ($role === 'super_admin') {
 } elseif ($role === 'dealer') {
     $nav[] = ['section' => 'Operations', 'items' => [
         ['label' => 'Vehicles', 'href' => '/vehicles', 'perm' => 'view_vehicles'],
-        ['label' => 'Sell Orders', 'href' => '/orders', 'perm' => 'view_orders'],
         ['label' => 'Payments', 'href' => '/payments', 'perm' => 'view_payments'],
         ['label' => 'Leads', 'href' => '/leads', 'perm' => 'view_leads'],
         ['label' => 'Services', 'href' => '/services', 'perm' => 'view_services'],
+    ]];
+    $nav[] = ['section' => 'Orders', 'items' => [
+        ['label' => 'Sell Orders', 'href' => '/orders', 'perm' => 'view_orders'],
     ]];
 } elseif ($role === 'service') {
     $nav[] = ['section' => 'Field Ops', 'items' => [
