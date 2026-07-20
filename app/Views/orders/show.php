@@ -53,9 +53,12 @@
       </div>
     </div>
     <div class="actions">
-      <a class="btn btn-sm btn-outline" href="<?= url('orders/' . $order['id'] . '/print') ?>" target="_blank">Print</a>
       <?php if ($bill): ?>
-        <a class="btn btn-sm btn-primary" href="<?= url('billing/' . $bill['id'] . '/pdf') ?>" target="_blank">Bill</a>
+        <a class="btn btn-sm btn-outline" href="<?= url('orders/' . $order['id'] . '/print') ?>" target="_blank">Tax Invoice</a>
+        <a class="btn btn-sm btn-primary" href="<?= url('orders/' . $order['id'] . '/invoice/pdf') ?>" target="_blank">PDF</a>
+        <?php if (can('view_billing')): ?>
+          <a class="btn btn-sm btn-outline" href="<?= url('billing/' . $bill['id']) ?>">Edit invoice</a>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
   </div>

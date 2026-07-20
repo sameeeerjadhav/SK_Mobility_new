@@ -9,10 +9,6 @@ class BillPdfService
 {
     public static function renderHtml(array $bill, array $items): string
     {
-        if (($bill['bill_type'] ?? 'vehicle') === 'warranty') {
-            return self::renderWarranty($bill);
-        }
-
         $cgstRate = (float)($bill['cgst_rate'] ?? 14);
         $sgstRate = (float)($bill['sgst_rate'] ?? 14);
         $saleDate = $bill['vehicle_sale_date'] ?? $bill['created_at'] ?? null;
@@ -267,23 +263,6 @@ class BillPdfService
             return '';
         }
         return number_format((float)$n, 2, '.', ',');
-    }
-
-    private static function renderWarranty(array $bill): string
-    {
-        return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' . htmlspecialchars($bill['bill_number']) . '</title>
-        <style>body{font-family:DejaVu Sans,Arial,sans-serif;margin:24px;} .brand{color:#c62828;font-size:22px;font-weight:900;}</style>
-        </head><body>
-        <div class="brand">' . htmlspecialchars($bill['company_name'] ?: 'SAI KUBER MOBILITY') . '</div>
-        <h2>Warranty Certificate</h2>
-        <p><strong>' . htmlspecialchars($bill['bill_number']) . '</strong> · ' . india_date($bill['created_at'] ?? null) . '</p>
-        <p>Customer: ' . htmlspecialchars($bill['customer_name'] ?? '') . '<br>
-        Vehicle: ' . htmlspecialchars($bill['vehicle_model'] ?? '') . '<br>
-        Chassis: ' . htmlspecialchars($bill['chassis_no'] ?? '') . ' · Motor: ' . htmlspecialchars($bill['motor_no'] ?? '') . '<br>
-        Warranty: ' . india_date($bill['warranty_start'] ?? null) . ' → ' . india_date($bill['warranty_end'] ?? null) .
-        ' (' . htmlspecialchars($bill['warranty_period'] ?? '') . ')</p>
-        <button onclick="window.print()">Print</button>
-        </body></html>';
     }
 
     public static function outputPdf(array $bill, array $items): void

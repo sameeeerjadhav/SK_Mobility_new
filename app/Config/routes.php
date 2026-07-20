@@ -77,6 +77,7 @@ $router->get('/orders/create', [OrderController::class, 'create'], ['require_aut
 $router->post('/orders', [OrderController::class, 'store'], ['require_auth']);
 $router->get('/orders/{id}', [OrderController::class, 'show'], ['require_auth']);
 $router->post('/orders/{id}/status', [OrderController::class, 'updateStatus'], ['require_auth']);
+$router->get('/orders/{id}/invoice/pdf', [OrderController::class, 'invoicePdf'], ['require_auth']);
 $router->get('/orders/{id}/print', [OrderController::class, 'print'], ['require_auth']);
 
 // Payments
@@ -85,7 +86,6 @@ $router->post('/payments', [PaymentController::class, 'store'], ['require_auth']
 
 // Billing
 $router->get('/billing', [BillingController::class, 'index'], ['require_auth']);
-$router->post('/billing/warranty', [BillingController::class, 'createWarranty'], ['require_auth']);
 $router->post('/billing/{id}', [BillingController::class, 'update'], ['require_auth']);
 $router->get('/billing/{id}/preview', [BillingController::class, 'preview'], ['require_auth']);
 $router->get('/billing/{id}/pdf', [BillingController::class, 'pdf'], ['require_auth']);

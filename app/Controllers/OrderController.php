@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Core\Auth;
 use App\Core\Controller;
+use App\Services\BillPdfService;
 use App\Services\OrderService;
 use RuntimeException;
 
@@ -226,28 +227,49 @@ class OrderController extends Controller
 
     public function print(string $id): void
     {
+        $this->outputTaxInvoice((int)$id, false);
+    }
+
+    public function invoicePdf(string $id): void
+    {
+        $this->outputTaxInvoice((int)$id, true);
+    }
+
+    private function outputTaxInvoice(int $orderId, bool asPdf): void
+    {
         require_permission('view_orders');
-        $orderId = (int)$id;
-        $stmt = $this->db()->prepare(
-            'SELECT o.*, d.business_name FROM orders o LEFT JOIN dealers d ON d.id = o.dealer_id WHERE o.id = ?'
-        );
+
+        $stmt = $this->db()->prepare('SELECT * FROM orders WHERE id = ?');
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
         if (!$order) {
-            exit('Not found');
+            flash('error', 'Order not found.');
+            $this->redirect('/orders');
         }
-        $items = $this->db()->prepare(
-            'SELECT oi.*, v.name AS vehicle_name, vv.name AS variant_name
-             FROM order_items oi
-             JOIN vehicles v ON v.id = oi.vehicle_id
-             JOIN vehicle_variants vv ON vv.id = oi.variant_id
-             WHERE oi.order_id = ?'
+        if (Auth::role() === 'dealer' && (int)$order['dealer_id'] !== Auth::dealerId()) {
+            flash('error', 'Unauthorized.');
+            $this->redirect('/orders');
+        }
+
+        $billStmt = $this->db()->prepare(
+            "SELECT * FROM bills WHERE order_id = ? AND bill_type = 'vehicle' LIMIT 1"
         );
-        $items->execute([$orderId]);
-        $this->view('orders/print', [
-            'title' => 'Print ' . $order['order_number'],
-            'order' => $order,
-            'items' => $items->fetchAll(),
-        ], 'print');
+        $billStmt->execute([$orderId]);
+        $bill = $billStmt->fetch();
+        if (!$bill) {
+            flash('error', 'Tax invoice not found for this order.');
+            $this->redirect('/orders/' . $orderId);
+        }
+
+        $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ?');
+        $items->execute([(int)$bill['id']]);
+        $lineItems = $items->fetchAll();
+
+        if ($asPdf) {
+            BillPdfService::outputPdf($bill, $lineItems);
+        }
+
+        echo BillPdfService::renderHtml($bill, $lineItems);
+        exit;
     }
 }

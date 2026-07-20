@@ -3,17 +3,20 @@ $payment = strtolower((string)($bill['payment_mode'] ?? ''));
 $paidCash = str_contains($payment, 'cash');
 $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check');
 ?>
-<div style="margin-bottom:1rem;"><a href="<?= url('billing') ?>">&larr; Billing</a></div>
+<div style="margin-bottom:1rem;"><a href="<?= url('billing') ?>">&larr; Tax Invoices</a></div>
 
 <div class="card" style="margin-bottom:1rem;">
   <div class="toolbar">
     <div>
       <h1 class="page-title" style="margin:0;"><?= e($bill['bill_number']) ?></h1>
-      <p class="page-sub" style="margin:0.35rem 0 0;"><?= e(ucfirst($bill['bill_type'])) ?> · <?= india_date($bill['vehicle_sale_date'] ?? $bill['created_at']) ?></p>
+      <p class="page-sub" style="margin:0.35rem 0 0;">Tax Invoice · <?= india_date($bill['vehicle_sale_date'] ?? $bill['created_at']) ?></p>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-      <a class="btn btn-outline" href="<?= url('billing/' . $bill['id'] . '/preview') ?>" target="_blank">Preview / Print (Tax Invoice)</a>
+      <a class="btn btn-outline" href="<?= url('billing/' . $bill['id'] . '/preview') ?>" target="_blank">Preview / Print</a>
       <a class="btn btn-primary" href="<?= url('billing/' . $bill['id'] . '/pdf') ?>" target="_blank">Download PDF</a>
+      <?php if (!empty($bill['order_id'])): ?>
+        <a class="btn btn-outline" href="<?= url('orders/' . (int)$bill['order_id']) ?>">View order</a>
+      <?php endif; ?>
     </div>
   </div>
 
@@ -28,36 +31,31 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
     </div>
   </div>
 
-  <?php if ($bill['bill_type'] === 'warranty'): ?>
-    <p><strong>Vehicle:</strong> <?= e($bill['vehicle_model']) ?> · Chassis <?= e($bill['chassis_no'] ?? '—') ?></p>
-    <p><strong>Warranty:</strong> <?= india_date($bill['warranty_start']) ?> → <?= india_date($bill['warranty_end']) ?> (<?= e($bill['warranty_period'] ?? '') ?>)</p>
-  <?php else: ?>
-    <div class="table-wrap" style="margin-top:1rem;">
-      <table class="data">
-        <thead><tr><th>Model / Code</th><th>Qty</th><th>Unit</th><th>Disc</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
-        <tbody>
-        <?php foreach ($items as $it): ?>
-          <tr>
-            <td><?= e($it['description']) ?><?php if (!empty($it['model_code'])): ?><br><span class="muted"><?= e($it['model_code']) ?></span><?php endif; ?></td>
-            <td><?= (int)$it['quantity'] ?></td>
-            <td><?= money($it['unit_price']) ?></td>
-            <td><?= money($it['discount'] ?? 0) ?></td>
-            <td><?= money($it['taxable_amount'] ?? 0) ?></td>
-            <td><?= money($it['cgst_amount'] ?? 0) ?></td>
-            <td><?= money($it['sgst_amount'] ?? 0) ?></td>
-            <td><?= money($it['total_price']) ?></td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-    <p style="margin-top:1rem;"><strong>Loan:</strong> <?= money($bill['loan_amount'] ?? 0) ?> ·
-      <strong>Total:</strong> <?= money($bill['total_amount']) ?> ·
-      <strong>In words:</strong> <?= e(amount_in_words($bill['total_amount'])) ?></p>
-  <?php endif; ?>
+  <div class="table-wrap" style="margin-top:1rem;">
+    <table class="data">
+      <thead><tr><th>Model / Code</th><th>Qty</th><th>Unit</th><th>Disc</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>Total</th></tr></thead>
+      <tbody>
+      <?php foreach ($items as $it): ?>
+        <tr>
+          <td><?= e($it['description']) ?><?php if (!empty($it['model_code'])): ?><br><span class="muted"><?= e($it['model_code']) ?></span><?php endif; ?></td>
+          <td><?= (int)$it['quantity'] ?></td>
+          <td><?= money($it['unit_price']) ?></td>
+          <td><?= money($it['discount'] ?? 0) ?></td>
+          <td><?= money($it['taxable_amount'] ?? 0) ?></td>
+          <td><?= money($it['cgst_amount'] ?? 0) ?></td>
+          <td><?= money($it['sgst_amount'] ?? 0) ?></td>
+          <td><?= money($it['total_price']) ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <p style="margin-top:1rem;"><strong>Loan:</strong> <?= money($bill['loan_amount'] ?? 0) ?> ·
+    <strong>Total:</strong> <?= money($bill['total_amount']) ?> ·
+    <strong>In words:</strong> <?= e(amount_in_words($bill['total_amount'])) ?></p>
 </div>
 
-<?php if ($bill['bill_type'] === 'vehicle' && can('manage_billing')): ?>
+<?php if (can('manage_billing')): ?>
 <div class="card">
   <h3 class="card-title">Edit tax invoice fields</h3>
   <p class="muted" style="margin-top:0;">Fill every field that appears on the paper SAI KUBER bill, then Preview / Print.</p>
