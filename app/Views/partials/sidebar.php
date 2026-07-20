@@ -43,7 +43,7 @@ if ($role === 'super_admin') {
         ['label' => 'Spare Parts', 'href' => '/spare-parts', 'perm' => 'view_spare_parts'],
     ]];
     $nav[] = ['section' => 'Finance', 'items' => [
-        ['label' => 'Billing', 'href' => '/billing', 'perm' => 'view_billing'],
+        ['label' => 'Tax Invoices', 'href' => '/billing', 'perm' => 'view_billing'],
         ['label' => 'HR', 'href' => '/hr'],
         ['label' => 'Partners', 'href' => '/partners'],
         ['label' => 'Expenses', 'href' => '/expenses'],
@@ -69,7 +69,7 @@ if ($role === 'super_admin') {
 } elseif ($role === 'accountant') {
     $nav[] = ['section' => 'Finance', 'items' => [
         ['label' => 'Payments', 'href' => '/payments', 'perm' => 'view_payments'],
-        ['label' => 'Billing', 'href' => '/billing', 'perm' => 'view_billing'],
+        ['label' => 'Tax Invoices', 'href' => '/billing', 'perm' => 'view_billing'],
         ['label' => 'Reports', 'href' => '/reports', 'perm' => 'view_reports'],
     ]];
 }
