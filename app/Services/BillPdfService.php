@@ -32,7 +32,9 @@ class BillPdfService
         }
 
         $rows = '';
-        $rowCount = max(5, count($items));
+        $itemCount = count($items);
+        $rowCount = $itemCount > 0 ? max(5, $itemCount) : 5;
+        $compactRows = $itemCount > 5 ? ' compact-items' : '';
         for ($i = 0; $i < $rowCount; $i++) {
             $item = $items[$i] ?? null;
             if ($item) {
@@ -95,6 +97,8 @@ class BillPdfService
   .spec td.wval { width: 28%; }
   table.items th { font-size: 9.5px; }
   table.items td { height: 22px; }
+  table.items.compact-items td { height: 18px; font-size: 10px; padding: 3px 4px; }
+  table.items.compact-items th { font-size: 9px; padding: 3px 4px; }
   .c { text-align: center; }
   .r { text-align: right; }
   .empty-row td { height: 24px; }
@@ -177,7 +181,7 @@ class BillPdfService
     </tr>
   </table>
 
-  <table class="grid items">
+  <table class="grid items' . $compactRows . '">
     <thead>
       <tr>
         <th style="width:5%">S.No.</th>

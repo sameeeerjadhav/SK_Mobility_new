@@ -29,7 +29,8 @@ foreach ($variants as $vv) {
     const id = String(this.items[0]?.variant_id || '');
     return this.variantMap[id] || null;
   },
-  syncFromVariant() {
+  syncFromVariant(idx) {
+    if (idx !== 0) return;
     const v = this.primary;
     if (!v) {
       this.modelType = '';
@@ -49,6 +50,19 @@ foreach ($variants as $vv) {
     } else {
       this.batteryType = '';
     }
+  },
+  onOrderTypeChange() {
+    if (this.orderType === 'customer') {
+      this.items = [{ variant_id: this.items[0]?.variant_id || '', quantity: 1 }];
+    }
+  },
+  addLine() {
+    this.items = [...this.items, { variant_id: '', quantity: 1 }];
+  },
+  removeLine(idx) {
+    if (this.items.length <= 1) return;
+    this.items = this.items.filter((_, i) => i !== idx);
+    this.syncFromVariant(0);
   }
 }">
   <div style="margin-bottom:0.75rem;"><a href="<?= url('orders') ?>">&larr; Orders</a></div>
@@ -68,7 +82,7 @@ foreach ($variants as $vv) {
       <div class="form-grid">
         <div class="form-group">
           <label>Order type</label>
-          <select class="form-control" name="order_type" x-model="orderType" required>
+          <select class="form-control" name="order_type" x-model="orderType" @change="onOrderTypeChange()" required>
             <?php if (!empty($isAdmin)): ?>
               <option value="dealer">Dealer Order</option>
             <?php endif; ?>
@@ -92,9 +106,9 @@ foreach ($variants as $vv) {
           <label>Date of Sale *</label>
           <input class="form-control" type="date" name="sale_date" value="<?= date('Y-m-d') ?>" required>
         </div>
-        <div class="form-group full">
+        <div class="form-group full" x-show="orderType === 'customer'" x-cloak>
           <label>Vehicle / Variant *</label>
-          <select class="form-control" name="variant_id[0]" x-model="items[0].variant_id" @change="syncFromVariant()" required>
+          <select class="form-control" name="variant_id[0]" x-model="items[0].variant_id" @change="syncFromVariant(0)" required>
             <option value="">Select variant</option>
             <?php foreach ($variants as $vv): ?>
               <option value="<?= (int)$vv['id'] ?>">
@@ -104,6 +118,36 @@ foreach ($variants as $vv) {
           </select>
           <input type="hidden" name="quantity[0]" value="1">
         </div>
+
+        <template x-if="orderType === 'dealer'">
+          <div class="form-group full" style="grid-column:1 / -1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.65rem;flex-wrap:wrap;">
+              <label style="margin:0;">Vehicles / variants *</label>
+              <button class="btn btn-sm btn-outline" type="button" @click="addLine()">+ Add variant</button>
+            </div>
+            <template x-for="(it, idx) in items" :key="idx">
+              <div style="display:flex;gap:0.5rem;align-items:end;margin-bottom:0.5rem;flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Variant</label>
+                  <select class="form-control" :name="'variant_id['+idx+']'" x-model="it.variant_id" @change="syncFromVariant(idx)" required>
+                    <option value="">Select variant</option>
+                    <?php foreach ($variants as $vv): ?>
+                      <option value="<?= (int)$vv['id'] ?>">
+                        <?= e($vv['vehicle_name'] . ' — ' . $vv['name'] . ($vv['color'] ? ' (' . $vv['color'] . ')' : '') . ' / ' . money($vv['price'])) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;width:100px;">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Qty *</label>
+                  <input class="form-control" type="number" min="1" :name="'quantity['+idx+']'" x-model="it.quantity" required>
+                </div>
+                <button class="btn btn-sm btn-danger" type="button" @click="removeLine(idx)" x-show="items.length > 1" style="margin-bottom:0.35rem;">×</button>
+              </div>
+            </template>
+            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Each line appears on the tax invoice. Add multiple variants or increase quantity per line.</p>
+          </div>
+        </template>
         <div class="form-group">
           <label>EV Model Name</label>
           <input class="form-control" :value="modelName" readonly placeholder="From variant">

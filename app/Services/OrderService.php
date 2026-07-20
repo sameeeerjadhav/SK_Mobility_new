@@ -65,6 +65,9 @@ class OrderService
         foreach ($items as $item) {
             $variantId = (int)($item['variant_id'] ?? 0);
             $qty = max(1, (int)($item['quantity'] ?? 1));
+            if ($orderType === 'customer') {
+                $qty = 1;
+            }
             if ($variantId <= 0) {
                 continue;
             }
