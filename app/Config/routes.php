@@ -102,6 +102,7 @@ $router->post('/inventory/warehouses/{id}/delete', [InventoryController::class, 
 
 // Purchase orders
 $router->get('/purchase-orders', [PurchaseOrderController::class, 'index'], ['require_auth']);
+$router->get('/purchase-orders/create', [PurchaseOrderController::class, 'create'], ['require_auth']);
 $router->post('/purchase-orders', [PurchaseOrderController::class, 'store'], ['require_auth']);
 $router->get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show'], ['require_auth']);
 $router->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive'], ['require_auth']);

@@ -86,7 +86,31 @@ class PurchaseOrderController extends Controller
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
 
-        $variants = $db->query(
+        $this->view('purchase-orders/index', [
+            'title' => 'Purchase Orders',
+            'orders' => $orders,
+            'stats' => $stats,
+            'status' => $status,
+            'supplier' => $supplier,
+            'search' => $search,
+            'from' => $from,
+            'to' => $to,
+        ]);
+    }
+
+    public function create(): void
+    {
+        require_role('super_admin');
+
+        $this->view('purchase-orders/create', [
+            'title' => 'New Purchase Order',
+            'variants' => $this->loadVariants(),
+        ]);
+    }
+
+    private function loadVariants(): array
+    {
+        return $this->db()->query(
             "SELECT vv.id, vv.name, vv.sku, vv.color, vv.price, vv.battery_type, vv.battery_spec,
                     v.id AS vehicle_id, v.name AS vehicle_name
              FROM vehicle_variants vv
@@ -94,18 +118,6 @@ class PurchaseOrderController extends Controller
              WHERE vv.is_active = 1 AND v.is_active = 1
              ORDER BY v.name, vv.name, vv.color"
         )->fetchAll();
-
-        $this->view('purchase-orders/index', [
-            'title' => 'Purchase Orders',
-            'orders' => $orders,
-            'stats' => $stats,
-            'variants' => $variants,
-            'status' => $status,
-            'supplier' => $supplier,
-            'search' => $search,
-            'from' => $from,
-            'to' => $to,
-        ]);
     }
 
     public function show(string $id): void
@@ -205,11 +217,9 @@ class PurchaseOrderController extends Controller
                 $this->db()->rollBack();
             }
             flash('error', $e->getMessage());
-            $this->redirect('/purchase-orders');
+            $this->redirect('/purchase-orders/create');
         }
     }
-
-    public function receive(string $id): void
     {
         require_role('super_admin');
         $this->validateCsrf();
