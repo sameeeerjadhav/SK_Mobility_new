@@ -359,7 +359,7 @@ a:hover { color: var(--primary-dark); }
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 0.9rem;
   margin-bottom: 1.35rem;
 }
@@ -369,7 +369,8 @@ a:hover { color: var(--primary-dark); }
   border-radius: var(--radius);
   padding: 1.05rem 1.15rem;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  min-width: 0;
   box-shadow: var(--shadow-sm);
   animation: fadeUp 0.4s var(--ease) both;
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
@@ -401,10 +402,13 @@ a:hover { color: var(--primary-dark); }
   letter-spacing: 0.04em;
 }
 .stat-value {
-  font-size: 1.45rem;
+  font-size: clamp(1rem, 1.6vw, 1.35rem);
   font-weight: 800;
   margin: 0.35rem 0 0.2rem;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .stat-trend { font-size: 0.75rem; font-weight: 700; }
 .stat-trend.up { color: var(--success); }

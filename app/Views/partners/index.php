@@ -40,11 +40,12 @@ $txTypeChip = static function (string $type): string {
   margin-bottom: 0.35rem;
 }
 .pn-stat .v {
-  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  font-size: clamp(1rem, 1.8vw, 1.35rem);
   font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .pn-stat .hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
 .pn-stat.paid .v { color: #b45309; }
