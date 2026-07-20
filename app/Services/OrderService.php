@@ -557,8 +557,16 @@ class OrderService
     public static function resolveGstRates(array $data, string $productType): array
     {
         $default = $productType === 'spare_part' ? 9.0 : 14.0;
-        $cgst = round((float)($data['cgst_rate'] ?? $default), 2);
-        $sgst = round((float)($data['sgst_rate'] ?? $default), 2);
+        $cgstRaw = trim((string)($data['cgst_rate'] ?? ''));
+        $sgstRaw = trim((string)($data['sgst_rate'] ?? ''));
+        $cgst = $cgstRaw !== '' ? round((float)$cgstRaw, 2) : $default;
+        $sgst = $sgstRaw !== '' ? round((float)$sgstRaw, 2) : $default;
+        // Intra-state GST is split equally; if only one half was posted, mirror the other.
+        if ($cgstRaw !== '' && $sgstRaw === '') {
+            $sgst = $cgst;
+        } elseif ($sgstRaw !== '' && $cgstRaw === '') {
+            $cgst = $sgst;
+        }
         if ($cgst < 0 || $sgst < 0 || $cgst > 100 || $sgst > 100) {
             throw new RuntimeException('CGST and SGST rates must be between 0 and 100.');
         }

@@ -364,8 +364,10 @@ foreach ($spareParts ?? [] as $sp) {
           </div>
         </template>
         <template x-if="gstPreset !== 'custom'">
-          <input type="hidden" name="cgst_rate" :value="cgstRate">
-          <input type="hidden" name="sgst_rate" :value="sgstRate">
+          <div style="display:none">
+            <input type="hidden" name="cgst_rate" :value="cgstRate">
+            <input type="hidden" name="sgst_rate" :value="sgstRate">
+          </div>
         </template>
         <div class="form-group">
           <label>Total GST</label>
