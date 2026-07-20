@@ -41,7 +41,7 @@ class PartnerController extends Controller
             'INSERT INTO partners (name, phone, email, address, aadhar_number, pan_number, is_active) VALUES (?,?,?,?,?,?,1)'
         )->execute([
             trim((string)$this->input('name')),
-            trim((string)$this->input('phone')),
+            trim((string)$this->input('phone')) !== '' ? format_phone($this->input('phone')) : '',
             trim((string)$this->input('email')),
             trim((string)$this->input('address')),
             trim((string)$this->input('aadhar_number')) !== '' ? format_aadhar($this->input('aadhar_number')) : null,
@@ -60,7 +60,7 @@ class PartnerController extends Controller
             'UPDATE partners SET name=?, phone=?, email=?, address=?, aadhar_number=?, pan_number=?, is_active=? WHERE id=?'
         )->execute([
             trim((string)$this->input('name')),
-            trim((string)$this->input('phone')),
+            trim((string)$this->input('phone')) !== '' ? format_phone($this->input('phone')) : '',
             trim((string)$this->input('email')),
             trim((string)$this->input('address')),
             trim((string)$this->input('aadhar_number')) !== '' ? format_aadhar($this->input('aadhar_number')) : null,

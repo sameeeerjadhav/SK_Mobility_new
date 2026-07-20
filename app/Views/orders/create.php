@@ -128,7 +128,7 @@ foreach ($variants as $vv) {
       <h3 class="card-title">2. Buyer (same for dealer &amp; customer)</h3>
       <div class="form-grid">
         <div class="form-group"><label>Cust. Name *</label><input class="form-control" name="customer_name" required></div>
-        <div class="form-group"><label>Mob. *</label><input class="form-control" name="customer_phone" required></div>
+        <div class="form-group"><label>Mob. *</label><input class="form-control contact-input" name="customer_phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" required></div>
         <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" type="email"></div>
         <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="customer_aadhaar" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012"></div>
         <div class="form-group"><label>PAN No.</label><input class="form-control" name="customer_pan"></div>

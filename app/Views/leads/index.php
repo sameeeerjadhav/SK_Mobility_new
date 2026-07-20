@@ -63,7 +63,7 @@
         <div class="modal-header"><h3 class="modal-title">Create Lead</h3><button type="button" class="btn btn-sm btn-outline" @click="createOpen=false">Close</button></div>
         <div class="modal-body form-grid">
           <div class="form-group"><label>Name</label><input class="form-control" name="customer_name" required></div>
-          <div class="form-group"><label>Phone</label><input class="form-control" name="customer_phone" required></div>
+          <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="customer_phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" required></div>
           <div class="form-group"><label>Email</label><input class="form-control" type="email" name="customer_email"></div>
           <div class="form-group"><label>Source</label>
             <select class="form-control" name="source_id"><?php foreach ($sources as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select>

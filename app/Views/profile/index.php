@@ -11,7 +11,7 @@
         <div class="form-group"><label>First name</label><input class="form-control" name="first_name" value="<?= e($u['first_name']) ?>" required></div>
         <div class="form-group"><label>Last name</label><input class="form-control" name="last_name" value="<?= e($u['last_name']) ?>" required></div>
         <div class="form-group full"><label>Email</label><input class="form-control" value="<?= e($u['email']) ?>" disabled></div>
-        <div class="form-group full"><label>Phone</label><input class="form-control" name="phone" value="<?= e($u['phone'] ?? '') ?>"></div>
+        <div class="form-group full"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" value="<?= e(format_phone($u['phone'] ?? '')) ?>"></div>
         <div class="form-group full"><label>Role</label><input class="form-control" value="<?= e($u['role_name'] ?? $u['role_slug']) ?>" disabled></div>
       </div>
       <button class="btn btn-primary" type="submit">Save changes</button>

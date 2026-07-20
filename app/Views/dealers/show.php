@@ -9,7 +9,7 @@
         &nbsp; Code: <strong><?= e($dealer['dealer_code'] ?? 'Pending') ?></strong>
       </p>
       <p class="muted" style="margin:0.5rem 0 0;">
-        <?= e($dealer['contact_person']) ?> · <?= e($dealer['phone']) ?> · <?= e($dealer['email']) ?>
+        <?= e($dealer['contact_person']) ?> · <?= e(format_phone($dealer['phone'])) ?> · <?= e($dealer['email']) ?>
       </p>
     </div>
     <?php if ($dealer['status'] === 'pending'): ?>
@@ -252,7 +252,7 @@
       <div class="modal-body form-grid">
         <div class="form-group full"><label>Business name</label><input class="form-control" name="business_name" value="<?= e($dealer['business_name']) ?>" required></div>
         <div class="form-group"><label>Contact person</label><input class="form-control" name="contact_person" value="<?= e($dealer['contact_person']) ?>" required></div>
-        <div class="form-group"><label>Phone</label><input class="form-control" name="phone" value="<?= e($dealer['phone']) ?>" required></div>
+        <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" value="<?= e(format_phone($dealer['phone'])) ?>" required></div>
         <div class="form-group"><label>Email</label><input class="form-control" type="email" name="email" value="<?= e($dealer['email']) ?>" required></div>
         <div class="form-group"><label>GST</label><input class="form-control" name="gst_number" value="<?= e($dealer['gst_number'] ?? '') ?>"></div>
         <div class="form-group"><label>PAN</label><input class="form-control" name="pan_number" value="<?= e($dealer['pan_number'] ?? '') ?>"></div>

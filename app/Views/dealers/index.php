@@ -80,7 +80,7 @@
           <div class="form-grid">
             <div class="form-group full"><label>Business Name</label><input class="form-control" name="business_name" required></div>
             <div class="form-group"><label>Contact Person</label><input class="form-control" name="contact_person" required></div>
-            <div class="form-group"><label>Phone</label><input class="form-control" name="phone" required></div>
+            <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" required></div>
             <div class="form-group"><label>Email</label><input class="form-control" type="email" name="email" required></div>
             <div class="form-group"><label>GST</label><input class="form-control" name="gst_number"></div>
             <div class="form-group"><label>PAN</label><input class="form-control" name="pan_number"></div>

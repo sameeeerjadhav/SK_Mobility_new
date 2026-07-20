@@ -101,7 +101,7 @@ class BillingController extends Controller
         )->execute([
             $this->input('booking_no') ?: null,
             $this->input('customer_name'),
-            $this->input('customer_phone'),
+            trim((string)$this->input('customer_phone')) !== '' ? format_phone($this->input('customer_phone')) : null,
             $this->input('customer_email'),
             $this->input('customer_address'),
             trim((string)$this->input('customer_aadhaar')) !== '' ? format_aadhar($this->input('customer_aadhaar')) : null,

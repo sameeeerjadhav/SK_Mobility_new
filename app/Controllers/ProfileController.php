@@ -27,7 +27,8 @@ class ProfileController extends Controller
         $this->validateCsrf();
         $first = $this->input('first_name');
         $last = $this->input('last_name');
-        $phone = $this->input('phone');
+        $phone = trim((string)$this->input('phone'));
+        $phone = $phone !== '' ? format_phone($phone) : null;
 
         $this->db()->prepare(
             'UPDATE users SET first_name = ?, last_name = ?, phone = ? WHERE id = ?'

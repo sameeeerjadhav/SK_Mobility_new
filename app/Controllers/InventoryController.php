@@ -179,7 +179,7 @@ class InventoryController extends Controller
             $this->input('location'),
             $this->input('address'),
             $this->input('manager_name'),
-            $this->input('phone'),
+            trim((string)$this->input('phone')) !== '' ? format_phone($this->input('phone')) : null,
         ]);
         Audit::log('create', 'inventory', 'warehouses', (int)$this->db()->lastInsertId());
         flash('success', 'Warehouse created.');
@@ -197,7 +197,7 @@ class InventoryController extends Controller
             $this->input('location'),
             $this->input('address'),
             $this->input('manager_name'),
-            $this->input('phone'),
+            trim((string)$this->input('phone')) !== '' ? format_phone($this->input('phone')) : null,
             (int)$this->input('is_active'),
             (int)$id,
         ]);

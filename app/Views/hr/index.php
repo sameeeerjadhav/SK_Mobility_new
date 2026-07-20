@@ -71,7 +71,7 @@
         <div class="form-group"><label>First name</label><input class="form-control" name="first_name" required></div>
         <div class="form-group"><label>Last name</label><input class="form-control" name="last_name" required></div>
         <div class="form-group"><label>Email</label><input class="form-control" name="email"></div>
-        <div class="form-group"><label>Phone</label><input class="form-control" name="phone"></div>
+        <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210"></div>
         <div class="form-group"><label>Department</label><input class="form-control" name="department"></div>
         <div class="form-group"><label>Designation</label><input class="form-control" name="designation"></div>
         <div class="form-group"><label>Joining date</label><input class="form-control" type="date" name="date_of_joining"></div>
@@ -90,7 +90,7 @@
           <div class="form-group"><label>First name</label><input class="form-control" name="first_name" :value="editEmp?.first_name" required></div>
           <div class="form-group"><label>Last name</label><input class="form-control" name="last_name" :value="editEmp?.last_name" required></div>
           <div class="form-group"><label>Email</label><input class="form-control" name="email" :value="editEmp?.email"></div>
-          <div class="form-group"><label>Phone</label><input class="form-control" name="phone" :value="editEmp?.phone"></div>
+          <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" :value="editEmp?.phone"></div>
           <div class="form-group"><label>Department</label><input class="form-control" name="department" :value="editEmp?.department"></div>
           <div class="form-group"><label>Designation</label><input class="form-control" name="designation" :value="editEmp?.designation"></div>
           <div class="form-group"><label>Joining date</label><input class="form-control" type="date" name="date_of_joining" :value="editEmp?.date_of_joining"></div>

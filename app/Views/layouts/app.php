@@ -143,6 +143,30 @@ try {
       bindAadharInput(e.target);
     }
   });
+
+  window.formatContactValue = function (value) {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+    if (!digits) return '';
+    if (digits.length <= 5) return digits;
+    return digits.slice(0, 5) + ' ' + digits.slice(5);
+  };
+
+  const bindContactInput = (input) => {
+    input.addEventListener('input', () => {
+      const formatted = window.formatContactValue(input.value);
+      if (input.value !== formatted) input.value = formatted;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    input.value = window.formatContactValue(input.value);
+  };
+
+  document.querySelectorAll('.contact-input').forEach(bindContactInput);
+  document.addEventListener('focusin', (e) => {
+    if (e.target.matches('.contact-input:not([data-contact-bound])')) {
+      e.target.dataset.contactBound = '1';
+      bindContactInput(e.target);
+    }
+  });
 </script>
 </body>
 </html>

@@ -55,7 +55,7 @@
         <div class="modal-header"><h3 class="modal-title">Create Service Request</h3><button type="button" class="btn btn-sm btn-outline" @click="createOpen=false">Close</button></div>
         <div class="modal-body form-grid">
           <div class="form-group"><label>Customer name</label><input class="form-control" name="customer_name" required></div>
-          <div class="form-group"><label>Phone</label><input class="form-control" name="customer_phone" required></div>
+          <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="customer_phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" required></div>
           <div class="form-group"><label>Vehicle model</label><input class="form-control" name="vehicle_model"></div>
           <div class="form-group"><label>VIN</label><input class="form-control" name="vehicle_vin"></div>
           <div class="form-group full"><label>Issue description</label><textarea class="form-control" name="issue_description" rows="3" required></textarea></div>
@@ -72,7 +72,7 @@
         <div class="modal-header"><h3 class="modal-title">Add Technician</h3></div>
         <div class="modal-body form-grid">
           <div class="form-group"><label>Name</label><input class="form-control" name="name" required></div>
-          <div class="form-group"><label>Phone</label><input class="form-control" name="phone"></div>
+          <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210"></div>
           <div class="form-group"><label>Email</label><input class="form-control" name="email"></div>
           <div class="form-group"><label>Specialization</label><input class="form-control" name="specialization"></div>
         </div>

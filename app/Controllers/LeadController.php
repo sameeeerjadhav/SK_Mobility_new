@@ -97,7 +97,7 @@ class LeadController extends Controller
              VALUES (?,?,?,?,?,?,?,?,?)'
         )->execute([
             $this->input('customer_name'),
-            $this->input('customer_phone'),
+            trim((string)$this->input('customer_phone')) !== '' ? format_phone($this->input('customer_phone')) : null,
             $this->input('customer_email') ?: null,
             $this->input('source_id') !== '' ? (int)$this->input('source_id') : null,
             $this->input('interested_vehicle_id') !== '' ? (int)$this->input('interested_vehicle_id') : null,
@@ -161,7 +161,8 @@ class LeadController extends Controller
     {
         $this->validateCsrf();
         $name = $this->input('customer_name');
-        $phone = $this->input('customer_phone');
+        $phone = trim((string)$this->input('customer_phone'));
+        $phone = $phone !== '' ? format_phone($phone) : '';
         if ($name === '' || $phone === '') {
             flash('error', 'Name and phone are required.');
             $this->redirect('/login');

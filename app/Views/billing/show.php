@@ -27,7 +27,7 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
     </div>
     <div>
       <h4>Customer</h4>
-      <p><?= e($bill['customer_name']) ?><br><?= e($bill['customer_phone'] ?? '') ?> · <?= e($bill['customer_email'] ?? '') ?><br><?= nl2br(e($bill['customer_address'] ?? '')) ?><br>Aadhar: <?= e(format_aadhar($bill['customer_aadhaar'] ?? '') ?: '—') ?> · PAN: <?= e($bill['customer_pan'] ?? '—') ?></p>
+      <p><?= e($bill['customer_name']) ?><br><?= e(format_phone($bill['customer_phone'] ?? '') ?: '—') ?> · <?= e($bill['customer_email'] ?? '') ?><br><?= nl2br(e($bill['customer_address'] ?? '')) ?><br>Aadhar: <?= e(format_aadhar($bill['customer_aadhaar'] ?? '') ?: '—') ?> · PAN: <?= e($bill['customer_pan'] ?? '—') ?></p>
     </div>
   </div>
 
@@ -65,7 +65,7 @@ $paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check'
       <div class="form-group"><label>Booking No.</label><input class="form-control" name="booking_no" value="<?= e($bill['booking_no'] ?? '') ?>"></div>
       <div class="form-group"><label>Date of Sale</label><input class="form-control" type="date" name="vehicle_sale_date" value="<?= e($bill['vehicle_sale_date'] ?? '') ?>"></div>
       <div class="form-group"><label>Cust. Name</label><input class="form-control" name="customer_name" value="<?= e($bill['customer_name'] ?? '') ?>"></div>
-      <div class="form-group"><label>Mob.</label><input class="form-control" name="customer_phone" value="<?= e($bill['customer_phone'] ?? '') ?>"></div>
+      <div class="form-group"><label>Mob.</label><input class="form-control contact-input" name="customer_phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" value="<?= e(format_phone($bill['customer_phone'] ?? '')) ?>"></div>
       <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" value="<?= e($bill['customer_email'] ?? '') ?>"></div>
       <div class="form-group full"><label>Add.</label><textarea class="form-control" name="customer_address" rows="2"><?= e($bill['customer_address'] ?? '') ?></textarea></div>
       <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="customer_aadhaar" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012" value="<?= e(format_aadhar($bill['customer_aadhaar'] ?? '')) ?>"></div>

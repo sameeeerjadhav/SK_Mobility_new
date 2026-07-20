@@ -64,7 +64,7 @@ class ServiceController extends Controller
         )->execute([
             $number,
             $this->input('customer_name'),
-            $this->input('customer_phone'),
+            trim((string)$this->input('customer_phone')) !== '' ? format_phone($this->input('customer_phone')) : null,
             $this->input('vehicle_model'),
             $this->input('vehicle_vin'),
             $this->input('issue_description'),
@@ -174,7 +174,7 @@ class ServiceController extends Controller
             'INSERT INTO technicians (name, phone, email, specialization, is_available) VALUES (?,?,?,?,1)'
         )->execute([
             $this->input('name'),
-            $this->input('phone'),
+            trim((string)$this->input('phone')) !== '' ? format_phone($this->input('phone')) : null,
             $this->input('email'),
             $this->input('specialization'),
         ]);

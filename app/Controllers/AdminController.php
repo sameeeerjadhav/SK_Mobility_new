@@ -81,7 +81,7 @@ class AdminController extends Controller
             password_hash($pass, PASSWORD_BCRYPT),
             $this->input('first_name'),
             $this->input('last_name'),
-            $this->input('phone'),
+            trim((string)$this->input('phone')) !== '' ? format_phone($this->input('phone')) : null,
         ]);
         Audit::log('create', 'admin', 'users', (int)$this->db()->lastInsertId());
         flash('success', "User created. Temp password: {$pass}");
@@ -101,7 +101,7 @@ class AdminController extends Controller
         )->execute([
             $this->input('first_name'),
             $this->input('last_name'),
-            $this->input('phone'),
+            trim((string)$this->input('phone')) !== '' ? format_phone($this->input('phone')) : null,
             $roleId,
             (int)$this->input('is_active'),
             (int)$id,

@@ -173,6 +173,21 @@ function format_aadhar(?string $value): string
     return implode(' ', str_split($digits, 4));
 }
 
+/** Format mobile/contact as XXXXX XXXXX (max 10 digits). */
+function format_phone(?string $value): string
+{
+    $digits = preg_replace('/\D/', '', (string)$value);
+    $digits = substr($digits, 0, 10);
+    if ($digits === '') {
+        return '';
+    }
+    if (strlen($digits) <= 5) {
+        return $digits;
+    }
+
+    return substr($digits, 0, 5) . ' ' . substr($digits, 5);
+}
+
 function url(string $path = ''): string
 {
     $base = rtrim((string)env('APP_URL', ''), '/');

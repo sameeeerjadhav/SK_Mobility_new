@@ -134,7 +134,7 @@
           <div class="form-group"><label>Name</label><input class="form-control" name="name" required></div>
           <div class="form-group"><label>Location</label><input class="form-control" name="location"></div>
           <div class="form-group"><label>Manager</label><input class="form-control" name="manager_name"></div>
-          <div class="form-group"><label>Phone</label><input class="form-control" name="phone"></div>
+          <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210"></div>
           <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" rows="2"></textarea></div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-outline" @click="whOpen=false">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
@@ -151,7 +151,7 @@
           <div class="form-group"><label>Name</label><input class="form-control" name="name" :value="editWh?.name" required></div>
           <div class="form-group"><label>Location</label><input class="form-control" name="location" :value="editWh?.location"></div>
           <div class="form-group"><label>Manager</label><input class="form-control" name="manager_name" :value="editWh?.manager_name"></div>
-          <div class="form-group"><label>Phone</label><input class="form-control" name="phone" :value="editWh?.phone"></div>
+          <div class="form-group"><label>Phone</label><input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" :value="editWh?.phone"></div>
           <div class="form-group full"><label>Address</label><textarea class="form-control" name="address" :value="editWh?.address" rows="2"></textarea></div>
           <div class="form-group"><label>Active</label>
             <select class="form-control" name="is_active">

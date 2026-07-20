@@ -17,7 +17,7 @@
         </div>
         <div class="form-group">
           <label>Phone *</label>
-          <input class="form-control" name="phone" value="<?= e(old('phone')) ?>" required>
+          <input class="form-control contact-input" name="phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" value="<?= e(format_phone(old('phone'))) ?>" required>
         </div>
         <div class="form-group">
           <label>Email *</label>
