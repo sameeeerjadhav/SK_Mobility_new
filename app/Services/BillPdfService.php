@@ -24,7 +24,15 @@ class BillPdfService
         $location = strtolower((string)($bill['billing_location'] ?? 'kokamthan'));
         $mainAddress = $bill['company_address'] ?? setting('company_address', '');
         $branchAddress = $bill['company_branch_address'] ?? setting('company_branch_address', '');
-        $invoiceAddress = $location === 'kopargaon' ? $branchAddress : $mainAddress;
+        $isKopargaon = $location === 'kopargaon';
+        $invoiceAddress = $isKopargaon ? $branchAddress : $mainAddress;
+
+        $headerAddressHtml = $isKopargaon
+            ? ''
+            : '<p class="co-line">' . htmlspecialchars($invoiceAddress) . '</p>';
+        $gstBarAddressHtml = $isKopargaon && $invoiceAddress !== ''
+            ? '<div class="gst-bar-addr">' . htmlspecialchars($invoiceAddress) . '</div>'
+            : '';
 
         $battery = $bill['battery_type_no'] ?? '';
         if ($battery === '' && !empty($bill['battery_capacity'])) {
@@ -80,6 +88,7 @@ class BillPdfService
   .co-line { font-size: 10px; line-height: 1.35; margin: 0; }
   .gst-bar { border-bottom: 1.5px solid #111; padding: 5px 10px; font-size: 11px; font-weight: 700; text-align: center; }
   .gst-bar span { margin: 0 14px; }
+  .gst-bar-addr { margin-top: 4px; font-size: 10px; font-weight: 600; line-height: 1.35; }
   .top-grid { display: table; width: 100%; border-bottom: 1.5px solid #111; }
   .cust { display: table-cell; width: 62%; vertical-align: top; padding: 8px 10px; border-right: 1.5px solid #111; }
   .invbox { display: table-cell; width: 38%; vertical-align: top; padding: 8px 10px; }
@@ -122,7 +131,7 @@ class BillPdfService
     </div>
     <div class="hdr-mid">
       <h1 class="co-name">' . htmlspecialchars($bill['company_name'] ?: 'SAI KUBER MOBILITY') . '</h1>
-      <p class="co-line">' . htmlspecialchars($invoiceAddress) . '</p>
+      ' . $headerAddressHtml . '
       <p class="co-line"><strong>Mob. :</strong> ' . htmlspecialchars($bill['company_phone'] ?? '') . '</p>
     </div>
   </div>
@@ -130,6 +139,7 @@ class BillPdfService
     <span>GST Reg. No. : ' . htmlspecialchars($bill['company_gstin'] ?? '') . '</span>
     <span>State: ' . htmlspecialchars((string)$companyState) . '</span>
     <span>State code : ' . htmlspecialchars($bill['company_state_code'] ?? '27') . '</span>
+    ' . $gstBarAddressHtml . '
   </div>
 
   <div class="top-grid">
