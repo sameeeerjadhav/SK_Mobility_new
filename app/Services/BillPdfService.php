@@ -40,6 +40,7 @@ class BillPdfService
         }
 
         $isDealerBill = strtolower((string)($bill['order_type'] ?? '')) === 'dealer';
+        $isSpareBill = strtolower((string)($bill['bill_type'] ?? '')) === 'spare';
 
         $rows = '';
         $itemCount = count($items);
@@ -78,7 +79,9 @@ class BillPdfService
         $v = static fn (?string $k) => htmlspecialchars((string)($bill[$k] ?? ''));
         $blank = static fn (?string $val) => htmlspecialchars($val !== null && $val !== '' ? $val : '');
 
-        $specTableHtml = $isDealerBill ? '' : '
+        $specTableHtml = '';
+        if (!$isDealerBill && !$isSpareBill) {
+            $specTableHtml = '
   <table class="grid spec">
     <tr>
       <td class="label">EV Model Name</td><td class="val">' . $v('vehicle_model') . '</td>
@@ -111,6 +114,17 @@ class BillPdfService
       <td class="label">H.P. Name</td><td class="val" colspan="4">' . $v('hp_name') . '</td>
     </tr>
   </table>';
+        } elseif (!$isDealerBill && $isSpareBill) {
+            $specTableHtml = '
+  <table class="grid spec">
+    <tr>
+      <td class="label">Product Type</td><td class="val" colspan="4">Spare Parts / Batteries</td>
+    </tr>
+    <tr>
+      <td class="label">Date of Sale</td><td class="val" colspan="4">' . india_date($saleDate) . '</td>
+    </tr>
+  </table>';
+        }
 
         return '<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Tax Invoice ' . htmlspecialchars($bill['bill_number'] ?? '') . '</title>
@@ -243,7 +257,7 @@ class BillPdfService
   </div>
 </div>
 <p style="max-width:800px;margin:10px auto 0;font-size:9px;color:#666;text-align:center;">
-  CGST ' . $cgstRate . '% + SGST ' . $sgstRate . '% · HSN 87116020 · Computer generated tax invoice
+  CGST ' . $cgstRate . '% + SGST ' . $sgstRate . '% · HSN ' . ($isSpareBill ? '85076000' : '87116020') . ' · Computer generated tax invoice
 </p>
 </body></html>';
     }

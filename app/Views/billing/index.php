@@ -70,6 +70,7 @@ $locationLabels = [
       <thead>
         <tr>
           <th>Invoice #</th>
+          <th>Product</th>
           <th>Order type</th>
           <th>Location</th>
           <th>Customer</th>
@@ -82,6 +83,13 @@ $locationLabels = [
       <?php foreach ($bills as $b): ?>
         <tr>
           <td><strong><?= e($b['bill_number']) ?></strong></td>
+          <td>
+            <?php if (($b['bill_type'] ?? '') === 'spare'): ?>
+              <span class="chip chip-muted">Spare Parts</span>
+            <?php else: ?>
+              <span class="chip chip-muted">Vehicle</span>
+            <?php endif; ?>
+          </td>
           <td>
             <?php if (($b['order_type'] ?? '') === 'dealer'): ?>
               <span class="chip chip-info">Dealer</span>
@@ -103,7 +111,7 @@ $locationLabels = [
         </tr>
       <?php endforeach; ?>
       <?php if (!$bills): ?>
-        <tr><td colspan="7" class="muted">No tax invoices match these filters. Invoices are created automatically when you place an order.</td></tr>
+        <tr><td colspan="8" class="muted">No tax invoices match these filters. Invoices are created automatically when you place an order.</td></tr>
       <?php endif; ?>
       </tbody>
     </table>

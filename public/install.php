@@ -12,6 +12,7 @@
  *  /install.php?migrate_po_supplier=1  ← supplier company name on purchase orders (replaces partners link)
  *  /install.php?migrate_po_spare_items=1  ← spare parts / batteries on PO line items
  *  /install.php?migrate_billing_location=1  ← Kokamthan / Kopargaon billing location on orders & invoices
+ *  /install.php?migrate_sell_order_spare_parts=1  ← spare parts on sell orders + order line types
  */
 require dirname(__DIR__) . '/app/Config/bootstrap.php';
 
@@ -371,6 +372,63 @@ try {
         } else {
             echo "skip bills.billing_location\n";
         }
+        echo "Migration complete.\n";
+    }
+
+    if (isset($_GET['migrate_sell_order_spare_parts']) && $_GET['migrate_sell_order_spare_parts'] === '1') {
+        echo "\n--- Sell order spare parts migration ---\n";
+        $colExists = static function (PDO $db, string $table, string $column): bool {
+            $stmt = $db->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        };
+        if (!$colExists($db, 'orders', 'product_type')) {
+            $db->exec(
+                "ALTER TABLE orders
+                 ADD COLUMN product_type ENUM('vehicle','spare_part') NOT NULL DEFAULT 'vehicle' AFTER order_type"
+            );
+            echo "added orders.product_type\n";
+        } else {
+            echo "skip orders.product_type\n";
+        }
+        if (!$colExists($db, 'order_items', 'item_type')) {
+            $db->exec(
+                "ALTER TABLE order_items
+                 ADD COLUMN item_type ENUM('vehicle_variant','spare_part') NOT NULL DEFAULT 'vehicle_variant' AFTER order_id"
+            );
+            echo "added order_items.item_type\n";
+        } else {
+            echo "skip order_items.item_type\n";
+        }
+        if (!$colExists($db, 'order_items', 'spare_part_id')) {
+            $db->exec('ALTER TABLE order_items ADD COLUMN spare_part_id INT UNSIGNED NULL AFTER variant_id');
+            echo "added order_items.spare_part_id\n";
+        } else {
+            echo "skip order_items.spare_part_id\n";
+        }
+        $db->exec('ALTER TABLE order_items MODIFY vehicle_id INT UNSIGNED NULL');
+        $db->exec('ALTER TABLE order_items MODIFY variant_id INT UNSIGNED NULL');
+        echo "nullable order_items vehicle_id / variant_id\n";
+        $fkStmt = $db->query(
+            "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_items'
+               AND COLUMN_NAME = 'spare_part_id' AND REFERENCED_TABLE_NAME IS NOT NULL
+             LIMIT 1"
+        );
+        if (!$fkStmt->fetchColumn()) {
+            $db->exec(
+                'ALTER TABLE order_items
+                 ADD CONSTRAINT fk_order_items_spare_part FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id) ON DELETE SET NULL'
+            );
+            echo "added fk_order_items_spare_part\n";
+        } else {
+            echo "skip fk_order_items_spare_part\n";
+        }
+        $db->exec("ALTER TABLE bills MODIFY bill_type ENUM('vehicle','warranty','spare') NOT NULL DEFAULT 'vehicle'");
+        echo "bills.bill_type includes spare\n";
         echo "Migration complete.\n";
     }
 } catch (Throwable $e) {

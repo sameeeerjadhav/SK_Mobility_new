@@ -1,3 +1,7 @@
+<?php
+$isSpareOrder = ($order['product_type'] ?? 'vehicle') === 'spare_part';
+$gstLabel = $isSpareOrder ? 'GST 18%' : 'GST 28%';
+?>
 <style>
 .od{max-width:1080px}
 .od a.od-back{display:inline-block;font-size:.84rem;font-weight:600;color:#64748b;margin:0 0 .7rem}
@@ -49,6 +53,8 @@
         <?= status_chip($order['status']) ?>
         <span><?= e(ucfirst($order['order_type'])) ?> sell order</span>
         <span>·</span>
+        <span><?= $isSpareOrder ? 'Spare Parts' : 'Vehicle' ?></span>
+        <span>·</span>
         <span><?= india_datetime($order['created_at'] ?? null) ?></span>
       </div>
     </div>
@@ -86,10 +92,15 @@
           <?php endif; ?>
           <div class="od-row"><span class="k">Buyer</span><span class="v"><?= e($o('customer_name', '—')) ?> · <?= e($o('customer_phone', '—')) ?></span></div>
           <div class="od-row"><span class="k">Address</span><span class="v"><?= e($o('customer_address') ?: ($o('delivery_address') ?: '—')) ?></span></div>
+          <?php if (!$isSpareOrder): ?>
           <div class="od-row"><span class="k">Model type</span><span class="v"><?= e($o('vehicle_model_type', '—')) ?> · <?= e($o('color', '—')) ?></span></div>
+          <?php else: ?>
+          <div class="od-row"><span class="k">Product</span><span class="v">Spare parts / batteries</span></div>
+          <?php endif; ?>
           <div class="od-row"><span class="k">Sale date</span><span class="v"><?= india_date($o('sale_date') ?: null) ?></span></div>
         </div>
 
+        <?php if (!$isSpareOrder): ?>
         <div class="od-parts">
           <div class="od-part">
             <h4>Chassis</h4>
@@ -122,10 +133,11 @@
           </div>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <div class="od-money">
           <div><span class="k">Subtotal</span><span class="v"><?= money($order['subtotal']) ?></span></div>
-          <div><span class="k">GST 28%</span><span class="v"><?= money($order['tax_amount']) ?></span></div>
+          <div><span class="k"><?= e($gstLabel) ?></span><span class="v"><?= money($order['tax_amount']) ?></span></div>
           <div class="total"><span class="k">Total</span><span class="v"><?= money($order['total_amount']) ?></span></div>
         </div>
       </div>
@@ -134,6 +146,21 @@
         <h3 class="card-title">Items</h3>
         <div class="table-wrap">
           <table class="data">
+            <?php if ($isSpareOrder): ?>
+            <thead><tr><th>Category</th><th>Part</th><th>Part No.</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
+            <tbody>
+            <?php foreach ($items as $it): ?>
+              <tr>
+                <td><?= e($it['spare_category_name'] ?? '—') ?></td>
+                <td><?= e($it['spare_part_name'] ?? '—') ?></td>
+                <td><?= e($it['part_number'] ?? '—') ?></td>
+                <td><?= (int)$it['quantity'] ?></td>
+                <td><?= money($it['unit_price']) ?></td>
+                <td><?= money($it['total_price']) ?></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+            <?php else: ?>
             <thead><tr><th>Vehicle</th><th>Variant</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
             <tbody>
             <?php foreach ($items as $it): ?>
@@ -146,6 +173,7 @@
               </tr>
             <?php endforeach; ?>
             </tbody>
+            <?php endif; ?>
           </table>
         </div>
       </div>

@@ -14,9 +14,13 @@ class OrderService
     {
         $db = Database::connection();
         $orderType = $data['order_type'] ?? '';
+        $productType = $data['product_type'] ?? 'vehicle';
 
         if (!in_array($orderType, ['dealer', 'customer'], true)) {
             throw new RuntimeException('Invalid order type.');
+        }
+        if (!in_array($productType, ['vehicle', 'spare_part'], true)) {
+            throw new RuntimeException('Invalid product type.');
         }
 
         $items = $data['items'] ?? [];
@@ -41,79 +45,51 @@ class OrderService
             throw new RuntimeException('Select a valid billing location (Kokamthan or Kopargaon).');
         }
 
-        $requiredInvoice = [
-            'sale_date' => 'Date of Sale',
-            'chassis_no' => 'Chassis No.',
-            'motor_no' => 'Motor No.',
-            'motor_warranty' => 'Motor Warranty',
-            'battery_capacity' => 'Battery Type',
-            'battery_no' => 'Battery No.',
-            'battery_warranty' => 'Battery Warranty',
-            'controller_no' => 'Controller No.',
-            'controller_warranty' => 'Controller Warranty',
-            'charger_no' => 'Charger No.',
-            'charger_warranty' => 'Charger Warranty',
-        ];
-        foreach ($requiredInvoice as $key => $label) {
-            if (trim((string)($data[$key] ?? '')) === '') {
-                throw new RuntimeException($label . ' is required for the tax invoice.');
-            }
-        }
-
-        $lineItems = [];
-        $subtotal = 0.0;
-        foreach ($items as $item) {
-            $variantId = (int)($item['variant_id'] ?? 0);
-            $qty = max(1, (int)($item['quantity'] ?? 1));
-            if ($orderType === 'customer') {
-                $qty = 1;
-            }
-            if ($variantId <= 0) {
-                continue;
-            }
-            $stmt = $db->prepare(
-                'SELECT vv.*, v.id AS vehicle_id, v.name AS vehicle_name, c.name AS category_name
-                 FROM vehicle_variants vv
-                 JOIN vehicles v ON v.id = vv.vehicle_id
-                 JOIN vehicle_categories c ON c.id = v.category_id
-                 WHERE vv.id = ? AND vv.is_active = 1'
-            );
-            $stmt->execute([$variantId]);
-            $variant = $stmt->fetch();
-            if (!$variant) {
-                throw new RuntimeException('Invalid vehicle variant selected.');
-            }
-            $unit = (float)$variant['price'];
-            $total = $unit * $qty;
-            $subtotal += $total;
-            $lineItems[] = [
-                'vehicle_id' => (int)$variant['vehicle_id'],
-                'variant_id' => $variantId,
-                'quantity' => $qty,
-                'unit_price' => $unit,
-                'total_price' => $total,
-                'description' => $variant['vehicle_name'] . ' — ' . $variant['name'] . ($variant['color'] ? ' (' . $variant['color'] . ')' : ''),
-                'model_code' => $variant['sku'] ?? null,
-                'model_name' => $variant['vehicle_name'],
-                'variant_name' => $variant['name'],
-                'category_name' => $variant['category_name'] ?? null,
-                'color' => $variant['color'] ?? null,
+        if ($productType === 'vehicle') {
+            $requiredInvoice = [
+                'sale_date' => 'Date of Sale',
+                'chassis_no' => 'Chassis No.',
+                'motor_no' => 'Motor No.',
+                'motor_warranty' => 'Motor Warranty',
+                'battery_capacity' => 'Battery Type',
+                'battery_no' => 'Battery No.',
+                'battery_warranty' => 'Battery Warranty',
+                'controller_no' => 'Controller No.',
+                'controller_warranty' => 'Controller Warranty',
+                'charger_no' => 'Charger No.',
+                'charger_warranty' => 'Charger Warranty',
             ];
+            foreach ($requiredInvoice as $key => $label) {
+                if (trim((string)($data[$key] ?? '')) === '') {
+                    throw new RuntimeException($label . ' is required for the tax invoice.');
+                }
+            }
+            $lineItems = self::buildVehicleLineItems($db, $items, $orderType);
+            $primary = $lineItems[0];
+            $vehicleModelType = $primary['variant_name'];
+            $color = trim((string)($data['color'] ?? '')) !== ''
+                ? $data['color']
+                : ($primary['color'] ?? null);
+            if ($color === null || $color === '') {
+                throw new RuntimeException('Model Color is required (select a variant with a color, or enter color).');
+            }
+            $cgstRate = 14.0;
+            $sgstRate = 14.0;
+            $defaultHsn = '87116020';
+        } else {
+            if (trim((string)($data['sale_date'] ?? '')) === '') {
+                throw new RuntimeException('Date of Sale is required for the tax invoice.');
+            }
+            $lineItems = self::buildSpareLineItems($db, $items, $orderType);
+            $primary = $lineItems[0];
+            $vehicleModelType = 'Spare Parts';
+            $color = null;
+            $cgstRate = 9.0;
+            $sgstRate = 9.0;
+            $defaultHsn = '85076000';
         }
 
-        if (!$lineItems) {
-            throw new RuntimeException('No valid items in order.');
-        }
-
-        // EV model type / color come from the selected variant (tax invoice alignment)
-        $primary = $lineItems[0];
-        $vehicleModelType = $primary['variant_name'];
-        $color = trim((string)($data['color'] ?? '')) !== ''
-            ? $data['color']
-            : ($primary['color'] ?? null);
-        if ($color === null || $color === '') {
-            throw new RuntimeException('Model Color is required (select a variant with a color, or enter color).');
-        }
+        $subtotal = array_sum(array_column($lineItems, 'total_price'));
 
         $pmIncentive = (float)($data['pm_drive_incentive'] ?? 0);
         $stateSubsidy = (float)($data['state_subsidy'] ?? 0);
@@ -122,12 +98,15 @@ class OrderService
         $totalDisc = $pmIncentive + $stateSubsidy + $extraDisc;
 
         $taxable = max(0, $subtotal - $totalDisc);
-        $cgst = round($taxable * 0.14, 2);
-        $sgst = round($taxable * 0.14, 2);
+        $cgst = round($taxable * ($cgstRate / 100), 2);
+        $sgst = round($taxable * ($sgstRate / 100), 2);
         $taxAmount = round($cgst + $sgst, 2);
         $totalAmount = round($taxable + $taxAmount, 2);
 
         $prefix = $orderType === 'dealer' ? 'ORD' : 'CORD';
+        if ($productType === 'spare_part') {
+            $prefix = $orderType === 'dealer' ? 'SORD' : 'SCORD';
+        }
         $orderNumber = next_code($prefix, 'orders', 'order_number');
         $bookingNo = trim((string)($data['booking_no'] ?? '')) ?: $orderNumber;
         $saleDate = $data['sale_date'] ?: date('Y-m-d');
@@ -142,7 +121,7 @@ class OrderService
         try {
             $db->prepare(
                 'INSERT INTO orders (
-                    order_number, booking_no, order_type, billing_location, dealer_id,
+                    order_number, booking_no, order_type, product_type, billing_location, dealer_id,
                     customer_name, customer_phone, customer_email, customer_address,
                     customer_aadhaar, customer_pan, chassis_no, motor_no,
                     battery_capacity, battery_no, controller_no, charger_no,
@@ -151,9 +130,9 @@ class OrderService
                     pm_drive_incentive, state_subsidy, loan_amount, discount_amount,
                     payment_mode, sale_date, subtotal, tax_amount, total_amount,
                     status, delivery_address, notes, expected_delivery_date, created_by
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
-                $orderNumber, $bookingNo, $orderType, $billingLocation, $dealerId,
+                $orderNumber, $bookingNo, $orderType, $productType, $billingLocation, $dealerId,
                 $data['customer_name'] ?? null,
                 $data['customer_phone'] ?? null,
                 $data['customer_email'] ?? null,
@@ -184,14 +163,30 @@ class OrderService
             $orderId = (int)$db->lastInsertId();
 
             $itemStmt = $db->prepare(
-                'INSERT INTO order_items (order_id, vehicle_id, variant_id, quantity, unit_price, total_price)
-                 VALUES (?,?,?,?,?,?)'
+                'INSERT INTO order_items (order_id, item_type, vehicle_id, variant_id, spare_part_id, quantity, unit_price, total_price)
+                 VALUES (?,?,?,?,?,?,?,?)'
             );
             foreach ($lineItems as $li) {
                 $itemStmt->execute([
-                    $orderId, $li['vehicle_id'], $li['variant_id'],
-                    $li['quantity'], $li['unit_price'], $li['total_price'],
+                    $orderId,
+                    $li['item_type'],
+                    $li['vehicle_id'] ?? null,
+                    $li['variant_id'] ?? null,
+                    $li['spare_part_id'] ?? null,
+                    $li['quantity'],
+                    $li['unit_price'],
+                    $li['total_price'],
                 ]);
+                if ($productType === 'spare_part') {
+                    $stockStmt = $db->prepare(
+                        'UPDATE spare_parts SET quantity_in_stock = quantity_in_stock - ?
+                         WHERE id = ? AND quantity_in_stock >= ?'
+                    );
+                    $stockStmt->execute([$li['quantity'], $li['spare_part_id'], $li['quantity']]);
+                    if ($stockStmt->rowCount() === 0) {
+                        throw new RuntimeException('Insufficient stock for ' . $li['description'] . '.');
+                    }
+                }
             }
 
             $db->prepare(
@@ -211,6 +206,11 @@ class OrderService
                 $dealerCode = $cs->fetchColumn() ?: null;
             }
 
+            $billType = $productType === 'spare_part' ? 'spare' : 'vehicle';
+            $billModelLabel = $productType === 'spare_part'
+                ? ($primary['category_name'] ?? 'Spare Parts')
+                : ($lineItems[0]['model_name'] ?? ($lineItems[0]['description'] ?? null));
+
             $db->prepare(
                 'INSERT INTO bills (
                     bill_number, bill_type, billing_location, order_id, booking_no,
@@ -227,7 +227,7 @@ class OrderService
                     payment_mode, total_amount, created_by
                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             )->execute([
-                $billNumber, 'vehicle', $billingLocation, $orderId, $bookingNo,
+                $billNumber, $billType, $billingLocation, $orderId, $bookingNo,
                 setting('company_name'), setting('company_address'), setting('company_branch_address'),
                 setting('company_phone'), setting('company_email'),
                 setting('company_gstin'), setting('company_state', 'Maharashtra'), setting('company_state_code'),
@@ -238,21 +238,21 @@ class OrderService
                 $data['customer_address'] ?? ($data['delivery_address'] ?? null),
                 $data['customer_aadhaar'] ?? null,
                 $data['customer_pan'] ?? null,
-                $lineItems[0]['model_name'] ?? ($lineItems[0]['description'] ?? null),
+                $billModelLabel,
                 $vehicleModelType,
                 $color,
-                $data['chassis_no'] ?? null,
-                $data['motor_no'] ?? null,
-                $batteryTypeNo !== '' ? $batteryTypeNo : null,
-                $data['controller_no'] ?? null,
-                $data['charger_no'] ?? null,
-                $data['motor_warranty'] ?? null,
-                $data['battery_warranty'] ?? null,
-                $data['controller_warranty'] ?? null,
-                $data['charger_warranty'] ?? null,
-                $data['hp_name'] ?? null,
+                $productType === 'vehicle' ? ($data['chassis_no'] ?? null) : null,
+                $productType === 'vehicle' ? ($data['motor_no'] ?? null) : null,
+                $productType === 'vehicle' && $batteryTypeNo !== '' ? $batteryTypeNo : null,
+                $productType === 'vehicle' ? ($data['controller_no'] ?? null) : null,
+                $productType === 'vehicle' ? ($data['charger_no'] ?? null) : null,
+                $productType === 'vehicle' ? ($data['motor_warranty'] ?? null) : null,
+                $productType === 'vehicle' ? ($data['battery_warranty'] ?? null) : null,
+                $productType === 'vehicle' ? ($data['controller_warranty'] ?? null) : null,
+                $productType === 'vehicle' ? ($data['charger_warranty'] ?? null) : null,
+                $productType === 'vehicle' ? ($data['hp_name'] ?? null) : null,
                 $saleDate,
-                $subtotal, 28, 14, 14,
+                $subtotal, $cgstRate + $sgstRate, $cgstRate, $sgstRate,
                 $pmIncentive, $stateSubsidy, $loanAmount, $extraDisc,
                 $paymentMode, $totalAmount, $userId,
             ]);
@@ -265,11 +265,11 @@ class OrderService
             foreach ($lineItems as $idx => $li) {
                 $lineDisc = $idx === 0 ? $totalDisc : 0.0;
                 $lineTaxable = max(0, $li['unit_price'] * $li['quantity'] - $lineDisc);
-                $lineCgst = round($lineTaxable * 0.14, 2);
-                $lineSgst = round($lineTaxable * 0.14, 2);
+                $lineCgst = round($lineTaxable * ($cgstRate / 100), 2);
+                $lineSgst = round($lineTaxable * ($sgstRate / 100), 2);
                 $lineTotal = round($lineTaxable + $lineCgst + $lineSgst, 2);
                 $bi->execute([
-                    $billId, $li['description'], $li['model_code'], '87116020',
+                    $billId, $li['description'], $li['model_code'], $li['hsn_code'] ?? $defaultHsn,
                     $li['quantity'], $li['unit_price'], $lineDisc,
                     $lineTaxable, $lineCgst, $lineSgst, $lineTotal,
                 ]);
@@ -290,7 +290,7 @@ class OrderService
         NotificationService::notifyRole(
             'super_admin',
             'New Sell Order',
-            "Order {$orderNumber} created for " . money($totalAmount),
+            "Order {$orderNumber} (" . ($productType === 'spare_part' ? 'spare parts' : 'vehicle') . ") created for " . money($totalAmount),
             'order',
             'orders',
             $orderId
@@ -308,6 +308,109 @@ class OrderService
             'bill_number' => $billNumber,
             'total_amount' => $totalAmount,
         ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private static function buildVehicleLineItems(PDO $db, array $items, string $orderType): array
+    {
+        $lineItems = [];
+        foreach ($items as $item) {
+            $variantId = (int)($item['variant_id'] ?? 0);
+            $qty = max(1, (int)($item['quantity'] ?? 1));
+            if ($orderType === 'customer') {
+                $qty = 1;
+            }
+            if ($variantId <= 0) {
+                continue;
+            }
+            $stmt = $db->prepare(
+                'SELECT vv.*, v.id AS vehicle_id, v.name AS vehicle_name, c.name AS category_name
+                 FROM vehicle_variants vv
+                 JOIN vehicles v ON v.id = vv.vehicle_id
+                 JOIN vehicle_categories c ON c.id = v.category_id
+                 WHERE vv.id = ? AND vv.is_active = 1'
+            );
+            $stmt->execute([$variantId]);
+            $variant = $stmt->fetch();
+            if (!$variant) {
+                throw new RuntimeException('Invalid vehicle variant selected.');
+            }
+            $unit = (float)$variant['price'];
+            $lineItems[] = [
+                'item_type' => 'vehicle_variant',
+                'vehicle_id' => (int)$variant['vehicle_id'],
+                'variant_id' => $variantId,
+                'spare_part_id' => null,
+                'quantity' => $qty,
+                'unit_price' => $unit,
+                'total_price' => $unit * $qty,
+                'description' => $variant['vehicle_name'] . ' — ' . $variant['name'] . ($variant['color'] ? ' (' . $variant['color'] . ')' : ''),
+                'model_code' => $variant['sku'] ?? null,
+                'model_name' => $variant['vehicle_name'],
+                'variant_name' => $variant['name'],
+                'category_name' => $variant['category_name'] ?? null,
+                'color' => $variant['color'] ?? null,
+                'hsn_code' => '87116020',
+            ];
+        }
+        if (!$lineItems) {
+            throw new RuntimeException('No valid vehicle items in order.');
+        }
+        return $lineItems;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private static function buildSpareLineItems(PDO $db, array $items, string $orderType): array
+    {
+        $lineItems = [];
+        foreach ($items as $item) {
+            $sparePartId = (int)($item['spare_part_id'] ?? 0);
+            $qty = max(1, (int)($item['quantity'] ?? 1));
+            if ($orderType === 'customer') {
+                $qty = max(1, $qty);
+            }
+            if ($sparePartId <= 0) {
+                continue;
+            }
+            $stmt = $db->prepare(
+                'SELECT sp.*, sc.name AS category_name
+                 FROM spare_parts sp
+                 JOIN spare_categories sc ON sc.id = sp.category_id
+                 WHERE sp.id = ? AND sp.is_active = 1'
+            );
+            $stmt->execute([$sparePartId]);
+            $part = $stmt->fetch();
+            if (!$part) {
+                throw new RuntimeException('Invalid spare part selected.');
+            }
+            if ((int)$part['quantity_in_stock'] < $qty) {
+                throw new RuntimeException(
+                    'Insufficient stock for ' . $part['name'] . ' (available: ' . (int)$part['quantity_in_stock'] . ').'
+                );
+            }
+            $unit = (float)$part['unit_price'];
+            $label = trim(($part['category_name'] ?? '') . ' — ' . $part['name']);
+            $lineItems[] = [
+                'item_type' => 'spare_part',
+                'vehicle_id' => null,
+                'variant_id' => null,
+                'spare_part_id' => $sparePartId,
+                'quantity' => $qty,
+                'unit_price' => $unit,
+                'total_price' => $unit * $qty,
+                'description' => $label,
+                'model_code' => $part['part_number'] ?? null,
+                'model_name' => $part['name'],
+                'variant_name' => 'Spare Parts',
+                'category_name' => $part['category_name'] ?? null,
+                'color' => null,
+                'hsn_code' => '85076000',
+            ];
+        }
+        if (!$lineItems) {
+            throw new RuntimeException('No valid spare parts in order.');
+        }
+        return $lineItems;
     }
 
     private static function normalizePaymentMode(array $data): ?string

@@ -1,4 +1,5 @@
 <?php
+$productType = $productType ?? 'vehicle';
 $variantMap = [];
 foreach ($variants as $vv) {
     $variantMap[(string)(int)$vv['id']] = [
@@ -16,11 +17,27 @@ foreach ($variants as $vv) {
             . ' / ' . money($vv['price']),
     ];
 }
+$sparePartMap = [];
+foreach ($spareParts ?? [] as $sp) {
+    $sparePartMap[(string)(int)$sp['id']] = [
+        'id' => (int)$sp['id'],
+        'name' => $sp['name'],
+        'part_number' => $sp['part_number'],
+        'stock' => (int)$sp['quantity_in_stock'],
+        'category_name' => $sp['category_name'] ?? '',
+        'label' => ($sp['category_name'] ?? '') . ' — ' . $sp['name']
+            . ' (' . $sp['part_number'] . ') / ' . money($sp['unit_price'])
+            . ' · stock ' . (int)$sp['quantity_in_stock'],
+    ];
+}
 ?>
 <div x-data="{
+  productType: '<?= e($productType) ?>',
   orderType: 'customer',
   items: [{ variant_id: '', quantity: 1 }],
+  spareItems: [{ spare_part_id: '', quantity: 1 }],
   variantMap: <?= htmlspecialchars(json_encode($variantMap, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>,
+  sparePartMap: <?= htmlspecialchars(json_encode($sparePartMap, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>,
   color: '',
   modelType: '',
   modelName: '',
@@ -54,31 +71,48 @@ foreach ($variants as $vv) {
   onOrderTypeChange() {
     if (this.orderType === 'customer') {
       this.items = [{ variant_id: this.items[0]?.variant_id || '', quantity: 1 }];
+      this.spareItems = [{ spare_part_id: this.spareItems[0]?.spare_part_id || '', quantity: 1 }];
     }
   },
   addLine() {
+    if (this.productType === 'spare_part') {
+      this.spareItems = [...this.spareItems, { spare_part_id: '', quantity: 1 }];
+      return;
+    }
     this.items = [...this.items, { variant_id: '', quantity: 1 }];
   },
   removeLine(idx) {
+    if (this.productType === 'spare_part') {
+      if (this.spareItems.length <= 1) return;
+      this.spareItems = this.spareItems.filter((_, i) => i !== idx);
+      return;
+    }
     if (this.items.length <= 1) return;
     this.items = this.items.filter((_, i) => i !== idx);
     this.syncFromVariant(0);
-  }
+  },
+  addSpareLine() { this.addLine(); },
+  removeSpareLine(idx) { this.removeLine(idx); }
 }">
   <div style="margin-bottom:0.75rem;"><a href="<?= url('orders') ?>">&larr; Sell Orders</a></div>
 
   <div class="toolbar" style="margin-bottom:1rem;">
     <div>
-      <h1 class="page-title" style="margin:0;">Create Sell Order</h1>
-      <p class="page-sub" style="margin:0.25rem 0 0;">Same tax-invoice fields for dealer &amp; customer · model type follows the variant</p>
+      <h1 class="page-title" style="margin:0;" x-text="productType === 'spare_part' ? 'Create Spare Parts Sell Order' : 'Create Vehicle Sell Order'"></h1>
+      <p class="page-sub" style="margin:0.25rem 0 0;">Separate flow for vehicles and spare parts · same tax invoice rules (dealer vs customer)</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a class="btn btn-sm" :class="productType === 'vehicle' ? 'btn-primary' : 'btn-outline'" href="<?= url('orders/create?product=vehicle') ?>">Vehicle</a>
+      <a class="btn btn-sm" :class="productType === 'spare_part' ? 'btn-primary' : 'btn-outline'" href="<?= url('orders/create?product=spare_part') ?>">Spare Parts</a>
     </div>
   </div>
 
   <form method="post" action="<?= url('orders') ?>">
     <?= csrf_field() ?>
+    <input type="hidden" name="product_type" :value="productType">
 
     <div class="card" style="margin-bottom:0.85rem;">
-      <h3 class="card-title">1. Sell order &amp; vehicle</h3>
+      <h3 class="card-title" x-text="productType === 'spare_part' ? '1. Sell order &amp; spare parts' : '1. Sell order &amp; vehicle'"></h3>
       <div class="form-grid">
         <div class="form-group">
           <label>Sell order type</label>
@@ -106,7 +140,7 @@ foreach ($variants as $vv) {
           <label>Date of Sale *</label>
           <input class="form-control" type="date" name="sale_date" value="<?= date('Y-m-d') ?>" required>
         </div>
-        <div class="form-group full" x-show="orderType === 'customer'" x-cloak>
+        <div class="form-group full" x-show="productType === 'vehicle' && orderType === 'customer'" x-cloak>
           <label>Vehicle / Variant *</label>
           <select class="form-control" name="variant_id[0]" x-model="items[0].variant_id" @change="syncFromVariant(0)" required>
             <option value="">Select variant</option>
@@ -119,7 +153,7 @@ foreach ($variants as $vv) {
           <input type="hidden" name="quantity[0]" value="1">
         </div>
 
-        <template x-if="orderType === 'dealer'">
+        <template x-if="productType === 'vehicle' && orderType === 'dealer'">
           <div class="form-group full" style="grid-column:1 / -1;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.65rem;flex-wrap:wrap;">
               <label style="margin:0;">Vehicles / variants *</label>
@@ -148,20 +182,51 @@ foreach ($variants as $vv) {
             <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Each line appears on the tax invoice. Add multiple variants or increase quantity per line.</p>
           </div>
         </template>
-        <div class="form-group">
+
+        <template x-if="productType === 'spare_part'">
+          <div class="form-group full" style="grid-column:1 / -1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.65rem;flex-wrap:wrap;">
+              <label style="margin:0;">Spare parts / batteries *</label>
+              <button class="btn btn-sm btn-outline" type="button" @click="addSpareLine()" x-show="orderType === 'dealer'">+ Add part</button>
+            </div>
+            <template x-for="(it, idx) in spareItems" :key="'sp-' + idx">
+              <div style="display:flex;gap:0.5rem;align-items:end;margin-bottom:0.5rem;flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Part</label>
+                  <select class="form-control" :name="'spare_part_id['+idx+']'" x-model="it.spare_part_id" required>
+                    <option value="">Select spare part</option>
+                    <?php foreach ($spareParts ?? [] as $sp): ?>
+                      <option value="<?= (int)$sp['id'] ?>">
+                        <?= e(($sp['category_name'] ?? '') . ' — ' . $sp['name'] . ' (' . $sp['part_number'] . ') / ' . money($sp['unit_price']) . ' · stock ' . (int)$sp['quantity_in_stock']) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;width:100px;">
+                  <label x-show="idx === 0" style="font-size:0.82rem;">Qty *</label>
+                  <input class="form-control" type="number" min="1" :name="'quantity['+idx+']'" x-model="it.quantity" required>
+                </div>
+                <button class="btn btn-sm btn-danger" type="button" @click="removeSpareLine(idx)" x-show="orderType === 'dealer' && spareItems.length > 1" style="margin-bottom:0.35rem;">×</button>
+              </div>
+            </template>
+            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Each line appears on the tax invoice. Stock is reduced when the order is created.</p>
+          </div>
+        </template>
+
+        <div class="form-group" x-show="productType === 'vehicle'" x-cloak>
           <label>EV Model Name</label>
           <input class="form-control" :value="modelName" readonly placeholder="From variant">
         </div>
-        <div class="form-group">
+        <div class="form-group" x-show="productType === 'vehicle'" x-cloak>
           <label>EV Model Type *</label>
-          <input class="form-control" name="vehicle_model_type" x-model="modelType" readonly required placeholder="Matches selected variant">
+          <input class="form-control" name="vehicle_model_type" x-model="modelType" readonly :required="productType === 'vehicle'" placeholder="Matches selected variant">
           <p class="muted" style="margin:0.3rem 0 0;font-size:0.78rem;">Locked to the selected variant name</p>
         </div>
-        <div class="form-group">
+        <div class="form-group" x-show="productType === 'vehicle'" x-cloak>
           <label>Model Color *</label>
-          <input class="form-control" name="color" x-model="color" required placeholder="From variant (editable)">
+          <input class="form-control" name="color" x-model="color" :required="productType === 'vehicle'" placeholder="From variant (editable)">
         </div>
-        <div class="form-group">
+        <div class="form-group" x-show="productType === 'vehicle'" x-cloak>
           <label>Expected Delivery</label>
           <input class="form-control" type="date" name="expected_delivery_date">
         </div>
@@ -198,7 +263,7 @@ foreach ($variants as $vv) {
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:0.85rem;">
+    <div class="card" style="margin-bottom:0.85rem;" x-show="productType === 'vehicle'" x-cloak>
       <h3 class="card-title">3. Parts &amp; warranty (printed on tax invoice)</h3>
       <p class="muted" style="margin:-0.35rem 0 0.85rem;font-size:0.82rem;">Each part has its own number and warranty — fill one block at a time.</p>
       <?php
@@ -224,14 +289,14 @@ foreach ($variants as $vv) {
         <div class="ow-block chassis">
           <h4>Chassis</h4>
           <div class="form-grid">
-            <div class="form-group full"><label>Chassis No. *</label><input class="form-control" name="chassis_no" required></div>
+            <div class="form-group full"><label>Chassis No. *</label><input class="form-control" name="chassis_no" :required="productType === 'vehicle'"></div>
           </div>
         </div>
 
         <div class="ow-block">
           <h4>Motor</h4>
           <div class="form-grid">
-            <div class="form-group"><label>Motor No. *</label><input class="form-control" name="motor_no" required></div>
+            <div class="form-group"><label>Motor No. *</label><input class="form-control" name="motor_no" :required="productType === 'vehicle'"></div>
             <div class="form-group"><label>Warranty *</label><?php $wSelect('motor_warranty', '12 months'); ?></div>
           </div>
         </div>
@@ -239,8 +304,8 @@ foreach ($variants as $vv) {
         <div class="ow-block">
           <h4>Battery</h4>
           <div class="form-grid">
-            <div class="form-group"><label>Battery Type *</label><input class="form-control" name="battery_capacity" x-model="batteryType" placeholder="e.g. Lithium 60V" required></div>
-            <div class="form-group"><label>Battery No. *</label><input class="form-control" name="battery_no" required></div>
+            <div class="form-group"><label>Battery Type *</label><input class="form-control" name="battery_capacity" x-model="batteryType" placeholder="e.g. Lithium 60V" :required="productType === 'vehicle'"></div>
+            <div class="form-group"><label>Battery No. *</label><input class="form-control" name="battery_no" :required="productType === 'vehicle'"></div>
             <div class="form-group"><label>Warranty *</label><?php $wSelect('battery_warranty', '36 months'); ?></div>
           </div>
         </div>
@@ -248,7 +313,7 @@ foreach ($variants as $vv) {
         <div class="ow-block">
           <h4>Controller</h4>
           <div class="form-grid">
-            <div class="form-group"><label>Controller No. *</label><input class="form-control" name="controller_no" required></div>
+            <div class="form-group"><label>Controller No. *</label><input class="form-control" name="controller_no" :required="productType === 'vehicle'"></div>
             <div class="form-group"><label>Warranty *</label><?php $wSelect('controller_warranty', '12 months'); ?></div>
           </div>
         </div>
@@ -256,7 +321,7 @@ foreach ($variants as $vv) {
         <div class="ow-block">
           <h4>Charger</h4>
           <div class="form-grid">
-            <div class="form-group"><label>Charger No. *</label><input class="form-control" name="charger_no" required></div>
+            <div class="form-group"><label>Charger No. *</label><input class="form-control" name="charger_no" :required="productType === 'vehicle'"></div>
             <div class="form-group"><label>Warranty *</label><?php $wSelect('charger_warranty', '12 months'); ?></div>
           </div>
         </div>

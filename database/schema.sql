@@ -192,6 +192,7 @@ CREATE TABLE orders (
   order_number VARCHAR(40) NOT NULL UNIQUE,
   booking_no VARCHAR(50) NULL,
   order_type ENUM('dealer','customer') NOT NULL,
+  product_type ENUM('vehicle','spare_part') NOT NULL DEFAULT 'vehicle',
   billing_location ENUM('kokamthan','kopargaon') NOT NULL DEFAULT 'kokamthan',
   dealer_id INT UNSIGNED NULL,
   customer_name VARCHAR(150) NULL,
@@ -237,14 +238,17 @@ CREATE TABLE orders (
 CREATE TABLE order_items (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id INT UNSIGNED NOT NULL,
-  vehicle_id INT UNSIGNED NOT NULL,
-  variant_id INT UNSIGNED NOT NULL,
+  item_type ENUM('vehicle_variant','spare_part') NOT NULL DEFAULT 'vehicle_variant',
+  vehicle_id INT UNSIGNED NULL,
+  variant_id INT UNSIGNED NULL,
+  spare_part_id INT UNSIGNED NULL,
   quantity INT NOT NULL,
   unit_price DECIMAL(12,2) NOT NULL,
   total_price DECIMAL(12,2) NOT NULL,
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
-  FOREIGN KEY (variant_id) REFERENCES vehicle_variants(id)
+  FOREIGN KEY (variant_id) REFERENCES vehicle_variants(id),
+  FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE order_status_history (
@@ -288,7 +292,7 @@ CREATE TABLE payments (
 CREATE TABLE bills (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   bill_number VARCHAR(40) NOT NULL UNIQUE,
-  bill_type ENUM('vehicle','warranty') NOT NULL DEFAULT 'vehicle',
+  bill_type ENUM('vehicle','warranty','spare') NOT NULL DEFAULT 'vehicle',
   billing_location ENUM('kokamthan','kopargaon') NOT NULL DEFAULT 'kokamthan',
   order_id INT UNSIGNED NULL,
   booking_no VARCHAR(50) NULL,

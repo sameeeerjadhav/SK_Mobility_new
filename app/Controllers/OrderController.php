@@ -14,6 +14,7 @@ class OrderController extends Controller
     {
         require_permission('view_orders');
         $orderType = $this->input('order_type');
+        $productType = $this->input('product_type');
         $status = $this->input('status');
         $page = max(1, (int)($this->input('page') ?: 1));
         $perPage = 20;
@@ -28,6 +29,11 @@ class OrderController extends Controller
         } elseif ($orderType !== '') {
             $where[] = 'o.order_type = ?';
             $params[] = $orderType;
+        }
+
+        if ($productType !== '' && in_array($productType, ['vehicle', 'spare_part'], true)) {
+            $where[] = 'o.product_type = ?';
+            $params[] = $productType;
         }
 
         if ($status !== '') {
@@ -61,6 +67,7 @@ class OrderController extends Controller
             'title' => 'Sell Orders',
             'orders' => $stmt->fetchAll(),
             'orderType' => $orderType,
+            'productType' => $productType,
             'status' => $status,
             'page' => $page,
             'totalPages' => max(1, (int)ceil($total / $perPage)),
@@ -75,6 +82,10 @@ class OrderController extends Controller
     public function create(): void
     {
         require_permission('manage_orders');
+        $productType = $this->input('product');
+        if (!in_array($productType, ['vehicle', 'spare_part'], true)) {
+            $productType = 'vehicle';
+        }
         $dealers = $this->db()->query(
             "SELECT id, business_name, dealer_code FROM dealers WHERE status = 'approved' ORDER BY business_name"
         )->fetchAll();
@@ -87,11 +98,21 @@ class OrderController extends Controller
              WHERE vv.is_active = 1 AND v.is_active = 1
              ORDER BY v.name, vv.name"
         )->fetchAll();
+        $spareParts = $this->db()->query(
+            "SELECT sp.id, sp.name, sp.part_number, sp.unit_price, sp.quantity_in_stock,
+                    sc.name AS category_name
+             FROM spare_parts sp
+             JOIN spare_categories sc ON sc.id = sp.category_id
+             WHERE sp.is_active = 1
+             ORDER BY sc.name, sp.name"
+        )->fetchAll();
 
         $this->view('orders/create', [
-            'title' => 'Create Sell Order',
+            'title' => $productType === 'spare_part' ? 'Create Spare Parts Sell Order' : 'Create Sell Order',
             'dealers' => $dealers,
             'variants' => $variants,
+            'spareParts' => $spareParts,
+            'productType' => $productType,
             'isAdmin' => Auth::role() === 'super_admin',
         ]);
     }
@@ -102,20 +123,37 @@ class OrderController extends Controller
         $this->validateCsrf();
 
         $items = [];
-        $variantIds = $_POST['variant_id'] ?? [];
-        $qtys = $_POST['quantity'] ?? [];
-        if (is_array($variantIds)) {
-            foreach ($variantIds as $i => $vid) {
-                if ((int)$vid > 0) {
-                    $items[] = [
-                        'variant_id' => (int)$vid,
-                        'quantity' => (int)($qtys[$i] ?? 1),
-                    ];
+        $productType = $this->input('product_type') ?: 'vehicle';
+        if ($productType === 'spare_part') {
+            $spareIds = $_POST['spare_part_id'] ?? [];
+            $qtys = $_POST['quantity'] ?? [];
+            if (is_array($spareIds)) {
+                foreach ($spareIds as $i => $sid) {
+                    if ((int)$sid > 0) {
+                        $items[] = [
+                            'spare_part_id' => (int)$sid,
+                            'quantity' => (int)($qtys[$i] ?? 1),
+                        ];
+                    }
+                }
+            }
+        } else {
+            $variantIds = $_POST['variant_id'] ?? [];
+            $qtys = $_POST['quantity'] ?? [];
+            if (is_array($variantIds)) {
+                foreach ($variantIds as $i => $vid) {
+                    if ((int)$vid > 0) {
+                        $items[] = [
+                            'variant_id' => (int)$vid,
+                            'quantity' => (int)($qtys[$i] ?? 1),
+                        ];
+                    }
                 }
             }
         }
 
         $payload = [
+            'product_type' => $productType,
             'order_type' => $this->input('order_type'),
             'dealer_id' => $this->input('dealer_id'),
             'booking_no' => $this->input('booking_no'),
@@ -162,10 +200,10 @@ class OrderController extends Controller
             $this->redirect('/orders/' . $result['order_id']);
         } catch (RuntimeException $e) {
             flash('error', $e->getMessage());
-            $this->redirect('/orders/create');
+            $this->redirect('/orders/create?product=' . urlencode($productType === 'spare_part' ? 'spare_part' : 'vehicle'));
         } catch (\Throwable $e) {
             flash('error', env('APP_DEBUG') === 'true' ? $e->getMessage() : 'Failed to create sell order.');
-            $this->redirect('/orders/create');
+            $this->redirect('/orders/create?product=' . urlencode($productType === 'spare_part' ? 'spare_part' : 'vehicle'));
         }
     }
 
@@ -189,10 +227,13 @@ class OrderController extends Controller
         }
 
         $items = $this->db()->prepare(
-            'SELECT oi.*, v.name AS vehicle_name, vv.name AS variant_name, vv.sku, vv.color
+            'SELECT oi.*, v.name AS vehicle_name, vv.name AS variant_name, vv.sku, vv.color,
+                    sp.name AS spare_part_name, sp.part_number, sc.name AS spare_category_name
              FROM order_items oi
-             JOIN vehicles v ON v.id = oi.vehicle_id
-             JOIN vehicle_variants vv ON vv.id = oi.variant_id
+             LEFT JOIN vehicles v ON v.id = oi.vehicle_id
+             LEFT JOIN vehicle_variants vv ON vv.id = oi.variant_id
+             LEFT JOIN spare_parts sp ON sp.id = oi.spare_part_id
+             LEFT JOIN spare_categories sc ON sc.id = sp.category_id
              WHERE oi.order_id = ?'
         );
         $items->execute([$orderId]);
@@ -257,7 +298,7 @@ class OrderController extends Controller
         }
 
         $billStmt = $this->db()->prepare(
-            "SELECT * FROM bills WHERE order_id = ? AND bill_type = 'vehicle' LIMIT 1"
+            'SELECT * FROM bills WHERE order_id = ? LIMIT 1'
         );
         $billStmt->execute([$orderId]);
         $bill = $billStmt->fetch();

@@ -19,7 +19,7 @@ class BillingController extends Controller
         $to = trim((string)$this->input('to'));
         $locationFilterAvailable = $this->billingLocationColumnExists();
 
-        $where = ["b.bill_type = 'vehicle'"];
+        $where = ["b.bill_type IN ('vehicle','spare')"];
         $params = [];
         if ($orderType !== '' && in_array($orderType, ['dealer', 'customer'], true)) {
             $where[] = 'o.order_type = ?';
@@ -43,7 +43,7 @@ class BillingController extends Controller
         $sqlWhere = implode(' AND ', $where);
 
         $totalInvoices = (int)$this->db()->query(
-            "SELECT COUNT(*) FROM bills WHERE bill_type = 'vehicle'"
+            "SELECT COUNT(*) FROM bills WHERE bill_type IN ('vehicle','spare')"
         )->fetchColumn();
 
         $stmt = $this->db()->prepare(
@@ -117,7 +117,7 @@ class BillingController extends Controller
         $stmt = $this->db()->prepare('SELECT * FROM bills WHERE id = ?');
         $stmt->execute([$billId]);
         $bill = $stmt->fetch();
-        if (!$bill || ($bill['bill_type'] ?? '') !== 'vehicle') {
+        if (!$bill || !in_array($bill['bill_type'] ?? '', ['vehicle', 'spare'], true)) {
             flash('error', 'Tax invoice not found.');
             $this->redirect('/billing');
         }
@@ -211,7 +211,7 @@ class BillingController extends Controller
         );
         $stmt->execute([$id]);
         $bill = $stmt->fetch();
-        if (!$bill || ($bill['bill_type'] ?? '') !== 'vehicle') {
+        if (!$bill || !in_array($bill['bill_type'] ?? '', ['vehicle', 'spare'], true)) {
             flash('error', 'Tax invoice not found.');
             $this->redirect('/billing');
         }
