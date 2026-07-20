@@ -13,9 +13,12 @@ class PartnerController extends Controller
         require_role('super_admin');
         $stats = [
             'partners' => (int)$this->db()->query('SELECT COUNT(*) FROM partners WHERE is_active=1')->fetchColumn(),
+            'total_partners' => (int)$this->db()->query('SELECT COUNT(*) FROM partners')->fetchColumn(),
             'paid' => (float)$this->db()->query("SELECT COALESCE(SUM(amount),0) FROM partner_transactions WHERE transaction_type='payment'")->fetchColumn(),
             'received' => (float)$this->db()->query("SELECT COALESCE(SUM(amount),0) FROM partner_transactions WHERE transaction_type='receipt'")->fetchColumn(),
+            'transactions' => (int)$this->db()->query('SELECT COUNT(*) FROM partner_transactions')->fetchColumn(),
         ];
+        $stats['net'] = $stats['received'] - $stats['paid'];
         $partners = $this->db()->query('SELECT * FROM partners ORDER BY name')->fetchAll();
         $transactions = $this->db()->query(
             'SELECT pt.*, p.name AS partner_name FROM partner_transactions pt
