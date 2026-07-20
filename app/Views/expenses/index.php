@@ -50,12 +50,20 @@ document.addEventListener('alpine:init', () => {
       this.gstApplicable = false;
       this.items = [{ name: '', amount: '' }];
     },
-    addItem(listKey) {
-      this[listKey].push({ name: '', amount: '' });
+    addRecordItem() {
+      this.items = [...this.items, { name: '', amount: '' }];
     },
-    removeItem(listKey, idx) {
-      if (this[listKey].length <= 1) return;
-      this[listKey].splice(idx, 1);
+    removeRecordItem(idx) {
+      if (this.items.length <= 1) return;
+      this.items = this.items.filter((_, i) => i !== idx);
+    },
+    addEditItem() {
+      if (!this.editExp) return;
+      this.editExp.items = [...this.editExp.items, { name: '', amount: '' }];
+    },
+    removeEditItem(idx) {
+      if (!this.editExp || this.editExp.items.length <= 1) return;
+      this.editExp.items = this.editExp.items.filter((_, i) => i !== idx);
     },
     openEdit(row) {
       const copy = JSON.parse(JSON.stringify(row));
@@ -290,19 +298,21 @@ document.addEventListener('alpine:init', () => {
                 <label style="margin:0;font-weight:700;">Items in this record *</label>
                 <p class="muted" style="margin:0.2rem 0 0;font-size:0.78rem;">e.g. Laptop and Printer on one receipt</p>
               </div>
-              <button type="button" class="btn btn-sm btn-primary" @click="addItem('items')">+ Add item</button>
+              <button type="button" class="btn btn-sm btn-primary" @click="addRecordItem()">+ Add item</button>
             </div>
-            <div x-for="(item, idx) in items" :key="'add-item-' + idx" style="display:grid;grid-template-columns:1fr 140px auto;gap:0.45rem;margin-bottom:0.45rem;align-items:end;">
-              <div class="form-group" style="margin:0;">
-                <label x-text="'Item ' + (idx + 1)" style="font-size:0.75rem;"></label>
-                <input class="form-control" name="item_name[]" x-model="item.name" required placeholder="e.g. Laptop">
+            <template x-for="(item, idx) in items" :key="'add-' + idx">
+              <div style="display:grid;grid-template-columns:1fr 140px auto;gap:0.45rem;margin-bottom:0.45rem;align-items:end;">
+                <div class="form-group" style="margin:0;">
+                  <label x-text="'Item ' + (idx + 1)" style="font-size:0.75rem;"></label>
+                  <input class="form-control" name="item_name[]" x-model="item.name" required placeholder="e.g. Laptop">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label style="font-size:0.75rem;">Base amount</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="item_amount[]" x-model="item.amount" required>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger" style="margin-bottom:0;" @click="removeRecordItem(idx)" :disabled="items.length <= 1" title="Remove item">×</button>
               </div>
-              <div class="form-group" style="margin:0;">
-                <label style="font-size:0.75rem;">Base amount</label>
-                <input class="form-control" type="number" step="0.01" min="0.01" name="item_amount[]" x-model="item.amount" required>
-              </div>
-              <button type="button" class="btn btn-sm btn-danger" style="margin-bottom:0;" @click="removeItem('items', idx)" :disabled="items.length <= 1" title="Remove item">×</button>
-            </div>
+            </template>
           </div>
 
           <div class="form-group full">
@@ -370,19 +380,21 @@ document.addEventListener('alpine:init', () => {
           <div class="form-group full" x-show="editExp?.items" style="padding:0.75rem;border:1px solid var(--border);border-radius:10px;background:#fafafa;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.55rem;">
               <label style="margin:0;font-weight:700;">Items in this record *</label>
-              <button type="button" class="btn btn-sm btn-primary" @click="editExp.items.push({ name: '', amount: '' })">+ Add item</button>
+              <button type="button" class="btn btn-sm btn-primary" @click="addEditItem()">+ Add item</button>
             </div>
-            <div x-for="(item, idx) in editExp.items" :key="'edit-item-' + idx" style="display:grid;grid-template-columns:1fr 140px auto;gap:0.45rem;margin-bottom:0.45rem;align-items:end;">
-              <div class="form-group" style="margin:0;">
-                <label x-text="'Item ' + (idx + 1)" style="font-size:0.75rem;"></label>
-                <input class="form-control" name="item_name[]" x-model="item.name" required placeholder="e.g. Laptop">
+            <template x-for="(item, idx) in editExp.items" :key="'edit-' + idx">
+              <div style="display:grid;grid-template-columns:1fr 140px auto;gap:0.45rem;margin-bottom:0.45rem;align-items:end;">
+                <div class="form-group" style="margin:0;">
+                  <label x-text="'Item ' + (idx + 1)" style="font-size:0.75rem;"></label>
+                  <input class="form-control" name="item_name[]" x-model="item.name" required placeholder="e.g. Laptop">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label style="font-size:0.75rem;">Base amount</label>
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="item_amount[]" x-model="item.amount" required>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger" style="margin-bottom:0;" @click="removeEditItem(idx)" :disabled="editExp.items.length <= 1" title="Remove item">×</button>
               </div>
-              <div class="form-group" style="margin:0;">
-                <label style="font-size:0.75rem;">Base amount</label>
-                <input class="form-control" type="number" step="0.01" min="0.01" name="item_amount[]" x-model="item.amount" required>
-              </div>
-              <button type="button" class="btn btn-sm btn-danger" style="margin-bottom:0;" @click="editExp.items.length > 1 && editExp.items.splice(idx, 1)" :disabled="editExp.items.length <= 1" title="Remove item">×</button>
-            </div>
+            </template>
           </div>
 
           <div class="form-group full">
