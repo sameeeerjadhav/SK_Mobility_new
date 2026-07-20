@@ -6,6 +6,27 @@
   splitOpen: false,
   splitRow: null,
   splitLines: [{ color: '', quantity: '' }],
+  fromWarehouseId: <?= (int)$warehouseId ?>,
+  transferVariantId: '',
+  transferStock: <?= json_encode(array_map(static function (array $row): array {
+      return [
+          'variant_id' => (int)$row['variant_id'],
+          'warehouse_id' => (int)$row['warehouse_id'],
+          'quantity_available' => (int)$row['quantity_available'],
+          'label' => variant_option_label($row),
+      ];
+  }, $transferStock ?? []), JSON_HEX_APOS | JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) ?>,
+  openTransfer() {
+    this.fromWarehouseId = <?= (int)$warehouseId ?>;
+    this.transferVariantId = '';
+    this.transferOpen = true;
+  },
+  transferOptions() {
+    return this.transferStock.filter((row) => Number(row.warehouse_id) === Number(this.fromWarehouseId));
+  },
+  transferOptionLabel(row) {
+    return row.label + ' · ' + row.quantity_available + ' avail';
+  },
   openSplit(row) {
     this.splitRow = row;
     this.splitLines = [{ color: '', quantity: '' }, { color: '', quantity: '' }];
@@ -31,7 +52,7 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         <button class="btn btn-outline" type="button" @click="whOpen=true">+ Warehouse</button>
         <button class="btn btn-outline" type="button" @click="adjustOpen=true">Adjust Stock</button>
-        <button class="btn btn-primary" type="button" @click="transferOpen=true">Transfer Stock</button>
+        <button class="btn btn-primary" type="button" @click="openTransfer()">Transfer Stock</button>
       </div>
     <?php endif; ?>
   </div>
@@ -188,7 +209,7 @@
             <select class="form-control" name="variant_id" required>
               <option value="">Select</option>
               <?php foreach ($variants as $v): ?>
-                <option value="<?= (int)$v['id'] ?>"><?= e($v['vehicle_name'] . ' — ' . $v['name'] . ' (' . $v['sku'] . ')') ?></option>
+                <option value="<?= (int)$v['id'] ?>"><?= e(variant_option_label($v)) ?></option>
               <?php endforeach; ?>
             </select>
           </div>
@@ -207,15 +228,19 @@
         <div class="modal-header"><h3 class="modal-title">Transfer Stock</h3><button type="button" class="btn btn-sm btn-outline" @click="transferOpen=false">Close</button></div>
         <div class="modal-body">
           <div class="form-group"><label>Variant</label>
-            <select class="form-control" name="variant_id" required>
-              <?php foreach ($variants as $v): ?>
-                <option value="<?= (int)$v['id'] ?>"><?= e($v['vehicle_name'] . ' — ' . $v['name']) ?></option>
-              <?php endforeach; ?>
+            <select class="form-control" name="variant_id" required x-model="transferVariantId">
+              <option value="">Select variant with stock</option>
+              <template x-for="row in transferOptions()" :key="row.variant_id + '-' + row.warehouse_id">
+                <option :value="row.variant_id" x-text="transferOptionLabel(row)"></option>
+              </template>
             </select>
+            <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;" x-show="transferOptions().length === 0" x-cloak>
+              No stock available in the selected source warehouse.
+            </p>
           </div>
           <div class="form-grid">
             <div class="form-group"><label>From warehouse</label>
-              <select class="form-control" name="from_warehouse_id" required>
+              <select class="form-control" name="from_warehouse_id" required x-model.number="fromWarehouseId" @change="transferVariantId=''">
                 <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['id'] ?>" <?= (int)$warehouseId === (int)$w['id'] ? 'selected' : '' ?>><?= e($w['name']) ?></option><?php endforeach; ?>
               </select>
             </div>

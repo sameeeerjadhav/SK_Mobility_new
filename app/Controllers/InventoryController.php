@@ -46,9 +46,20 @@ class InventoryController extends Controller
         }
 
         $variants = $this->db()->query(
-            "SELECT vv.id, vv.name, vv.sku, v.name AS vehicle_name, v.id AS vehicle_id
+            "SELECT vv.id, vv.name, vv.sku, vv.color, vv.battery_type, v.name AS vehicle_name, v.id AS vehicle_id
              FROM vehicle_variants vv JOIN vehicles v ON v.id = vv.vehicle_id
-             WHERE vv.is_active = 1 AND v.is_active = 1 ORDER BY v.name, vv.name"
+             WHERE vv.is_active = 1 AND v.is_active = 1
+             ORDER BY v.name, vv.name, vv.color, vv.sku"
+        )->fetchAll();
+
+        $transferStock = $this->db()->query(
+            "SELECT i.variant_id, i.warehouse_id, i.quantity_available,
+                    v.name AS vehicle_name, vv.name, vv.sku, vv.color, vv.battery_type
+             FROM inventory i
+             JOIN vehicles v ON v.id = i.vehicle_id
+             JOIN vehicle_variants vv ON vv.id = i.variant_id
+             WHERE i.quantity_available > 0 AND vv.is_active = 1 AND v.is_active = 1
+             ORDER BY v.name, vv.name, vv.color, vv.sku"
         )->fetchAll();
 
         $this->view('inventory/index', [
@@ -59,6 +70,7 @@ class InventoryController extends Controller
             'filterVehicle' => $filterVehicle,
             'stock' => $stock,
             'variants' => $variants,
+            'transferStock' => $transferStock,
             'canManage' => can('manage_inventory'),
         ]);
     }

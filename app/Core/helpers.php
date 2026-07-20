@@ -239,6 +239,32 @@ function slugify(string $text): string
     return trim($text, '-') ?: 'item';
 }
 
+/** Human-readable variant label for selects: vehicle, color, battery, SKU. */
+function variant_option_label(array $variant, bool $includeSku = true): string
+{
+    $vehicle = trim((string)($variant['vehicle_name'] ?? ''));
+    $name = trim((string)($variant['name'] ?? ''));
+    $color = trim((string)($variant['color'] ?? ''));
+    $battery = trim((string)($variant['battery_type'] ?? ''));
+    $sku = trim((string)($variant['sku'] ?? ''));
+
+    if ($vehicle !== '' && $name !== '' && strcasecmp($vehicle, $name) !== 0) {
+        $label = $vehicle . ' — ' . $name;
+    } else {
+        $label = $vehicle !== '' ? $vehicle : $name;
+    }
+
+    $details = array_values(array_filter([$color, $battery]));
+    if ($details) {
+        $label .= ' (' . implode(', ', $details) . ')';
+    }
+    if ($includeSku && $sku !== '') {
+        $label .= ' · ' . $sku;
+    }
+
+    return $label;
+}
+
 function require_auth(): void
 {
     if (!\App\Core\Auth::check()) {
