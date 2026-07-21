@@ -30,6 +30,18 @@ $paidLoan = $paidLoan ?? 0;
 $batteryCapacity = $batteryCapacity ?? '';
 $batteryNo = $batteryNo ?? '';
 $subtotal = (float)($bill['subtotal'] ?? 0);
+$editLines = [];
+foreach ($items as $it) {
+    $editLines[] = [
+        'id' => (int)$it['id'],
+        'description' => (string)($it['description'] ?? ''),
+        'quantity' => max(1, (int)($it['quantity'] ?? 1)),
+        'unit_price' => round((float)($it['unit_price'] ?? 0), 2),
+    ];
+}
+if ($editLines === [] && $subtotal > 0) {
+    $editLines[] = ['id' => 0, 'description' => 'Sell amount', 'quantity' => 1, 'unit_price' => $subtotal];
+}
 ?>
 <div style="margin-bottom:1rem;"><a href="<?= url('billing') ?>">&larr; Tax Invoices</a></div>
 
@@ -119,12 +131,15 @@ $subtotal = (float)($bill['subtotal'] ?? 0);
   defaultSgst: <?= $isSpareBill ? '9' : '14' ?>,
   cgstRate: <?= json_encode($billCgst) ?>,
   sgstRate: <?= json_encode($billSgst) ?>,
-  subtotal: <?= json_encode($subtotal) ?>,
+  lines: <?= htmlspecialchars(json_encode($editLines, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>,
   applyGstPreset() {
     const presets = { default: [this.defaultCgst, this.defaultSgst], '28': [14,14], '18': [9,9], '12': [6,6], '5': [2.5,2.5], '0': [0,0] };
     if (this.gstPreset === 'custom') return;
     const p = presets[this.gstPreset] || presets.default;
     this.cgstRate = p[0]; this.sgstRate = p[1];
+  },
+  get subtotal() {
+    return Math.round(this.lines.reduce((s, it) => s + (parseFloat(it.unit_price)||0) * (parseInt(it.quantity,10)||1), 0) * 100) / 100;
   },
   get totalGstPercent() { return Math.round(((parseFloat(this.cgstRate)||0)+(parseFloat(this.sgstRate)||0))*100)/100; },
   get gstAmount() { return Math.round(this.subtotal * this.totalGstPercent / 100 * 100) / 100; },
@@ -138,7 +153,7 @@ $subtotal = (float)($bill['subtotal'] ?? 0);
   money(n) { return '₹' + (Math.round((parseFloat(n)||0)*100)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 }">
   <h3 class="card-title">Edit sell order / tax invoice</h3>
-  <p class="muted" style="margin-top:0;">Same fields as create sell order — line items and sell amount are fixed; you can update buyer, parts, GST, and payment.</p>
+  <p class="muted" style="margin-top:0;">Same fields as create sell order — update sell amount, buyer, parts, GST, and payment.</p>
   <form method="post" action="<?= url('billing/' . $bill['id']) ?>">
     <?= csrf_field() ?>
 
@@ -158,6 +173,38 @@ $subtotal = (float)($bill['subtotal'] ?? 0);
       <div class="form-group"><label>EV Model Type</label><input class="form-control" name="vehicle_model_type" value="<?= e($bill['vehicle_model_type'] ?? '') ?>"></div>
       <div class="form-group"><label>Model Color</label><input class="form-control" name="color" value="<?= e($bill['color'] ?? '') ?>"></div>
       <?php endif; ?>
+      <div class="form-group full" style="grid-column:1 / -1;padding:0.85rem 1rem;border-radius:12px;background:#f0fdf4;border:1px solid #86efac;">
+        <template x-if="lines.length === 1 && productType === 'vehicle'">
+          <div class="form-group" style="margin:0;">
+            <label>Vehicle sell amount (₹) *</label>
+            <input type="hidden" :name="'item_id[0]'" :value="lines[0].id">
+            <input type="hidden" :name="'quantity[0]'" :value="lines[0].quantity">
+            <input class="form-control" type="number" step="0.01" min="0.01" name="unit_price[0]" x-model="lines[0].unit_price" required
+                   placeholder="Enter the price at which you are selling this vehicle">
+            <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">This is your <strong>selling price</strong> (before GST) — not the purchase/PO cost.</p>
+          </div>
+        </template>
+        <template x-if="!(lines.length === 1 && productType === 'vehicle')">
+          <div>
+            <label style="display:block;margin-bottom:0.5rem;">Sell amount (₹) *</label>
+            <template x-for="(it, idx) in lines" :key="it.id || idx">
+              <div class="form-grid" style="margin-bottom:0.5rem;align-items:end;">
+                <div class="form-group" style="margin:0;">
+                  <label style="font-size:0.82rem;" x-text="it.description || ('Line ' + (idx+1))"></label>
+                  <input type="hidden" :name="'item_id['+idx+']'" :value="it.id">
+                  <input type="hidden" :name="'quantity['+idx+']'" :value="it.quantity">
+                  <input class="form-control" type="number" step="0.01" min="0.01" :name="'unit_price['+idx+']'" x-model="it.unit_price" required placeholder="Selling price">
+                </div>
+                <div class="form-group" style="margin:0;" x-show="(parseInt(it.quantity,10)||1) > 1">
+                  <label style="font-size:0.82rem;">Qty</label>
+                  <input class="form-control" type="number" :value="it.quantity" readonly>
+                </div>
+              </div>
+            </template>
+            <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Enter the <strong>sell amount</strong> per line — the price you are selling at, not PO/purchase cost.</p>
+          </div>
+        </template>
+      </div>
     </div>
 
     <h4 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;">Buyer</h4>
@@ -260,7 +307,7 @@ $subtotal = (float)($bill['subtotal'] ?? 0);
       </template>
       <div class="form-group full">
         <div style="padding:0.75rem 1rem;border-radius:10px;background:#f8fafc;border:1px solid var(--border);max-width:420px;">
-          <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.25rem;"><span>Sell amount (fixed)</span><span x-text="money(subtotal)"></span></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.25rem;"><span>Sell amount</span><span x-text="money(subtotal)"></span></div>
           <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.25rem;"><span x-text="'GST @ ' + totalGstPercent + '%'"></span><span x-text="money(gstAmount)"></span></div>
           <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.35rem;border-top:1px solid var(--border);"><span>Invoice total</span><span x-text="money(grandTotal)"></span></div>
         </div>

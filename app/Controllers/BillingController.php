@@ -156,7 +156,44 @@ class BillingController extends Controller
             $this->redirect('/billing');
         }
 
-        $subtotal = (float)$bill['subtotal'];
+        $itemIds = $_POST['item_id'] ?? [];
+        $unitPrices = $_POST['unit_price'] ?? [];
+        $quantities = $_POST['quantity'] ?? [];
+        $existingItems = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ? ORDER BY id ASC');
+        $existingItems->execute([$billId]);
+        $rows = $existingItems->fetchAll();
+
+        $priceById = [];
+        if (is_array($unitPrices)) {
+            foreach ($unitPrices as $idx => $price) {
+                $itemId = (int)($itemIds[$idx] ?? ($rows[$idx]['id'] ?? 0));
+                $unit = round((float)$price, 2);
+                if ($unit < 0.01) {
+                    flash('error', 'Vehicle sell amount must be greater than zero.');
+                    $this->redirect('/billing/' . $billId);
+                }
+                if ($itemId > 0) {
+                    $priceById[$itemId] = $unit;
+                }
+            }
+        }
+
+        $subtotal = 0.0;
+        if ($rows) {
+            foreach ($rows as $i => $row) {
+                $qty = max(1, (int)($quantities[$i] ?? $row['quantity'] ?? 1));
+                $unit = $priceById[(int)$row['id']] ?? round((float)$row['unit_price'], 2);
+                $subtotal += $unit * $qty;
+            }
+            $subtotal = round($subtotal, 2);
+        } else {
+            $subtotal = round((float)($unitPrices[0] ?? $bill['subtotal']), 2);
+            if ($subtotal < 0.01) {
+                flash('error', 'Vehicle sell amount must be greater than zero.');
+                $this->redirect('/billing/' . $billId);
+            }
+        }
+
         $billProductType = ($bill['bill_type'] ?? '') === 'spare' ? 'spare_part' : 'vehicle';
         try {
             [$cgstRate, $sgstRate] = OrderService::resolveGstRates([
@@ -213,7 +250,7 @@ class BillingController extends Controller
                 motor_warranty=?, battery_warranty=?, controller_warranty=?, charger_warranty=?,
                 hp_name=?, vehicle_sale_date=?,
                 pm_drive_incentive=0, state_subsidy=0, loan_amount=?, discount_amount=0,
-                cgst_rate=?, sgst_rate=?, tax_rate=?,
+                subtotal=?, cgst_rate=?, sgst_rate=?, tax_rate=?,
                 payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?
              WHERE id=?'
         )->execute([
@@ -240,7 +277,7 @@ class BillingController extends Controller
             $this->input('hp_name'),
             $this->input('vehicle_sale_date') ?: null,
             $loanAmount,
-            $cgstRate, $sgstRate, $taxRate,
+            $subtotal, $cgstRate, $sgstRate, $taxRate,
             $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total, $billId,
         ]);
 
@@ -254,7 +291,7 @@ class BillingController extends Controller
                     motor_warranty=?, battery_warranty=?, controller_warranty=?, charger_warranty=?,
                     hp_name=?, color=?, vehicle_model_type=?,
                     pm_drive_incentive=0, state_subsidy=0, loan_amount=?, discount_amount=0,
-                    cgst_rate=?, sgst_rate=?, tax_rate=?, tax_amount=?,
+                    subtotal=?, cgst_rate=?, sgst_rate=?, tax_rate=?, tax_amount=?,
                     payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?,
                     bank_account_id=?, affect_bank_balance=?, sale_date=?
                  WHERE id=?'
@@ -281,7 +318,7 @@ class BillingController extends Controller
                 $this->input('color'),
                 $this->input('vehicle_model_type'),
                 $loanAmount,
-                $cgstRate, $sgstRate, $taxRate, $taxAmount,
+                $subtotal, $cgstRate, $sgstRate, $taxRate, $taxAmount,
                 $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total,
                 $bankAccountId ?: null, $affectBank ? 1 : 0,
                 $this->input('vehicle_sale_date') ?: null,
@@ -289,19 +326,35 @@ class BillingController extends Controller
             ]);
         }
 
-        $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ? ORDER BY id ASC');
-        $items->execute([$billId]);
-        $rows = $items->fetchAll();
         if ($rows) {
             $upd = $this->db()->prepare(
-                'UPDATE bill_items SET discount=0, taxable_amount=?, cgst_amount=?, sgst_amount=?, total_price=? WHERE id=?'
+                'UPDATE bill_items SET unit_price=?, discount=0, taxable_amount=?, cgst_amount=?, sgst_amount=?, total_price=? WHERE id=?'
             );
-            foreach ($rows as $row) {
-                $lineTaxable = max(0, (float)$row['unit_price'] * (int)$row['quantity']);
+            foreach ($rows as $i => $row) {
+                $qty = max(1, (int)($row['quantity'] ?? 1));
+                $unit = $priceById[(int)$row['id']] ?? round((float)$row['unit_price'], 2);
+                $lineTaxable = max(0, $unit * $qty);
                 $lineCgst = round($lineTaxable * ($cgstRate / 100), 2);
                 $lineSgst = round($lineTaxable * ($sgstRate / 100), 2);
                 $lineTotal = round($lineTaxable + $lineCgst + $lineSgst, 2);
-                $upd->execute([$lineTaxable, $lineCgst, $lineSgst, $lineTotal, $row['id']]);
+                $upd->execute([$unit, $lineTaxable, $lineCgst, $lineSgst, $lineTotal, $row['id']]);
+            }
+
+            if (!empty($bill['order_id'])) {
+                $orderItems = $this->db()->prepare('SELECT id, quantity FROM order_items WHERE order_id = ? ORDER BY id ASC');
+                $orderItems->execute([(int)$bill['order_id']]);
+                $orderRows = $orderItems->fetchAll();
+                $updOrder = $this->db()->prepare(
+                    'UPDATE order_items SET unit_price=?, total_price=? WHERE id=?'
+                );
+                foreach ($orderRows as $i => $orow) {
+                    if (!isset($rows[$i])) {
+                        break;
+                    }
+                    $qty = max(1, (int)($orow['quantity'] ?? 1));
+                    $unit = $priceById[(int)$rows[$i]['id']] ?? round((float)$rows[$i]['unit_price'], 2);
+                    $updOrder->execute([$unit, round($unit * $qty, 2), $orow['id']]);
+                }
             }
         }
 
