@@ -161,6 +161,12 @@ $gstLabel = 'GST ' . rtrim(rtrim(number_format($taxRate, 2, '.', ''), '0'), '.')
         ?>
         <div class="od-rows" style="margin-top:0.75rem;padding-top:0.7rem;border-top:1px solid #e2e8f0;">
           <div class="od-row"><span class="k">Payment</span><span class="v"><?= e($paymentLabel) ?></span></div>
+          <?php
+            [$dispCash, $dispBank, $dispLoan] = \App\Services\OrderService::parseStoredPaymentBreakdown($order);
+          ?>
+          <?php if ($dispCash > 0): ?><div class="od-row"><span class="k">Cash</span><span class="v"><?= money($dispCash) ?></span></div><?php endif; ?>
+          <?php if ($dispBank > 0): ?><div class="od-row"><span class="k">Bank / online</span><span class="v"><?= money($dispBank) ?></span></div><?php endif; ?>
+          <?php if ($dispLoan > 0): ?><div class="od-row"><span class="k">Loan</span><span class="v"><?= money($dispLoan) ?></span></div><?php endif; ?>
           <?php if ($payStatus === 'partial'): ?>
             <div class="od-row"><span class="k">Paid</span><span class="v"><?= money($amountPaid) ?></span></div>
             <div class="od-row"><span class="k">Due</span><span class="v" style="color:#b45309;"><?= money($amountDue) ?></span></div>

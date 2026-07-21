@@ -538,6 +538,31 @@ class OrderService
         return $parts ? implode('+', $parts) : null;
     }
 
+    /** @return array{0:float,1:float,2:float} cash, bank, loan */
+    public static function parseStoredPaymentBreakdown(array $record): array
+    {
+        $loan = round((float)($record['loan_amount'] ?? 0), 2);
+        $paid = round((float)($record['amount_paid'] ?? 0), 2);
+        if ($paid <= 0 && strtolower((string)($record['payment_status'] ?? 'full')) === 'full') {
+            $paid = round((float)($record['total_amount'] ?? 0), 2);
+        }
+        $nonLoan = max(0, round($paid - $loan, 2));
+        $mode = strtolower(str_replace(['_', ' '], '+', (string)($record['payment_mode'] ?? '')));
+        $cash = 0.0;
+        $bank = 0.0;
+        if (str_contains($mode, 'bank') && !str_contains($mode, 'cash')) {
+            $bank = $nonLoan;
+        } else {
+            $cash = $nonLoan;
+        }
+        return [$cash, $bank, $loan];
+    }
+
+    public static function formatPaymentMode(float $cash, float $bank, float $loan): ?string
+    {
+        return self::buildPaymentMode($cash, $bank, $loan);
+    }
+
     private static function normalizePaymentMode(array $data): ?string
     {
         if (!empty($data['payment_mode'])) {

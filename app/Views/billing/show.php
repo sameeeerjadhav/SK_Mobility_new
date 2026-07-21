@@ -1,7 +1,4 @@
 <?php
-$payment = strtolower((string)($bill['payment_mode'] ?? ''));
-$paidCash = str_contains($payment, 'cash');
-$paidCheque = str_contains($payment, 'cheque') || str_contains($payment, 'check');
 $paymentStatus = strtolower((string)($bill['payment_status'] ?? 'full'));
 $amountPaid = (float)($bill['amount_paid'] ?? 0);
 $amountDue = (float)($bill['amount_due'] ?? 0);
@@ -13,9 +10,26 @@ $billingLoc = $bill['billing_location'] ?? 'kokamthan';
 $companyAddress = $billingLoc === 'kopargaon'
     ? ($bill['company_branch_address'] ?? '')
     : ($bill['company_address'] ?? '');
-$billCgst = (float)($bill['cgst_rate'] ?? 14);
-$billSgst = (float)($bill['sgst_rate'] ?? 14);
+$billCgst = (float)($bill['cgst_rate'] ?? ($productType === 'spare_part' ? 9 : 14));
+$billSgst = (float)($bill['sgst_rate'] ?? ($productType === 'spare_part' ? 9 : 14));
 $billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
+$isSpareBill = ($productType ?? 'vehicle') === 'spare_part';
+$gstPreset = 'default';
+foreach ([['28', 14, 14], ['18', 9, 9], ['12', 6, 6], ['5', 2.5, 2.5], ['0', 0, 0]] as [$key, $c, $s]) {
+    if (abs($billCgst - $c) < 0.01 && abs($billSgst - $s) < 0.01) {
+        $gstPreset = $key;
+        break;
+    }
+}
+if ($gstPreset === 'default' && (abs($billCgst - ($isSpareBill ? 9 : 14)) > 0.01 || abs($billSgst - ($isSpareBill ? 9 : 14)) > 0.01)) {
+    $gstPreset = 'custom';
+}
+$paidCash = $paidCash ?? 0;
+$paidBank = $paidBank ?? 0;
+$paidLoan = $paidLoan ?? 0;
+$batteryCapacity = $batteryCapacity ?? '';
+$batteryNo = $batteryNo ?? '';
+$subtotal = (float)($bill['subtotal'] ?? 0);
 ?>
 <div style="margin-bottom:1rem;"><a href="<?= url('billing') ?>">&larr; Tax Invoices</a></div>
 
@@ -71,7 +85,7 @@ $billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
     </table>
   </div>
   <p style="margin-top:1rem;"><strong>GST:</strong> <?= e(rtrim(rtrim(number_format($billTaxRate, 2), '0'), '.')) ?>% (CGST <?= e(rtrim(rtrim(number_format($billCgst, 2), '0'), '.')) ?>% + SGST <?= e(rtrim(rtrim(number_format($billSgst, 2), '0'), '.')) ?>%) ·
-    <strong>Loan:</strong> <?= money($bill['loan_amount'] ?? 0) ?> ·
+    <strong>Loan portion:</strong> <?= money($bill['loan_amount'] ?? 0) ?> ·
     <strong>Total:</strong> <?= money($bill['total_amount']) ?> ·
     <?php if (($bill['payment_status'] ?? 'full') === 'partial'): ?>
       <strong>Paid:</strong> <?= money($bill['amount_paid'] ?? 0) ?> ·
@@ -79,29 +93,84 @@ $billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
     <?php else: ?>
       <strong>Payment:</strong> Full paid ·
     <?php endif; ?>
+    <?php if (!empty($bill['payment_mode'])): ?>
+      <strong>Mode:</strong> <?= e(str_replace('+', ' + ', $bill['payment_mode'])) ?> ·
+    <?php endif; ?>
     <strong>In words:</strong> <?= e(amount_in_words($bill['total_amount'])) ?></p>
 </div>
 
 <?php if (can('manage_billing')): ?>
-<div class="card">
-  <h3 class="card-title">Edit tax invoice fields</h3>
-  <p class="muted" style="margin-top:0;">Fill every field that appears on the paper SAI KUBER bill, then Preview / Print.</p>
+<style>
+  .ow-parts{display:flex;flex-direction:column;gap:.7rem;margin:0.5rem 0 1rem}
+  .ow-block{border:1px solid var(--border);border-radius:12px;padding:.75rem .85rem;background:#f8fffd}
+  .ow-block h4{margin:0 0 .65rem;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#0f766e}
+  .ow-block .form-grid{gap:.65rem}
+  .ow-block.chassis{background:#fff}
+</style>
+<div class="card" x-data="{
+  productType: '<?= e($productType ?? 'vehicle') ?>',
+  paymentStatus: '<?= e($paymentStatus) ?>',
+  paidCash: '<?= e($paidCash > 0 ? (string)$paidCash : '') ?>',
+  paidBank: '<?= e($paidBank > 0 ? (string)$paidBank : '') ?>',
+  paidLoan: '<?= e($paidLoan > 0 ? (string)$paidLoan : '') ?>',
+  bankAccountId: '<?= e((string)($order['bank_account_id'] ?? '')) ?>',
+  gstPreset: '<?= e($gstPreset) ?>',
+  defaultCgst: <?= $isSpareBill ? '9' : '14' ?>,
+  defaultSgst: <?= $isSpareBill ? '9' : '14' ?>,
+  cgstRate: <?= json_encode($billCgst) ?>,
+  sgstRate: <?= json_encode($billSgst) ?>,
+  subtotal: <?= json_encode($subtotal) ?>,
+  applyGstPreset() {
+    const presets = { default: [this.defaultCgst, this.defaultSgst], '28': [14,14], '18': [9,9], '12': [6,6], '5': [2.5,2.5], '0': [0,0] };
+    if (this.gstPreset === 'custom') return;
+    const p = presets[this.gstPreset] || presets.default;
+    this.cgstRate = p[0]; this.sgstRate = p[1];
+  },
+  get totalGstPercent() { return Math.round(((parseFloat(this.cgstRate)||0)+(parseFloat(this.sgstRate)||0))*100)/100; },
+  get gstAmount() { return Math.round(this.subtotal * this.totalGstPercent / 100 * 100) / 100; },
+  get grandTotal() { return Math.round((this.subtotal + this.gstAmount) * 100) / 100; },
+  get totalPaidNow() { return (parseFloat(this.paidCash)||0)+(parseFloat(this.paidBank)||0)+(parseFloat(this.paidLoan)||0); },
+  get balanceDue() { return Math.max(0, Math.round((this.grandTotal - this.totalPaidNow)*100)/100); },
+  fillInvoiceTotal() {
+    if (this.grandTotal <= 0) return;
+    this.paidCash = String(this.grandTotal); this.paidBank = ''; this.paidLoan = ''; this.paymentStatus = 'full';
+  },
+  money(n) { return '₹' + (Math.round((parseFloat(n)||0)*100)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+}">
+  <h3 class="card-title">Edit sell order / tax invoice</h3>
+  <p class="muted" style="margin-top:0;">Same fields as create sell order — line items and sell amount are fixed; you can update buyer, parts, GST, and payment.</p>
   <form method="post" action="<?= url('billing/' . $bill['id']) ?>">
     <?= csrf_field() ?>
+
+    <h4 style="margin:1rem 0 0.5rem;font-size:0.95rem;">Order &amp; billing</h4>
     <div class="form-grid">
       <div class="form-group"><label>Booking No.</label><input class="form-control" name="booking_no" value="<?= e($bill['booking_no'] ?? '') ?>"></div>
-      <div class="form-group"><label>Date of Sale</label><input class="form-control" type="date" name="vehicle_sale_date" value="<?= e($bill['vehicle_sale_date'] ?? '') ?>"></div>
-      <div class="form-group"><label>Cust. Name</label><input class="form-control" name="customer_name" value="<?= e($bill['customer_name'] ?? '') ?>"></div>
-      <div class="form-group"><label>Mob.</label><input class="form-control contact-input" name="customer_phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" value="<?= e(format_phone($bill['customer_phone'] ?? '')) ?>"></div>
-      <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" value="<?= e($bill['customer_email'] ?? '') ?>"></div>
-      <div class="form-group full"><label>Add.</label><textarea class="form-control" name="customer_address" rows="2"><?= e($bill['customer_address'] ?? '') ?></textarea></div>
-      <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="customer_aadhaar" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012" value="<?= e(format_aadhar($bill['customer_aadhaar'] ?? '')) ?>"></div>
-      <div class="form-group"><label>PAN No.</label><input class="form-control" name="customer_pan" value="<?= e($bill['customer_pan'] ?? '') ?>"></div>
+      <div class="form-group"><label>Date of Sale *</label><input class="form-control" type="date" name="vehicle_sale_date" value="<?= e($bill['vehicle_sale_date'] ?? '') ?>" required></div>
+      <div class="form-group">
+        <label>Billing location *</label>
+        <select class="form-control" name="billing_location" required>
+          <option value="kokamthan" <?= $billingLoc === 'kokamthan' ? 'selected' : '' ?>>Kokamthan</option>
+          <option value="kopargaon" <?= $billingLoc === 'kopargaon' ? 'selected' : '' ?>>Kopargaon</option>
+        </select>
+      </div>
+      <?php if (!$isSpareBill): ?>
       <div class="form-group"><label>EV Model Name</label><input class="form-control" name="vehicle_model" value="<?= e($bill['vehicle_model'] ?? '') ?>"></div>
       <div class="form-group"><label>EV Model Type</label><input class="form-control" name="vehicle_model_type" value="<?= e($bill['vehicle_model_type'] ?? '') ?>"></div>
       <div class="form-group"><label>Model Color</label><input class="form-control" name="color" value="<?= e($bill['color'] ?? '') ?>"></div>
+      <?php endif; ?>
     </div>
 
+    <h4 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;">Buyer</h4>
+    <div class="form-grid">
+      <div class="form-group"><label>Cust. Name *</label><input class="form-control" name="customer_name" value="<?= e($bill['customer_name'] ?? '') ?>" required></div>
+      <div class="form-group"><label>Mob. *</label><input class="form-control contact-input" name="customer_phone" type="tel" maxlength="11" inputmode="numeric" placeholder="98765 43210" value="<?= e(format_phone($bill['customer_phone'] ?? '')) ?>" required></div>
+      <div class="form-group"><label>Email</label><input class="form-control" name="customer_email" type="email" value="<?= e($bill['customer_email'] ?? '') ?>"></div>
+      <div class="form-group"><label>Aadhar No.</label><input class="form-control aadhar-input" name="customer_aadhaar" maxlength="14" inputmode="numeric" placeholder="1234 5678 9012" value="<?= e(format_aadhar($bill['customer_aadhaar'] ?? '')) ?>"></div>
+      <div class="form-group"><label>PAN No.</label><input class="form-control" name="customer_pan" value="<?= e($bill['customer_pan'] ?? '') ?>"></div>
+      <div class="form-group full"><label>Add. (Address)</label><textarea class="form-control" name="customer_address" rows="2"><?= e($bill['customer_address'] ?? '') ?></textarea></div>
+    </div>
+
+    <?php if (!$isSpareBill): ?>
     <?php
       $warrantyOpts = ['6 months', '12 months', '18 months', '24 months', '36 months', 'N/A'];
       $wEdit = static function (string $name, ?string $current) use ($warrantyOpts): void {
@@ -109,8 +178,7 @@ $billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
           echo '<select class="form-control" name="' . e($name) . '">';
           echo '<option value="">Select warranty</option>';
           foreach ($warrantyOpts as $opt) {
-              $sel = $opt === $current ? ' selected' : '';
-              echo '<option value="' . e($opt) . '"' . $sel . '>' . e($opt) . '</option>';
+              echo '<option value="' . e($opt) . '"' . ($opt === $current ? ' selected' : '') . '>' . e($opt) . '</option>';
           }
           if ($current !== '' && !in_array($current, $warrantyOpts, true)) {
               echo '<option value="' . e($current) . '" selected>' . e($current) . '</option>';
@@ -118,15 +186,7 @@ $billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
           echo '</select>';
       };
     ?>
-    <style>
-      .ow-parts{display:flex;flex-direction:column;gap:.7rem;margin:1rem 0}
-      .ow-block{border:1px solid var(--border);border-radius:12px;padding:.75rem .85rem;background:#f8fffd}
-      .ow-block h4{margin:0 0 .65rem;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#0f766e}
-      .ow-block .form-grid{gap:.65rem}
-      .ow-block.chassis{background:#fff}
-    </style>
-    <h4 style="margin:1rem 0 .35rem;font-size:.95rem;">Parts &amp; warranty</h4>
-    <p class="muted" style="margin:0 0 .65rem;font-size:0.82rem;">Each part has its own number and warranty — fill one block at a time.</p>
+    <h4 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;">Parts &amp; warranty</h4>
     <div class="ow-parts">
       <div class="ow-block chassis">
         <h4>Chassis</h4>
@@ -144,7 +204,8 @@ $billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
       <div class="ow-block">
         <h4>Battery</h4>
         <div class="form-grid">
-          <div class="form-group"><label>Battery Type &amp; No.</label><input class="form-control" name="battery_type_no" value="<?= e($bill['battery_type_no'] ?? '') ?>"></div>
+          <div class="form-group"><label>Battery Type</label><input class="form-control" name="battery_capacity" value="<?= e($batteryCapacity) ?>" placeholder="e.g. Lithium 60V"></div>
+          <div class="form-group"><label>Battery No.</label><input class="form-control" name="battery_no" value="<?= e($batteryNo) ?>"></div>
           <div class="form-group"><label>Warranty</label><?php $wEdit('battery_warranty', $bill['battery_warranty'] ?? null); ?></div>
         </div>
       </div>
@@ -169,91 +230,94 @@ $billTaxRate = (float)($bill['tax_rate'] ?? ($billCgst + $billSgst));
         </div>
       </div>
     </div>
+    <?php endif; ?>
 
+    <h4 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;">GST</h4>
     <div class="form-grid">
       <div class="form-group">
-        <label>GST preset</label>
-        <select class="form-control" id="bill-gst-preset">
-          <option value="">— Select preset —</option>
-          <option value="28">28% (14 + 14)</option>
-          <option value="18">18% (9 + 9)</option>
-          <option value="12">12% (6 + 6)</option>
-          <option value="5">5% (2.5 + 2.5)</option>
-          <option value="0">0%</option>
+        <label>GST option *</label>
+        <select class="form-control" x-model="gstPreset" @change="applyGstPreset()">
+          <option value="default">Default — <?= $isSpareBill ? '18% (9+9)' : '28% (14+14)' ?></option>
+          <option value="28">28% — CGST 14% + SGST 14%</option>
+          <option value="18">18% — CGST 9% + SGST 9%</option>
+          <option value="12">12% — CGST 6% + SGST 6%</option>
+          <option value="5">5% — CGST 2.5% + SGST 2.5%</option>
+          <option value="0">0% — No GST</option>
+          <option value="custom">Custom rates</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>CGST % *</label>
-        <input class="form-control" type="number" step="0.01" min="0" max="100" name="cgst_rate" id="bill-cgst-rate" value="<?= e((string)$billCgst) ?>" required>
-      </div>
-      <div class="form-group">
-        <label>SGST % *</label>
-        <input class="form-control" type="number" step="0.01" min="0" max="100" name="sgst_rate" id="bill-sgst-rate" value="<?= e((string)$billSgst) ?>" required>
-      </div>
-
-      <div class="form-group"><label>PM E-DRIVE (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="pm_drive_incentive" value="<?= e((string)($bill['pm_drive_incentive'] ?? '0')) ?>"></div>
-      <div class="form-group"><label>State Subsidy (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="state_subsidy" value="<?= e((string)($bill['state_subsidy'] ?? '0')) ?>"></div>
-      <div class="form-group"><label>Extra Disc. (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="discount_amount" value="<?= e((string)($bill['discount_amount'] ?? '0')) ?>"></div>
-      <div class="form-group"><label>Loan Amount (₹)</label><input class="form-control" type="number" step="0.01" min="0" name="loan_amount" value="<?= e((string)($bill['loan_amount'] ?? '0')) ?>"></div>
-
-      <div class="form-group full" style="grid-column:1 / -1;padding-top:0.35rem;border-top:1px solid var(--border);">
-        <label>Payment status</label>
-        <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.35rem;">
-          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;">
-            <input type="radio" name="payment_status" value="full" <?= $paymentStatus !== 'partial' ? 'checked' : '' ?>> Full paid
-          </label>
-          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;">
-            <input type="radio" name="payment_status" value="partial" <?= $paymentStatus === 'partial' ? 'checked' : '' ?>> Partial payment
-          </label>
+      <template x-if="gstPreset === 'custom'">
+        <div class="form-group"><label>CGST % *</label><input class="form-control" type="number" step="0.01" min="0" max="100" name="cgst_rate" x-model="cgstRate" required></div>
+      </template>
+      <template x-if="gstPreset === 'custom'">
+        <div class="form-group"><label>SGST % *</label><input class="form-control" type="number" step="0.01" min="0" max="100" name="sgst_rate" x-model="sgstRate" required></div>
+      </template>
+      <template x-if="gstPreset !== 'custom'">
+        <div style="display:none">
+          <input type="hidden" name="cgst_rate" :value="cgstRate">
+          <input type="hidden" name="sgst_rate" :value="sgstRate">
+        </div>
+      </template>
+      <div class="form-group full">
+        <div style="padding:0.75rem 1rem;border-radius:10px;background:#f8fafc;border:1px solid var(--border);max-width:420px;">
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.25rem;"><span>Sell amount (fixed)</span><span x-text="money(subtotal)"></span></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.25rem;"><span x-text="'GST @ ' + totalGstPercent + '%'"></span><span x-text="money(gstAmount)"></span></div>
+          <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.35rem;border-top:1px solid var(--border);"><span>Invoice total</span><span x-text="money(grandTotal)"></span></div>
         </div>
       </div>
-      <div class="form-group partial-paid-field" style="<?= $paymentStatus === 'partial' ? '' : 'display:none;' ?>">
-        <label>Amount paid (₹)</label>
-        <input class="form-control" type="number" step="0.01" min="0.01" name="amount_paid" value="<?= e((string)($amountPaid > 0 ? $amountPaid : '')) ?>" placeholder="Received so far">
+    </div>
+
+    <h4 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;">Payment</h4>
+    <p class="muted" style="margin:-0.25rem 0 0.65rem;font-size:0.82rem;">Payment is against the invoice total (sell amount + GST).</p>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Payment status *</label>
+        <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.35rem;align-items:center;">
+          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
+            <input type="radio" name="payment_status" value="full" x-model="paymentStatus"> Full paid
+          </label>
+          <label style="display:flex;align-items:center;gap:0.45rem;font-weight:600;cursor:pointer;">
+            <input type="radio" name="payment_status" value="partial" x-model="paymentStatus"> Partial paid
+          </label>
+          <button class="btn btn-sm btn-outline" type="button" @click="fillInvoiceTotal()" x-show="grandTotal > 0">Use invoice total in cash</button>
+        </div>
       </div>
-      <div class="form-group partial-due-field" style="<?= $paymentStatus === 'partial' ? '' : 'display:none;' ?>">
-        <label>Balance due (₹)</label>
-        <input class="form-control" type="text" value="<?= e(money($amountDue)) ?>" readonly tabindex="-1" style="background:#f8fafc;">
-        <p class="muted" style="margin:0.25rem 0 0;font-size:0.78rem;">Recalculated when you save.</p>
+      <div class="form-group">
+        <label>Cash — amount paid (₹)</label>
+        <input class="form-control" type="number" step="0.01" min="0" name="paid_cash_amount" x-model="paidCash" placeholder="0">
       </div>
-      <div class="form-group full" style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap;">
-        <span style="font-weight:700;font-size:0.82rem;color:#64748b;">Payment mode</span>
-        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cash" value="1" <?= $paidCash ? 'checked' : '' ?>> Cash</label>
-        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:600;"><input type="checkbox" name="paid_cheque" value="1" <?= $paidCheque ? 'checked' : '' ?>> Cheque</label>
+      <div class="form-group">
+        <label>Bank (online) — amount paid (₹)</label>
+        <input class="form-control" type="number" step="0.01" min="0" name="paid_bank_amount" x-model="paidBank" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>From loan — amount given (₹)</label>
+        <input class="form-control" type="number" step="0.01" min="0" name="paid_loan_amount" x-model="paidLoan" placeholder="0">
+      </div>
+      <?php if (!empty($bankAccounts)): ?>
+      <div class="form-group full" x-show="parseFloat(paidBank) > 0" x-cloak>
+        <label>Bank account (for online payment) *</label>
+        <select class="form-control" name="bank_account_id" x-model="bankAccountId" :required="parseFloat(paidBank) > 0">
+          <option value="">Select account</option>
+          <?php foreach ($bankAccounts as $ba): ?>
+            <option value="<?= (int)$ba['id'] ?>"><?= e($ba['account_name']) ?> — <?= e($ba['bank_name']) ?> (<?= money($ba['current_balance']) ?>)</option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
+      <div class="form-group full">
+        <div style="padding:0.85rem 1rem;border-radius:12px;background:var(--surface-2,#f8fafc);border:1px solid var(--border);max-width:420px;">
+          <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem;"><span>Invoice total</span><span x-text="money(grandTotal)"></span></div>
+          <div class="muted" style="display:flex;justify-content:space-between;margin-bottom:0.35rem;font-size:0.82rem;"><span>Cash + bank + loan entered</span><span x-text="money(totalPaidNow)"></span></div>
+          <div style="display:flex;justify-content:space-between;font-weight:800;padding-top:0.5rem;border-top:1px solid var(--border);">
+            <span x-text="paymentStatus === 'full' ? 'Must equal invoice total' : 'Balance due'"></span>
+            <span x-text="paymentStatus === 'full' ? money(Math.abs(grandTotal - totalPaidNow)) : money(balanceDue)"></span>
+          </div>
+        </div>
       </div>
     </div>
-    <script>
-      (function () {
-        var presets = { '28': [14, 14], '18': [9, 9], '12': [6, 6], '5': [2.5, 2.5], '0': [0, 0] };
-        var presetEl = document.getElementById('bill-gst-preset');
-        var cgstEl = document.getElementById('bill-cgst-rate');
-        var sgstEl = document.getElementById('bill-sgst-rate');
-        if (presetEl && cgstEl && sgstEl) {
-          presetEl.addEventListener('change', function () {
-            var p = presets[this.value];
-            if (!p) return;
-            cgstEl.value = p[0];
-            sgstEl.value = p[1];
-          });
-        }
-      })();
-      document.querySelectorAll('input[name="payment_status"]').forEach(function (radio) {
-        radio.addEventListener('change', function () {
-          var partial = this.value === 'partial';
-          document.querySelectorAll('.partial-paid-field, .partial-due-field').forEach(function (el) {
-            el.style.display = partial ? '' : 'none';
-          });
-          var paidInput = document.querySelector('input[name="amount_paid"]');
-          if (paidInput) paidInput.required = partial;
-        });
-      });
-      (function () {
-        var partial = document.querySelector('input[name="payment_status"][value="partial"]');
-        var paidInput = document.querySelector('input[name="amount_paid"]');
-        if (paidInput && partial && partial.checked) paidInput.required = true;
-      })();
-    </script>
-    <div style="margin-top:1rem;"><button class="btn btn-primary" type="submit">Save invoice fields</button></div>
+
+    <div style="margin-top:1rem;"><button class="btn btn-primary" type="submit">Save sell order / invoice</button></div>
   </form>
 </div>
 <?php endif; ?>

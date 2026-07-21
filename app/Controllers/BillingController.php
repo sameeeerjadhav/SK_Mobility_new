@@ -6,6 +6,7 @@ use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Services\BillPdfService;
+use App\Services\BankTransactionService;
 use App\Services\OrderService;
 
 class BillingController extends Controller
@@ -90,16 +91,39 @@ class BillingController extends Controller
         require_permission('view_billing');
         [$bill, $items] = $this->loadBill((int)$id);
         $orderType = null;
+        $order = null;
         if (!empty($bill['order_id'])) {
-            $o = $this->db()->prepare('SELECT order_type FROM orders WHERE id = ?');
+            $o = $this->db()->prepare(
+                'SELECT o.*, ba.account_name AS bank_account_name
+                 FROM orders o
+                 LEFT JOIN bank_accounts ba ON ba.id = o.bank_account_id
+                 WHERE o.id = ?'
+            );
             $o->execute([(int)$bill['order_id']]);
-            $orderType = $o->fetchColumn() ?: null;
+            $order = $o->fetch() ?: null;
+            $orderType = $order['order_type'] ?? null;
+        }
+        $productType = ($bill['bill_type'] ?? '') === 'spare' ? 'spare_part' : 'vehicle';
+        $source = $order ?: $bill;
+        [$paidCash, $paidBank, $paidLoan] = OrderService::parseStoredPaymentBreakdown($source);
+        $batteryCapacity = (string)($order['battery_capacity'] ?? '');
+        $batteryNo = (string)($order['battery_no'] ?? '');
+        if ($batteryCapacity === '' && $batteryNo === '' && !empty($bill['battery_type_no'])) {
+            $batteryNo = (string)$bill['battery_type_no'];
         }
         $this->view('billing/show', [
             'title' => $bill['bill_number'],
             'bill' => $bill,
             'items' => $items,
             'orderType' => $orderType,
+            'order' => $order,
+            'productType' => $productType,
+            'paidCash' => $paidCash,
+            'paidBank' => $paidBank,
+            'paidLoan' => $paidLoan,
+            'batteryCapacity' => $batteryCapacity,
+            'batteryNo' => $batteryNo,
+            'bankAccounts' => can('manage_billing') ? BankTransactionService::loadActiveAccounts($this->db()) : [],
         ]);
     }
 
@@ -132,23 +156,7 @@ class BillingController extends Controller
             $this->redirect('/billing');
         }
 
-        $paidCash = isset($_POST['paid_cash']) ? 1 : 0;
-        $paidCheque = isset($_POST['paid_cheque']) ? 1 : 0;
-        $paymentParts = [];
-        if ($paidCash) {
-            $paymentParts[] = 'cash';
-        }
-        if ($paidCheque) {
-            $paymentParts[] = 'cheque';
-        }
-        $paymentMode = $paymentParts ? implode('_', $paymentParts) : null;
-
-        $loan = (float)$this->input('loan_amount');
-        $discount = (float)$this->input('discount_amount');
-        $pm = (float)$this->input('pm_drive_incentive');
-        $state = (float)$this->input('state_subsidy');
         $subtotal = (float)$bill['subtotal'];
-        $taxable = max(0, $subtotal - $pm - $state - $discount);
         $billProductType = ($bill['bill_type'] ?? '') === 'spare' ? 'spare_part' : 'vehicle';
         try {
             [$cgstRate, $sgstRate] = OrderService::resolveGstRates([
@@ -160,35 +168,57 @@ class BillingController extends Controller
             $this->redirect('/billing/' . $billId);
         }
         $taxRate = round($cgstRate + $sgstRate, 2);
+        $taxable = max(0, $subtotal);
         $cgst = round($taxable * ($cgstRate / 100), 2);
         $sgst = round($taxable * ($sgstRate / 100), 2);
         $taxAmount = round($cgst + $sgst, 2);
         $total = round($taxable + $taxAmount, 2);
 
         try {
-            [$paymentStatus, $amountPaid, $amountDue] = OrderService::resolvePaymentAmounts([
+            [$paymentStatus, $amountPaid, $amountDue, $paidCash, $paidBank, $paidLoan] = OrderService::resolvePaymentBreakdown([
                 'payment_status' => $this->input('payment_status'),
-                'amount_paid' => $this->input('amount_paid'),
-            ], $total);
+                'paid_cash_amount' => $this->input('paid_cash_amount'),
+                'paid_bank_amount' => $this->input('paid_bank_amount'),
+                'paid_loan_amount' => $this->input('paid_loan_amount'),
+            ], $total, $subtotal, $taxAmount);
         } catch (\RuntimeException $e) {
             flash('error', $e->getMessage());
             $this->redirect('/billing/' . $billId);
         }
 
+        $paymentMode = OrderService::formatPaymentMode($paidCash, $paidBank, $paidLoan);
+        $loanAmount = $paidLoan;
+        $bankAccountId = (int)($this->input('bank_account_id') ?? 0);
+        $affectBank = $paidBank > 0 && $bankAccountId > 0;
+        if ($paidBank > 0 && $bankAccountId <= 0) {
+            flash('error', 'Select a bank account for the online/bank payment amount.');
+            $this->redirect('/billing/' . $billId);
+        }
+
+        $billingLocation = strtolower(trim((string)$this->input('billing_location')));
+        if (!in_array($billingLocation, ['kokamthan', 'kopargaon'], true)) {
+            $billingLocation = $bill['billing_location'] ?? 'kokamthan';
+        }
+
+        $batteryCapacity = trim((string)$this->input('battery_capacity'));
+        $batteryNo = trim((string)$this->input('battery_no'));
+        $batteryTypeNo = trim(implode(' ', array_filter([$batteryCapacity, $batteryNo])));
+
         $this->db()->prepare(
             'UPDATE bills SET
-                booking_no=?, customer_name=?, customer_phone=?, customer_email=?, customer_address=?,
+                booking_no=?, billing_location=?, customer_name=?, customer_phone=?, customer_email=?, customer_address=?,
                 customer_aadhaar=?, customer_pan=?,
                 vehicle_model=?, vehicle_model_type=?, color=?, chassis_no=?, motor_no=?,
                 battery_type_no=?, controller_no=?, charger_no=?,
                 motor_warranty=?, battery_warranty=?, controller_warranty=?, charger_warranty=?,
                 hp_name=?, vehicle_sale_date=?,
-                pm_drive_incentive=?, state_subsidy=?, loan_amount=?, discount_amount=?,
+                pm_drive_incentive=0, state_subsidy=0, loan_amount=?, discount_amount=0,
                 cgst_rate=?, sgst_rate=?, tax_rate=?,
                 payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?
              WHERE id=?'
         )->execute([
             $this->input('booking_no') ?: null,
+            $billingLocation,
             $this->input('customer_name'),
             trim((string)$this->input('customer_phone')) !== '' ? format_phone($this->input('customer_phone')) : null,
             $this->input('customer_email'),
@@ -200,7 +230,7 @@ class BillingController extends Controller
             $this->input('color'),
             $this->input('chassis_no'),
             $this->input('motor_no'),
-            $this->input('battery_type_no'),
+            $batteryTypeNo !== '' ? $batteryTypeNo : null,
             $this->input('controller_no'),
             $this->input('charger_no'),
             $this->input('motor_warranty'),
@@ -209,7 +239,7 @@ class BillingController extends Controller
             $this->input('charger_warranty'),
             $this->input('hp_name'),
             $this->input('vehicle_sale_date') ?: null,
-            $pm, $state, $loan, $discount,
+            $loanAmount,
             $cgstRate, $sgstRate, $taxRate,
             $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total, $billId,
         ]);
@@ -217,39 +247,66 @@ class BillingController extends Controller
         if (!empty($bill['order_id'])) {
             $this->db()->prepare(
                 'UPDATE orders SET
-                    pm_drive_incentive=?, state_subsidy=?, loan_amount=?, discount_amount=?,
+                    booking_no=?, billing_location=?, customer_name=?, customer_phone=?, customer_email=?, customer_address=?,
+                    customer_aadhaar=?, customer_pan=?,
+                    chassis_no=?, motor_no=?, battery_capacity=?, battery_no=?,
+                    controller_no=?, charger_no=?,
+                    motor_warranty=?, battery_warranty=?, controller_warranty=?, charger_warranty=?,
+                    hp_name=?, color=?, vehicle_model_type=?,
+                    pm_drive_incentive=0, state_subsidy=0, loan_amount=?, discount_amount=0,
                     cgst_rate=?, sgst_rate=?, tax_rate=?, tax_amount=?,
-                    payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?
+                    payment_mode=?, payment_status=?, amount_paid=?, amount_due=?, total_amount=?,
+                    bank_account_id=?, affect_bank_balance=?, sale_date=?
                  WHERE id=?'
             )->execute([
-                $pm, $state, $loan, $discount,
+                $this->input('booking_no') ?: null,
+                $billingLocation,
+                $this->input('customer_name'),
+                trim((string)$this->input('customer_phone')) !== '' ? format_phone($this->input('customer_phone')) : null,
+                $this->input('customer_email'),
+                $this->input('customer_address'),
+                trim((string)$this->input('customer_aadhaar')) !== '' ? format_aadhar($this->input('customer_aadhaar')) : null,
+                $this->input('customer_pan'),
+                $this->input('chassis_no'),
+                $this->input('motor_no'),
+                $batteryCapacity ?: null,
+                $batteryNo ?: null,
+                $this->input('controller_no'),
+                $this->input('charger_no'),
+                $this->input('motor_warranty'),
+                $this->input('battery_warranty'),
+                $this->input('controller_warranty'),
+                $this->input('charger_warranty'),
+                $this->input('hp_name'),
+                $this->input('color'),
+                $this->input('vehicle_model_type'),
+                $loanAmount,
                 $cgstRate, $sgstRate, $taxRate, $taxAmount,
                 $paymentMode, $paymentStatus, $amountPaid, $amountDue, $total,
+                $bankAccountId ?: null, $affectBank ? 1 : 0,
+                $this->input('vehicle_sale_date') ?: null,
                 (int)$bill['order_id'],
             ]);
         }
 
-        // Refresh first bill line tax breakdown when amounts change
         $items = $this->db()->prepare('SELECT * FROM bill_items WHERE bill_id = ? ORDER BY id ASC');
         $items->execute([$billId]);
         $rows = $items->fetchAll();
         if ($rows) {
-            $totalDisc = $pm + $state + $discount;
             $upd = $this->db()->prepare(
-                'UPDATE bill_items SET discount=?, taxable_amount=?, cgst_amount=?, sgst_amount=?, total_price=? WHERE id=?'
+                'UPDATE bill_items SET discount=0, taxable_amount=?, cgst_amount=?, sgst_amount=?, total_price=? WHERE id=?'
             );
-            foreach ($rows as $idx => $row) {
-                $lineDisc = $idx === 0 ? $totalDisc : 0.0;
-                $lineTaxable = max(0, (float)$row['unit_price'] * (int)$row['quantity'] - $lineDisc);
+            foreach ($rows as $row) {
+                $lineTaxable = max(0, (float)$row['unit_price'] * (int)$row['quantity']);
                 $lineCgst = round($lineTaxable * ($cgstRate / 100), 2);
                 $lineSgst = round($lineTaxable * ($sgstRate / 100), 2);
                 $lineTotal = round($lineTaxable + $lineCgst + $lineSgst, 2);
-                $upd->execute([$lineDisc, $lineTaxable, $lineCgst, $lineSgst, $lineTotal, $row['id']]);
+                $upd->execute([$lineTaxable, $lineCgst, $lineSgst, $lineTotal, $row['id']]);
             }
         }
 
         Audit::log('update', 'billing', 'bills', $billId);
-        flash('success', 'Tax invoice details saved. Open Preview / Print to see the SAI KUBER format.');
+        flash('success', 'Sell order / tax invoice details saved.');
         $this->redirect('/billing/' . $billId);
     }
 
